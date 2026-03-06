@@ -21,6 +21,12 @@ const Index = () => (
         <img src={heroImg} alt="Studio" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-background/70" />
       </div>
+      {/* Background watermark text */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-[1]">
+        <span className="font-display text-[8vw] md:text-[6vw] lg:text-[5vw] font-bold uppercase tracking-[0.3em] text-gold-gradient opacity-[0.04] whitespace-nowrap">
+          s2k<span className="text-[0.55em] align-middle tracking-[0.15em]">dot</span>za Entertainment
+        </span>
+      </div>
       <div className="relative z-10 text-center max-w-4xl mx-auto px-6 animate-fade-in">
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold leading-tight mb-6">
           Built by Beats.<br />
