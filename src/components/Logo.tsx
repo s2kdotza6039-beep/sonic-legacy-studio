@@ -18,7 +18,7 @@ const Logo = ({ size = "md", linkTo = "/" }: LogoProps) => {
     <span className={`font-display ${s.main} font-bold tracking-wider leading-tight inline-flex flex-col`}>
       <span className="text-gold-gradient">
         s2k
-        <span className={`${s.dot} uppercase tracking-[0.15em] align-middle opacity-80`}>dot</span>
+        <span className={`${s.dot} uppercase tracking-[0.15em] align-middle opacity-70 font-semibold`}>DOT</span>
         za
       </span>
       <span className={`${s.ent} uppercase tracking-[0.35em] text-gold-gradient font-semibold -mt-1`}>
