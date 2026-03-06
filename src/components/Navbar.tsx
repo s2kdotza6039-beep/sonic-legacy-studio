@@ -22,9 +22,7 @@ const Navbar = () => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
-        <Link to="/" className="font-display text-2xl font-bold tracking-wider">
-          <span className="text-gold-gradient">s2kDOTza</span>
-        </Link>
+        <Logo size="sm" />
 
         {/* Desktop */}
         <div className="hidden lg:flex items-center gap-8">

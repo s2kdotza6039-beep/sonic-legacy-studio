@@ -6,9 +6,9 @@ const Footer = () => (
     <div className="max-w-7xl mx-auto section-padding">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
         <div>
-          <h3 className="text-xl font-bold tracking-wider mb-4">
-            <span className="text-gold-gradient">s2kDOTza</span>
-          </h3>
+          <div className="mb-4">
+            <Logo size="md" linkTo="/" />
+          </div>
           <p className="text-muted-foreground text-sm leading-relaxed">
             A forward-thinking music and entertainment company. Turning Noise into Legacy.
           </p>
