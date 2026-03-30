@@ -16,6 +16,7 @@ import News from "./pages/News";
 import Careers from "./pages/Careers";
 import Contact from "./pages/Contact";
 import Watch from "./pages/Watch";
+import Listen from "./pages/Listen";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
