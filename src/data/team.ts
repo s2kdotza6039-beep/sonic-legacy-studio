@@ -26,18 +26,4 @@ export const executives: Executive[] = [
     expertise: "Social Media Strategy & Digital Marketing",
     image: exec2,
   },
-  {
-    name: "David Chen",
-    title: "VP of Creative & A&R",
-    bio: "David is the creative engine of s2kDOTza. With a background in music production and A&R at two major labels, he identifies and develops talent with an ear for what's next. His curatorial instinct has shaped the company's acclaimed roster.",
-    expertise: "A&R, Music Production & Creative Direction",
-    image: exec3,
-  },
-  {
-    name: "Natasha Olivier",
-    title: "General Counsel & Head of Business Affairs",
-    bio: "Natasha's legal expertise spans entertainment law, publishing, and international licensing. She protects the company's interests and those of its artists, ensuring that every deal is structured for long-term success and growth.",
-    expertise: "Entertainment Law & Publishing",
-    image: exec4,
-  },
 ];
