@@ -53,9 +53,12 @@ export const artists: Artist[] = [
       { platform: "YouTube", url: "#" },
     ],
     tracks: [
-      { title: "Styling Gel", duration: "4:12" },
-      { title: "Zonke Bonke", duration: "3:58" },
-      { title: "African Taboo", duration: "4:35" },
+      { title: "Matofotofo", duration: "4:12" },
+      { title: "A Day in the Life", duration: "3:58" },
+      { title: "Izandla Phezulu", duration: "4:35" },
+      { title: "Never Let You Go", duration: "3:45" },
+      { title: "NO SUNSHINE (feat. Just Bothlale & Tshego Judah)", duration: "4:00" },
+      { title: "uMuntu (feat. Gospel Silinda)", duration: "3:50" },
     ],
     streaming: {
       spotify: "#",
