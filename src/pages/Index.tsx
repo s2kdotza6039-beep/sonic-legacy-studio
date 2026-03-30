@@ -96,6 +96,9 @@ const Index = () => (
       </div>
     </section>
 
+    {/* Listen Now */}
+    <ListenNowSection artists={artists} />
+
     {/* Services */}
     <section className="section-padding">
       <div className="max-w-7xl mx-auto">
