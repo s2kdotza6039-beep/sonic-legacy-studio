@@ -57,6 +57,24 @@ const ArtistProfile = () => {
           </div>
         </div>
 
+        {/* Singles & EPs */}
+        {artist.singlesAndEPs && artist.singlesAndEPs.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-display font-bold mb-6 text-gold-gradient inline-block">Singles & EPs</h2>
+            <div className="space-y-4">
+              {artist.singlesAndEPs.map((s) => (
+                <div key={s.title} className="flex justify-between items-center border-b border-border pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="font-display text-lg">{s.title}</span>
+                    <span className="text-xs uppercase tracking-widest border border-border px-2 py-0.5 text-muted-foreground">{s.type}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{s.year}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Press */}
         <div>
           <h2 className="text-2xl font-display font-bold mb-6 text-gold-gradient inline-block">Press</h2>
