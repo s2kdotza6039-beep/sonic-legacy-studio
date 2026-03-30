@@ -3,6 +3,19 @@ import artist2 from "@/assets/artist-2.jpg";
 import artist3 from "@/assets/artist-3.jpg";
 import artist4 from "@/assets/artist-4.jpg";
 
+export interface Track {
+  title: string;
+  duration: string;
+  audioUrl?: string; // MP3 URL for embedded playback
+}
+
+export interface StreamingLinks {
+  spotify?: string;
+  appleMusic?: string;
+  soundcloud?: string;
+  youtubeMusic?: string;
+}
+
 export interface Artist {
   id: string;
   name: string;
@@ -13,6 +26,8 @@ export interface Artist {
   discography: { title: string; year: string }[];
   pressQuotes: { quote: string; source: string }[];
   socials: { platform: string; url: string }[];
+  tracks: Track[];
+  streaming: StreamingLinks;
 }
 
 export const artists: Artist[] = [
