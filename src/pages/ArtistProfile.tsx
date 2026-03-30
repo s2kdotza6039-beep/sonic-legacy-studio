@@ -70,6 +70,9 @@ const ArtistProfile = () => {
           </div>
         </div>
 
+        {/* Listen Now */}
+        <ArtistListenSection artist={artist} />
+
         {/* Booking & Socials */}
         <div className="grid md:grid-cols-2 gap-12">
           <div>

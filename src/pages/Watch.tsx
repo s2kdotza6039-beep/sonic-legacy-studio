@@ -76,6 +76,9 @@ const Watch = () => (
       </div>
     </div>
 
+    {/* Listen Now */}
+    <ListenNowSection artists={artists} />
+
     {/* YouTube CTA */}
     <div className="section-padding text-center border-t border-border">
       <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
