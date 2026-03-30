@@ -13,7 +13,7 @@ export interface Executive {
 
 export const executives: Executive[] = [
   {
-    name: "Marcus Van Der Berg",
+    name: "Thulani 'Pitch Black Afro' Ngcobo",
     title: "Chief Executive Officer",
     bio: "With over 18 years in the music and entertainment industry, Marcus has led s2kDOTza from a boutique management firm to a full-service entertainment company with international reach. His strategic vision has guided partnerships with major labels and global brands.",
     expertise: "Corporate Strategy & Business Development",
