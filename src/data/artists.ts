@@ -148,5 +148,16 @@ export const artists: Artist[] = [
       { platform: "TikTok", url: "#" },
       { platform: "Spotify", url: "#" },
     ],
+    tracks: [
+      { title: "Supernova", duration: "3:18" },
+      { title: "Electric Bloom", duration: "3:55" },
+      { title: "First Light", duration: "4:22" },
+    ],
+    streaming: {
+      spotify: "#",
+      appleMusic: "#",
+      youtubeMusic: "#",
+      soundcloud: "#",
+    },
   },
 ];
