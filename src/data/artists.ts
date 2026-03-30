@@ -50,6 +50,14 @@ export const artists: Artist[] = [
       { title: "Zonke Bonke", year: "2009" },
       { title: "Int' Emnandi", year: "" },
     ],
+    singlesAndEPs: [
+      { title: "Pitch Black Afro (Self Titled)", year: "2004", type: "Single" },
+      { title: "Matofotofo", year: "2004", type: "EP" },
+      { title: "Never Let You Go", year: "2005", type: "Single" },
+      { title: "Int'emnandi", year: "2007", type: "Single" },
+      { title: "NO SUNSHINE (feat. Just Bothlale & Tshego Judah)", year: "2024", type: "Single" },
+      { title: "uMuntu (feat. Gospel Silinda)", year: "2025", type: "Single" },
+    ],
     pressQuotes: [
       { quote: "One of the true architects of South African hip-hop culture.", source: "Channel O" },
       { quote: "Pitch Black Afro paved the way for an entire generation of SA rappers.", source: "OkayAfrica" },
