@@ -20,10 +20,10 @@ export const executives: Executive[] = [
     image: exec1,
   },
   {
-    name: "Thandi Mokoena",
-    title: "Chief Operating Officer",
-    bio: "Thandi brings a decade of operational excellence from the worlds of media and entertainment. She oversees the company's day-to-day operations, ensuring that every division runs with precision and purpose. Her leadership has been instrumental in scaling the company's infrastructure.",
-    expertise: "Operations & Talent Management",
+    name: "Lerato 'Lava' Mafisa",
+    title: "Social Media Strategist",
+    bio: "Lerato is the digital voice behind S2KDOTZA's online presence. With a sharp eye for trends and a deep understanding of audience engagement, she crafts compelling social media strategies that amplify the brand and its artists across platforms. Her work bridges culture and content, turning followers into communities.",
+    expertise: "Social Media Strategy & Digital Marketing",
     image: exec2,
   },
   {
