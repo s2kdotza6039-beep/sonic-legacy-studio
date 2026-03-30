@@ -63,7 +63,7 @@ export const artists: Artist[] = [
       { quote: "Pitch Black Afro paved the way for an entire generation of SA rappers.", source: "OkayAfrica" },
     ],
     socials: [
-      { platform: "Instagram", url: "#" },
+      { platform: "Instagram", url: "http://www.instagram.com/the real pitch black afro?utm_source=qr&igsh=MWE0aDI6YWYwOGt5bA==" },
       { platform: "Spotify", url: "#" },
       { platform: "YouTube", url: "#" },
     ],
