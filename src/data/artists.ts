@@ -14,6 +14,12 @@ export interface StreamingLinks {
   youtubeMusic?: string;
 }
 
+export interface SingleOrEP {
+  title: string;
+  year: string;
+  type: "Single" | "EP";
+}
+
 export interface Artist {
   id: string;
   name: string;
@@ -22,6 +28,7 @@ export interface Artist {
   image: string;
   bio: string;
   discography: { title: string; year: string }[];
+  singlesAndEPs?: SingleOrEP[];
   pressQuotes: { quote: string; source: string }[];
   socials: { platform: string; url: string }[];
   tracks: Track[];
