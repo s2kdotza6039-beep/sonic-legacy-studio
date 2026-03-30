@@ -116,6 +116,16 @@ export const artists: Artist[] = [
       { platform: "SoundCloud", url: "#" },
       { platform: "Spotify", url: "#" },
     ],
+    tracks: [
+      { title: "Continental Shift", duration: "5:12" },
+      { title: "Frequencies", duration: "4:30" },
+      { title: "Log Drum Sessions", duration: "6:01" },
+    ],
+    streaming: {
+      spotify: "#",
+      soundcloud: "#",
+      youtubeMusic: "#",
+    },
   },
   {
     id: "nova-kim",
