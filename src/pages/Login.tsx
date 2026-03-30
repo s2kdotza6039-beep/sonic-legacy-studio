@@ -57,6 +57,21 @@ const Login = () => {
     setLoading(false);
   };
 
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (result?.error) {
+      toast({
+        title: "Google sign-in failed",
+        description: result.error.message || "An error occurred",
+        variant: "destructive",
+      });
+      setLoading(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="page-hero bg-card">
