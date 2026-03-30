@@ -52,6 +52,16 @@ export const artists: Artist[] = [
       { platform: "Spotify", url: "#" },
       { platform: "Apple Music", url: "#" },
     ],
+    tracks: [
+      { title: "Crown Theory", duration: "3:42" },
+      { title: "No Shortcuts", duration: "4:15" },
+      { title: "Velo City", duration: "3:28" },
+    ],
+    streaming: {
+      spotify: "#",
+      appleMusic: "#",
+      youtubeMusic: "#",
+    },
   },
   {
     id: "aura-cole",
