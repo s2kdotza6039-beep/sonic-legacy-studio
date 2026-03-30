@@ -4,6 +4,7 @@ import heroImg from "@/assets/hero-studio.jpg";
 import { artists } from "@/data/artists";
 import { executives } from "@/data/team";
 import { ArrowRight, Music, Mic2, Radio, Handshake, Clapperboard } from "lucide-react";
+import ListenNowSection from "@/components/ListenNow";
 
 const services = [
   { icon: Mic2, title: "Artist Management", desc: "End-to-end career strategy and development." },
