@@ -56,12 +56,12 @@ const Index = () => (
         <div>
           <p className="text-sm uppercase tracking-widest text-primary mb-4">Who We Are</p>
           <h2 className="text-3xl md:text-4xl font-display font-bold mb-6">
-            Shaping the Future of Entertainment
+            A Cultural Development Platform
           </h2>
         </div>
         <div>
           <p className="text-muted-foreground leading-relaxed mb-4">
-            s2kDOTza Entertainment is a full-service music and entertainment company positioned at the intersection of culture, commerce, and creativity. We represent a curated roster of world-class talent and deliver enterprise-level services across management, publishing, and brand partnerships.
+            Founded by Thulani "Pitch Black Afro", S2KDOTZA Entertainment is a multi-layered creative enterprise at the intersection of Afrobeat, Hip-Hop, and African urban culture. We discover, develop, and elevate artists who carry real stories—and position them on a global stage.
           </p>
           <Link to="/about" className="inline-flex items-center gap-2 text-primary text-sm uppercase tracking-widest hover:gap-3 transition-all">
             Learn More <ArrowRight size={16} />
