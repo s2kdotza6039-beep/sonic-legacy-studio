@@ -56,7 +56,7 @@ const Partnerships = () => (
         <p className="text-muted-foreground leading-relaxed mb-6">
           Download our comprehensive partnership deck for detailed information on sponsorship packages, case studies, and collaboration opportunities.
         </p>
-        <a href="#" className="border border-primary text-primary px-8 py-3 text-sm uppercase tracking-widest font-semibold hover:bg-primary hover:text-primary-foreground transition-colors inline-block">
+        <a href="/s2kDOTza_Brand_Collaboration_Deck.pdf" download className="border border-primary text-primary px-8 py-3 text-sm uppercase tracking-widest font-semibold hover:bg-primary hover:text-primary-foreground transition-colors inline-block">
           Download PDF Deck
         </a>
       </div>
