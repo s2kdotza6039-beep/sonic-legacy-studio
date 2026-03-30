@@ -30,11 +30,11 @@ const Index = () => (
       </div>
       <div className="relative z-10 text-center max-w-4xl mx-auto px-6 animate-fade-in">
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold leading-tight mb-6">
-          Built by Beats.<br />
-          <span className="text-gold-gradient">Powered by Culture.</span>
+          Building Culture.<br />
+          <span className="text-gold-gradient">Creating Legacy.</span>
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-          A forward-thinking music and entertainment company. Turning Noise into Legacy.
+          Talent is everywhere. Opportunity is not. S2KDOTZA exists to close that gap.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link to="/artists" className="bg-gold-gradient text-primary-foreground px-8 py-3 text-sm uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity">
