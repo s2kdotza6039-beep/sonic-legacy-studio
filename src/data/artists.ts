@@ -3,6 +3,19 @@ import artist2 from "@/assets/artist-2.jpg";
 import artist3 from "@/assets/artist-3.jpg";
 import artist4 from "@/assets/artist-4.jpg";
 
+export interface Track {
+  title: string;
+  duration: string;
+  audioUrl?: string; // MP3 URL for embedded playback
+}
+
+export interface StreamingLinks {
+  spotify?: string;
+  appleMusic?: string;
+  soundcloud?: string;
+  youtubeMusic?: string;
+}
+
 export interface Artist {
   id: string;
   name: string;
@@ -13,6 +26,8 @@ export interface Artist {
   discography: { title: string; year: string }[];
   pressQuotes: { quote: string; source: string }[];
   socials: { platform: string; url: string }[];
+  tracks: Track[];
+  streaming: StreamingLinks;
 }
 
 export const artists: Artist[] = [
@@ -37,6 +52,16 @@ export const artists: Artist[] = [
       { platform: "Spotify", url: "#" },
       { platform: "Apple Music", url: "#" },
     ],
+    tracks: [
+      { title: "Crown Theory", duration: "3:42" },
+      { title: "No Shortcuts", duration: "4:15" },
+      { title: "Velo City", duration: "3:28" },
+    ],
+    streaming: {
+      spotify: "#",
+      appleMusic: "#",
+      youtubeMusic: "#",
+    },
   },
   {
     id: "aura-cole",
@@ -59,6 +84,16 @@ export const artists: Artist[] = [
       { platform: "Spotify", url: "#" },
       { platform: "YouTube", url: "#" },
     ],
+    tracks: [
+      { title: "Golden Hour", duration: "4:05" },
+      { title: "Midnight Letters", duration: "3:50" },
+      { title: "Echoes", duration: "3:33" },
+    ],
+    streaming: {
+      spotify: "#",
+      appleMusic: "#",
+      soundcloud: "#",
+    },
   },
   {
     id: "dj-phantom",
@@ -81,6 +116,16 @@ export const artists: Artist[] = [
       { platform: "SoundCloud", url: "#" },
       { platform: "Spotify", url: "#" },
     ],
+    tracks: [
+      { title: "Continental Shift", duration: "5:12" },
+      { title: "Frequencies", duration: "4:30" },
+      { title: "Log Drum Sessions", duration: "6:01" },
+    ],
+    streaming: {
+      spotify: "#",
+      soundcloud: "#",
+      youtubeMusic: "#",
+    },
   },
   {
     id: "nova-kim",
@@ -103,5 +148,16 @@ export const artists: Artist[] = [
       { platform: "TikTok", url: "#" },
       { platform: "Spotify", url: "#" },
     ],
+    tracks: [
+      { title: "Supernova", duration: "3:18" },
+      { title: "Electric Bloom", duration: "3:55" },
+      { title: "First Light", duration: "4:22" },
+    ],
+    streaming: {
+      spotify: "#",
+      appleMusic: "#",
+      youtubeMusic: "#",
+      soundcloud: "#",
+    },
   },
 ];

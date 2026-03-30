@@ -1,6 +1,7 @@
 import Layout from "@/components/Layout";
 import { artists } from "@/data/artists";
 import { Play, ExternalLink } from "lucide-react";
+import ListenNowSection from "@/components/ListenNow";
 
 const YOUTUBE_CHANNEL = "https://youtube.com/@therealpitchblackafro?si=oXXv9tzK3IjkBiIh";
 
@@ -74,6 +75,9 @@ const Watch = () => (
         ))}
       </div>
     </div>
+
+    {/* Listen Now */}
+    <ListenNowSection artists={artists} />
 
     {/* YouTube CTA */}
     <div className="section-padding text-center border-t border-border">
