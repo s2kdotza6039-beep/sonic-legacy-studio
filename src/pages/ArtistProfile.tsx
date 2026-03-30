@@ -2,6 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { artists } from "@/data/artists";
 import { ArrowLeft } from "lucide-react";
+import { ArtistListenSection } from "@/components/ListenNow";
 
 const ArtistProfile = () => {
   const { id } = useParams();
