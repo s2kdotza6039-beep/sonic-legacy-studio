@@ -52,6 +52,7 @@ const Footer = () => (
         <div className="flex gap-6">
           <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</a>
           <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms of Service</a>
+          <Link to="/dashboard" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">Team Login</Link>
         </div>
       </div>
     </div>
