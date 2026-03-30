@@ -53,7 +53,7 @@ const About = () => (
             <p>Every artist is developed through a system rooted in:</p>
             <ul className="space-y-3 my-6">
               {[
-                { icon: "🎯", text: "Lyrical discipline ("Lyrical Kung-Fu")" },
+                { icon: "🎯", text: 'Lyrical discipline ("Lyrical Kung-Fu")' },
                 { icon: "🧠", text: "Identity and storytelling" },
                 { icon: "🌍", text: "Cultural awareness and global positioning" },
                 { icon: "💼", text: "Professional structure and independence" },
