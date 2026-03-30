@@ -35,11 +35,13 @@ export const artists: Artist[] = [
     tagline: "The Godfather of SA Hip-Hop",
     genre: "Hip-Hop / Kwaito",
     image: artist1,
-    bio: "Pitch Black Afro, born Thulani Ngcobo, is one of South Africa's most iconic and pioneering hip-hop artists. Emerging from the early 2000s Johannesburg scene, he helped define the sound and culture of South African hip-hop at a time when the genre was still finding its footing on the continent. With a distinctive style that fuses hip-hop lyricism with kwaito rhythms and street-level storytelling, Pitch Black Afro became a household name and a cultural force. His influence extends beyond music — he is a mentor, a cultural pillar, and a living legend whose impact on the next generation of South African artists is immeasurable.",
+    bio: "Pitch Black Afro, born Thulani Ngcobo, is one of South Africa's most iconic and pioneering hip-hop artists. Emerging from the early 2000s Johannesburg scene, he helped define the sound and culture of South African hip-hop at a time when the genre was still finding its footing on the continent. With a distinctive style that fuses hip-hop lyricism with kwaito rhythms and street-level storytelling, Pitch Black Afro became a household name and a cultural force. His record-breaking debut album, Styling Gel, was one of the highest-selling South African hip-hop albums of its era, featuring the massive hit 'Matofotofo'. His influence extends beyond music — he is a mentor, a cultural pillar, and a living legend whose impact on the next generation of South African artists is immeasurable.",
     discography: [
       { title: "Styling Gel", year: "2004" },
-      { title: "Zonke Bonke", year: "2006" },
-      { title: "African Taboo", year: "2010" },
+      { title: "Split Endz", year: "2006" },
+      { title: "Bigger Blacker Better", year: "2007" },
+      { title: "Zonke Bonke", year: "2009" },
+      { title: "Int' Emnandi", year: "" },
     ],
     pressQuotes: [
       { quote: "One of the true architects of South African hip-hop culture.", source: "Channel O" },
@@ -51,9 +53,12 @@ export const artists: Artist[] = [
       { platform: "YouTube", url: "#" },
     ],
     tracks: [
-      { title: "Styling Gel", duration: "4:12" },
-      { title: "Zonke Bonke", duration: "3:58" },
-      { title: "African Taboo", duration: "4:35" },
+      { title: "Matofotofo", duration: "4:12" },
+      { title: "A Day in the Life", duration: "3:58" },
+      { title: "Izandla Phezulu", duration: "4:35" },
+      { title: "Never Let You Go", duration: "3:45" },
+      { title: "NO SUNSHINE (feat. Just Bothlale & Tshego Judah)", duration: "4:00" },
+      { title: "uMuntu (feat. Gospel Silinda)", duration: "3:50" },
     ],
     streaming: {
       spotify: "#",
