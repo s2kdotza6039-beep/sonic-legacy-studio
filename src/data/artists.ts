@@ -1,12 +1,10 @@
 import artist1 from "@/assets/artist-1.jpg";
 import artist2 from "@/assets/artist-2.jpg";
-import artist3 from "@/assets/artist-3.jpg";
-import artist4 from "@/assets/artist-4.jpg";
 
 export interface Track {
   title: string;
   duration: string;
-  audioUrl?: string; // MP3 URL for embedded playback
+  audioUrl?: string;
 }
 
 export interface StreamingLinks {
@@ -32,52 +30,20 @@ export interface Artist {
 
 export const artists: Artist[] = [
   {
-    id: "kxng-velo",
-    name: "KXNG Velo",
-    tagline: "The Future of South African Hip-Hop",
-    genre: "Hip-Hop / Trap",
+    id: "pitch-black-afro",
+    name: "Pitch Black Afro",
+    tagline: "The Godfather of SA Hip-Hop",
+    genre: "Hip-Hop / Kwaito",
     image: artist1,
-    bio: "Rising from the streets of Johannesburg, KXNG Velo has rapidly become one of the most electrifying voices in South African hip-hop. With a distinctive flow that bridges street narratives and global appeal, his debut project garnered over 5 million streams within its first month. His raw authenticity and relentless work ethic have positioned him as the next breakout star on the continent.",
+    bio: "Pitch Black Afro, born Thulani Ngcobo, is one of South Africa's most iconic and pioneering hip-hop artists. Emerging from the early 2000s Johannesburg scene, he helped define the sound and culture of South African hip-hop at a time when the genre was still finding its footing on the continent. With a distinctive style that fuses hip-hop lyricism with kwaito rhythms and street-level storytelling, Pitch Black Afro became a household name and a cultural force. His influence extends beyond music — he is a mentor, a cultural pillar, and a living legend whose impact on the next generation of South African artists is immeasurable.",
     discography: [
-      { title: "Crown Theory", year: "2025" },
-      { title: "Velo City (EP)", year: "2024" },
-      { title: "No Shortcuts", year: "2023" },
+      { title: "Styling Gel", year: "2004" },
+      { title: "Zonke Bonke", year: "2006" },
+      { title: "African Taboo", year: "2010" },
     ],
     pressQuotes: [
-      { quote: "A generational talent redefining the sound of SA hip-hop.", source: "Rolling Stone Africa" },
-      { quote: "KXNG Velo doesn't just rap — he commands.", source: "Complex" },
-    ],
-    socials: [
-      { platform: "Instagram", url: "#" },
-      { platform: "Spotify", url: "#" },
-      { platform: "Apple Music", url: "#" },
-    ],
-    tracks: [
-      { title: "Crown Theory", duration: "3:42" },
-      { title: "No Shortcuts", duration: "4:15" },
-      { title: "Velo City", duration: "3:28" },
-    ],
-    streaming: {
-      spotify: "#",
-      appleMusic: "#",
-      youtubeMusic: "#",
-    },
-  },
-  {
-    id: "aura-cole",
-    name: "Aura Cole",
-    tagline: "Soul That Moves the World",
-    genre: "R&B / Neo-Soul",
-    image: artist2,
-    bio: "Aura Cole's voice is a force of nature. Blending neo-soul with contemporary R&B, she crafts music that is both deeply personal and universally resonant. Her sophomore album 'Golden Hour' debuted at #3 on the South African charts and earned critical acclaim from international publications. Aura's live performances are legendary — intimate, powerful, and unforgettable.",
-    discography: [
-      { title: "Golden Hour", year: "2025" },
-      { title: "Midnight Letters", year: "2024" },
-      { title: "Echoes (EP)", year: "2023" },
-    ],
-    pressQuotes: [
-      { quote: "The voice of a generation, draped in gold.", source: "The FADER" },
-      { quote: "Aura Cole is the future of African R&B.", source: "OkayAfrica" },
+      { quote: "One of the true architects of South African hip-hop culture.", source: "Channel O" },
+      { quote: "Pitch Black Afro paved the way for an entire generation of SA rappers.", source: "OkayAfrica" },
     ],
     socials: [
       { platform: "Instagram", url: "#" },
@@ -85,73 +51,37 @@ export const artists: Artist[] = [
       { platform: "YouTube", url: "#" },
     ],
     tracks: [
-      { title: "Golden Hour", duration: "4:05" },
-      { title: "Midnight Letters", duration: "3:50" },
-      { title: "Echoes", duration: "3:33" },
+      { title: "Styling Gel", duration: "4:12" },
+      { title: "Zonke Bonke", duration: "3:58" },
+      { title: "African Taboo", duration: "4:35" },
     ],
     streaming: {
       spotify: "#",
       appleMusic: "#",
-      soundcloud: "#",
-    },
-  },
-  {
-    id: "dj-phantom",
-    name: "DJ Phantom",
-    tagline: "Afrobeats Without Borders",
-    genre: "Afrobeats / Amapiano",
-    image: artist3,
-    bio: "DJ Phantom has been at the forefront of the Amapiano and Afrobeats crossover, producing chart-topping hits that have dominated dance floors from Lagos to London. His production style fuses deep African rhythms with global electronic elements, creating a sound that transcends geography. With multiple platinum records and international tours under his belt, Phantom is building an empire.",
-    discography: [
-      { title: "Continental Shift", year: "2025" },
-      { title: "Frequencies", year: "2024" },
-      { title: "The Log Drum Sessions", year: "2023" },
-    ],
-    pressQuotes: [
-      { quote: "The architect of Africa's new sonic identity.", source: "Billboard" },
-      { quote: "Every track is a passport to the dancefloor.", source: "Mixmag" },
-    ],
-    socials: [
-      { platform: "Instagram", url: "#" },
-      { platform: "SoundCloud", url: "#" },
-      { platform: "Spotify", url: "#" },
-    ],
-    tracks: [
-      { title: "Continental Shift", duration: "5:12" },
-      { title: "Frequencies", duration: "4:30" },
-      { title: "Log Drum Sessions", duration: "6:01" },
-    ],
-    streaming: {
-      spotify: "#",
-      soundcloud: "#",
       youtubeMusic: "#",
     },
   },
   {
-    id: "nova-kim",
-    name: "Nova Kim",
-    tagline: "Pop Redefined",
-    genre: "Pop / Alternative",
-    image: artist4,
-    bio: "Nova Kim is rewriting the rules of pop music. With a genre-defying sound that pulls from alternative rock, electronic, and African pop traditions, she has built a devoted global fanbase. Her visual artistry is as compelling as her music — every release is a cinematic experience. Nova's debut album was named one of the top 10 albums of the year by multiple international outlets.",
+    id: "wijo-da-weekend",
+    name: "WIJO da WEEKEND",
+    tagline: "The Sound of Survival",
+    genre: "Afrobeat / Hip-Hop",
+    image: artist2,
+    bio: "Born Vusi William Moya on 27 February 1987, in the heart of Alexandra Township, north of Johannesburg, Wijo da Weekend's story is one of transformation, resilience, and purpose forged in fire. Raised by his aunt and step-grandmother after the loss of his father, Wijo grew up in an environment where survival was not guaranteed — but identity was waiting to be discovered. From an early age, he found refuge in music and dance, performing alongside respected names such as Vukani Khoza (Skomplas), DJ Funtron, and Biblos. In 2014, his life reached a turning point — he was sentenced to 25 years in prison. Inside those walls, he discovered rap, writing his first verses and beginning a powerful personal transformation. Mentored by hip-hop legend Pitch Black Afro, Wijo developed his signature style — combining raw storytelling, township influence, and global musical elements into what he calls 'Lyrical Kung-Fu'. Released in 2023, he emerged not just free — but focused, refined, and ready. Now stepping into the music industry with intention, Wijo da Weekend represents a new wave of artists whose music is rooted in truth, survival, and inspiration.",
     discography: [
-      { title: "Supernova", year: "2025" },
-      { title: "Electric Bloom (EP)", year: "2024" },
-      { title: "First Light", year: "2023" },
+      { title: "Shooting Star (Single)", year: "2025" },
     ],
     pressQuotes: [
-      { quote: "Nova Kim isn't just making music — she's building a universe.", source: "Pitchfork" },
-      { quote: "The most exciting new voice in global pop.", source: "NME" },
+      { quote: "Music chose me and saved me… now I choose to inspire.", source: "WIJO da WEEKEND" },
+      { quote: "Wijo da Weekend is the sound of survival — refined into a global movement.", source: "Sonic Legacy Studios" },
     ],
     socials: [
       { platform: "Instagram", url: "#" },
       { platform: "TikTok", url: "#" },
-      { platform: "Spotify", url: "#" },
+      { platform: "YouTube", url: "#" },
     ],
     tracks: [
-      { title: "Supernova", duration: "3:18" },
-      { title: "Electric Bloom", duration: "3:55" },
-      { title: "First Light", duration: "4:22" },
+      { title: "Shooting Star", duration: "3:45" },
     ],
     streaming: {
       spotify: "#",
