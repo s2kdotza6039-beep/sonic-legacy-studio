@@ -84,6 +84,16 @@ export const artists: Artist[] = [
       { platform: "Spotify", url: "#" },
       { platform: "YouTube", url: "#" },
     ],
+    tracks: [
+      { title: "Golden Hour", duration: "4:05" },
+      { title: "Midnight Letters", duration: "3:50" },
+      { title: "Echoes", duration: "3:33" },
+    ],
+    streaming: {
+      spotify: "#",
+      appleMusic: "#",
+      soundcloud: "#",
+    },
   },
   {
     id: "dj-phantom",
