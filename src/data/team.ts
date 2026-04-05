@@ -14,8 +14,8 @@ export interface Executive {
 export const executives: Executive[] = [
   {
     name: "Thulani 'Pitch Black Afro' Ngcobo",
-    title: "Chief Executive Officer",
-    bio: "With over 18 years in the music and entertainment industry, Marcus has led s2kDOTza from a boutique management firm to a full-service entertainment company with international reach. His strategic vision has guided partnerships with major labels and global brands.",
+    title: "Founder • Creative Director • Lead Performer",
+    bio: "A pioneering figure in South African hip-hop, Pitch Black Afro leads s2kDOTza's strategic vision at the intersection of music, culture, and business. With a career spanning decades, his journey reflects resilience, reinvention, and deep cultural influence. He oversees artist development, creative direction, and cultural positioning — ensuring every project aligns with artistic integrity and global market relevance. His approach combines street-level authenticity with executive-level strategy, building sustainable opportunities for emerging talent while keeping s2kDOTza culturally grounded and internationally competitive.",
     expertise: "Music Business Growth Strategy & Music Production",
     image: exec1,
   },
