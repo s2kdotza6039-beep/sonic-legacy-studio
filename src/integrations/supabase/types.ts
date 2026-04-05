@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      artist_activities: {
+        Row: {
+          activity_type: string
+          artist_id: string
+          created_at: string
+          description: string
+          id: string
+          metadata: Json | null
+          updated_at: string
+        }
+        Insert: {
+          activity_type?: string
+          artist_id: string
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          artist_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_activities_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artists: {
         Row: {
           created_at: string
