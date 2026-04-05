@@ -17,8 +17,8 @@ const Team = () => (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
         {executives.map((exec) => (
           <div key={exec.name} className="flex flex-col sm:flex-row gap-6">
-            <div className="w-full sm:w-48 flex-shrink-0 aspect-[3/4] overflow-hidden rounded">
-              <img src={exec.image} alt={exec.name} className="w-full h-full object-cover object-top grayscale" />
+            <div className="w-full sm:w-48 flex-shrink-0 overflow-hidden rounded">
+              <img src={exec.image} alt={exec.name} className="w-full h-auto object-contain grayscale" />
             </div>
             <div>
               <h3 className="font-display text-xl font-bold">{exec.name}</h3>
