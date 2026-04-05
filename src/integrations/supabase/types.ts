@@ -14,6 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
+      artists: {
+        Row: {
+          created_at: string
+          email: string | null
+          file_url: string | null
+          genre: string | null
+          id: string
+          music_link: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          file_url?: string | null
+          genre?: string | null
+          id?: string
+          music_link?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          file_url?: string | null
+          genre?: string | null
+          id?: string
+          music_link?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      content_posts: {
+        Row: {
+          created_at: string
+          id: string
+          platform: string | null
+          posted_at: string | null
+          tag: string
+          title: string
+          updated_at: string
+          url: string | null
+          views: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform?: string | null
+          posted_at?: string | null
+          tag?: string
+          title: string
+          updated_at?: string
+          url?: string | null
+          views?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: string | null
+          posted_at?: string | null
+          tag?: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+          views?: number
+        }
+        Relationships: []
+      }
+      deals: {
+        Row: {
+          amount: number | null
+          client_name: string
+          closed_at: string | null
+          created_at: string
+          deal_title: string
+          id: string
+          notes: string | null
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          client_name: string
+          closed_at?: string | null
+          created_at?: string
+          deal_title: string
+          id?: string
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          client_name?: string
+          closed_at?: string | null
+          created_at?: string
+          deal_title?: string
+          id?: string
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -38,6 +152,42 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      reminders: {
+        Row: {
+          created_at: string
+          due_at: string
+          email_sent: boolean
+          id: string
+          is_done: boolean
+          message: string
+          related_id: string
+          related_type: string
+          reminder_type: string
+        }
+        Insert: {
+          created_at?: string
+          due_at: string
+          email_sent?: boolean
+          id?: string
+          is_done?: boolean
+          message: string
+          related_id: string
+          related_type: string
+          reminder_type: string
+        }
+        Update: {
+          created_at?: string
+          due_at?: string
+          email_sent?: boolean
+          id?: string
+          is_done?: boolean
+          message?: string
+          related_id?: string
+          related_type?: string
+          reminder_type?: string
         }
         Relationships: []
       }

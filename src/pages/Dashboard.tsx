@@ -1,13 +1,29 @@
 import Layout from "@/components/Layout";
-import { Lock, Globe, Mail, Youtube, Instagram, LogOut, User } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import MetricsPanel from "@/components/dashboard/MetricsPanel";
+import ArtistPipeline from "@/components/dashboard/ArtistPipeline";
+import ContentEngine from "@/components/dashboard/ContentEngine";
+import RevenuePipeline from "@/components/dashboard/RevenuePipeline";
+import RemindersPanel from "@/components/dashboard/RemindersPanel";
+
+const TABS = [
+  { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "artists", label: "Artists", icon: Users },
+  { key: "content", label: "Content", icon: Film },
+  { key: "revenue", label: "Revenue", icon: DollarSign },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [tab, setTab] = useState<TabKey>("overview");
 
   const handleSignOut = async () => {
     await signOut();
@@ -18,59 +34,60 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="page-hero bg-card">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full border-2 border-primary/30 mb-8">
-            <Lock size={32} className="text-primary" />
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Lock size={20} className="text-primary" />
+                <p className="text-sm uppercase tracking-widest text-primary">Command Center</p>
+              </div>
+              <h1 className="text-3xl md:text-5xl font-display font-bold">Team Dashboard</h1>
+            </div>
+            <div className="flex items-center gap-4 bg-secondary/50 border border-border px-4 py-2">
+              <User size={14} className="text-primary" />
+              <span className="text-xs text-muted-foreground">{user?.email}</span>
+              <button onClick={handleSignOut} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors">
+                <LogOut size={12} /> Sign Out
+              </button>
+            </div>
           </div>
-          <p className="text-sm uppercase tracking-widest text-primary mb-4">Private Portal</p>
-          <h1 className="text-4xl md:text-6xl font-display font-bold mb-6">Team Dashboard</h1>
-
-          {/* User info & logout */}
-          <div className="inline-flex items-center gap-4 bg-secondary/50 border border-border px-6 py-3 mb-6">
-            <User size={16} className="text-primary" />
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors ml-4"
-            >
-              <LogOut size={14} />
-              Sign Out
-            </button>
-          </div>
-
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Secure access for the founding team, executives, and artists. Quick links to all social media pages, email accounts, and management tools.
-          </p>
         </div>
       </div>
 
       <div className="section-padding max-w-5xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="border border-border p-6 bg-card">
-            <h3 className="font-display font-bold text-lg mb-2">Founder & Execs</h3>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Mail size={14} className="text-primary" /> Business Email Access</li>
-              <li className="flex items-center gap-2"><Instagram size={14} className="text-primary" /> Social Media Pages</li>
-              <li className="flex items-center gap-2"><Globe size={14} className="text-primary" /> Management Tools</li>
-            </ul>
-          </div>
+        {/* Metrics */}
+        <MetricsPanel />
 
-          <div className="border border-border p-6 bg-card">
-            <h3 className="font-display font-bold text-lg mb-2">Artists</h3>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Youtube size={14} className="text-primary" /> YouTube Channel</li>
-              <li className="flex items-center gap-2"><Instagram size={14} className="text-primary" /> Social Accounts</li>
-              <li className="flex items-center gap-2"><Mail size={14} className="text-primary" /> Artist Email</li>
-            </ul>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2 mt-8 mb-6 border-b border-border pb-0 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-2 px-4 py-3 text-xs uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
+                tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <t.icon size={14} /> {t.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="border border-border p-6 bg-card">
-            <h3 className="font-display font-bold text-lg mb-2">Quick Links</h3>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Globe size={14} className="text-primary" /> Distribution Portals</li>
-              <li className="flex items-center gap-2"><Globe size={14} className="text-primary" /> Publishing Admin</li>
-              <li className="flex items-center gap-2"><Globe size={14} className="text-primary" /> Booking Calendar</li>
-            </ul>
+        {/* Tab Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            {tab === "overview" && (
+              <div className="space-y-6">
+                <ArtistPipeline />
+                <RevenuePipeline />
+              </div>
+            )}
+            {tab === "artists" && <ArtistPipeline />}
+            {tab === "content" && <ContentEngine />}
+            {tab === "revenue" && <RevenuePipeline />}
+          </div>
+          <div>
+            <RemindersPanel />
           </div>
         </div>
       </div>
