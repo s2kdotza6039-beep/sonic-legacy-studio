@@ -316,6 +316,160 @@ export type Database = {
         }
         Relationships: []
       }
+      royalty_alerts: {
+        Row: {
+          action_required: string | null
+          alert_type: string
+          created_at: string
+          id: string
+          message: string
+          resolved_at: string | null
+          severity: string
+          song_id: string | null
+          source: string | null
+          status: string
+        }
+        Insert: {
+          action_required?: string | null
+          alert_type: string
+          created_at?: string
+          id?: string
+          message: string
+          resolved_at?: string | null
+          severity?: string
+          song_id?: string | null
+          source?: string | null
+          status?: string
+        }
+        Update: {
+          action_required?: string | null
+          alert_type?: string
+          created_at?: string
+          id?: string
+          message?: string
+          resolved_at?: string | null
+          severity?: string
+          song_id?: string | null
+          source?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "royalty_alerts_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      royalty_income: {
+        Row: {
+          created_at: string
+          fees: number
+          gross: number
+          id: string
+          month: string
+          net: number
+          notes: string | null
+          paid: boolean
+          payment_date: string | null
+          song_id: string | null
+          source: string
+          territory: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fees?: number
+          gross?: number
+          id?: string
+          month: string
+          net?: number
+          notes?: string | null
+          paid?: boolean
+          payment_date?: string | null
+          song_id?: string | null
+          source: string
+          territory?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fees?: number
+          gross?: number
+          id?: string
+          month?: string
+          net?: number
+          notes?: string | null
+          paid?: boolean
+          payment_date?: string | null
+          song_id?: string | null
+          source?: string
+          territory?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "royalty_income_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      songs: {
+        Row: {
+          actual_publishing: number
+          artist_name: string | null
+          created_at: string
+          expected_publishing: number
+          id: string
+          isrc: string | null
+          iswc: string | null
+          platform: string | null
+          registered_capasso: boolean
+          registered_samro: boolean
+          release_date: string | null
+          streams: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          actual_publishing?: number
+          artist_name?: string | null
+          created_at?: string
+          expected_publishing?: number
+          id?: string
+          isrc?: string | null
+          iswc?: string | null
+          platform?: string | null
+          registered_capasso?: boolean
+          registered_samro?: boolean
+          release_date?: string | null
+          streams?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          actual_publishing?: number
+          artist_name?: string | null
+          created_at?: string
+          expected_publishing?: number
+          id?: string
+          isrc?: string | null
+          iswc?: string | null
+          platform?: string | null
+          registered_capasso?: boolean
+          registered_samro?: boolean
+          release_date?: string | null
+          streams?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -339,6 +493,47 @@ export type Database = {
           reason?: string
         }
         Relationships: []
+      }
+      territory_data: {
+        Row: {
+          actual_revenue: number
+          country: string
+          created_at: string
+          expected_revenue: number
+          id: string
+          song_id: string
+          streams: number
+          updated_at: string
+        }
+        Insert: {
+          actual_revenue?: number
+          country: string
+          created_at?: string
+          expected_revenue?: number
+          id?: string
+          song_id: string
+          streams?: number
+          updated_at?: string
+        }
+        Update: {
+          actual_revenue?: number
+          country?: string
+          created_at?: string
+          expected_revenue?: number
+          id?: string
+          song_id?: string
+          streams?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territory_data_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
