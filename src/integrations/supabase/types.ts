@@ -301,9 +301,40 @@ export type Database = {
         }
         Relationships: []
       }
+      idea_boards: {
+        Row: {
+          color: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ideas: {
         Row: {
           assigned_to: string | null
+          board_id: string | null
           category: string
           created_at: string
           description: string | null
@@ -319,6 +350,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          board_id?: string | null
           category?: string
           created_at?: string
           description?: string | null
@@ -334,6 +366,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          board_id?: string | null
           category?: string
           created_at?: string
           description?: string | null
@@ -347,7 +380,15 @@ export type Database = {
           updated_at?: string
           votes?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ideas_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "idea_boards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
