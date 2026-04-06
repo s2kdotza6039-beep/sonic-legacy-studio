@@ -18,6 +18,7 @@ import Contact from "./pages/Contact";
 import Watch from "./pages/Watch";
 import Listen from "./pages/Listen";
 import Dashboard from "./pages/Dashboard";
+import Royalties from "./pages/Royalties";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -49,6 +50,11 @@ const App = () => (
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/royalties" element={
+              <ProtectedRoute>
+                <Royalties />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
