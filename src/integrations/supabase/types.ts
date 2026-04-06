@@ -301,6 +301,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ideas: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          priority: string
+          status: string
+          submitted_by: string | null
+          title: string
+          updated_at: string
+          votes: number
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          status?: string
+          submitted_by?: string | null
+          title: string
+          updated_at?: string
+          votes?: number
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          status?: string
+          submitted_by?: string | null
+          title?: string
+          updated_at?: string
+          votes?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
