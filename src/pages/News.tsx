@@ -1,6 +1,33 @@
 import Layout from "@/components/Layout";
 
-const newsItems: { date: string; category: string; title: string; excerpt: string }[] = [];
+const newsItems = [
+  {
+    date: "April 2026",
+    category: "Company Announcement",
+    title: "s2kDOTza Entertainment — The Movement Has Begun",
+    excerpt: `This is more than just an update. This is a statement.
+
+s2kDOTza Entertainment is officially in motion — built from the ground up with purpose, structure, and a deep respect for the culture that raised us. From the streets of South Africa to the global stage, we are creating a platform where talent is not just seen… but built, measured, and elevated.
+
+We are not here to follow trends. We are here to create systems.
+
+At s2kDOTza, we believe in: Real artists with real stories. Real work that produces real results. Real opportunities that lead to real income.
+
+This is where street culture meets business discipline. Where creativity meets structure. Where passion meets execution.
+
+Our roots are proudly South African — shaped by the energy, resilience, and rhythm of our communities. But our vision is global. We are building something that speaks to Johannesburg, Lagos, New York, London, and everywhere in between.
+
+Through live events, digital content, and artist development, we are creating a movement that connects the streets to the boardroom — without losing authenticity.
+
+To the artists: This is your platform — if you're ready to work.
+To the fans: This is your culture — and you're part of it.
+To the brands and partners: This is your gateway into real, measurable, and powerful engagement with the culture.
+
+We are just getting started. The foundation is set. The system is in place. Now it's time to build.
+
+s2kDOTza Entertainment — Platform. Culture. Structure. Global Vision.`,
+  },
+];
 
 const News = () => (
   <Layout>
@@ -23,7 +50,7 @@ const News = () => (
               <span className="text-xs text-muted-foreground">{item.date}</span>
             </div>
             <h2 className="text-xl md:text-2xl font-display font-bold mb-3">{item.title}</h2>
-            <p className="text-muted-foreground leading-relaxed">{item.excerpt}</p>
+            <div className="text-muted-foreground leading-relaxed whitespace-pre-line">{item.excerpt}</div>
           </article>
         ))}
       </div>
