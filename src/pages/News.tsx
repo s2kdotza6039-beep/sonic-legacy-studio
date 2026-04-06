@@ -1,37 +1,6 @@
 import Layout from "@/components/Layout";
 
-const newsItems = [
-  {
-    date: "February 2026",
-    category: "Company Announcement",
-    title: "s2kDOTza Entertainment Announces International Expansion",
-    excerpt: "The company is set to open offices in London and Lagos as part of its global growth strategy, strengthening its presence in key music markets across Europe and West Africa.",
-  },
-  {
-    date: "January 2026",
-    category: "Artist Milestone",
-    title: "KXNG Velo's 'Crown Theory' Surpasses 10 Million Streams",
-    excerpt: "The breakout debut album from KXNG Velo has crossed the 10 million stream mark across all platforms, solidifying his position as one of the year's most exciting new voices.",
-  },
-  {
-    date: "December 2025",
-    category: "Press",
-    title: "Aura Cole Featured in Rolling Stone Africa's 'Artists to Watch'",
-    excerpt: "Aura Cole has been named among Rolling Stone Africa's top artists to watch in 2026, following the critical success of her album 'Golden Hour'.",
-  },
-  {
-    date: "November 2025",
-    category: "Partnership",
-    title: "s2kDOTza Signs Strategic Partnership with Global Distribution Platform",
-    excerpt: "A new multi-year distribution agreement will give s2kDOTza artists access to enhanced global distribution infrastructure and marketing support across 180+ territories.",
-  },
-  {
-    date: "October 2025",
-    category: "Media",
-    title: "CEO Marcus Van Der Berg Keynotes at African Music Business Summit",
-    excerpt: "Marcus Van Der Berg delivered the opening keynote at the AMBS, outlining his vision for the professionalization of the African music industry.",
-  },
-];
+const newsItems: { date: string; category: string; title: string; excerpt: string }[] = [];
 
 const News = () => (
   <Layout>
