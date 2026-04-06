@@ -50,7 +50,7 @@ const News = () => (
               <span className="text-xs text-muted-foreground">{item.date}</span>
             </div>
             <h2 className="text-xl md:text-2xl font-display font-bold mb-3">{item.title}</h2>
-            <p className="text-muted-foreground leading-relaxed">{item.excerpt}</p>
+            <div className="text-muted-foreground leading-relaxed whitespace-pre-line">{item.excerpt}</div>
           </article>
         ))}
       </div>
