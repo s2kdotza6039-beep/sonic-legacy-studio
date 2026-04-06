@@ -43,7 +43,11 @@ const Dashboard = () => {
               </div>
               <h1 className="text-3xl md:text-5xl font-display font-bold">Team Dashboard</h1>
             </div>
-            <div className="flex items-center gap-4 bg-secondary/50 border border-border px-4 py-2">
+            <div className="flex items-center gap-4">
+              <Link to="/royalties" className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-2">
+                <Music size={14} /> Royalty Audit
+              </Link>
+              <div className="flex items-center gap-4 bg-secondary/50 border border-border px-4 py-2">
               <User size={14} className="text-primary" />
               <span className="text-xs text-muted-foreground">{user?.email}</span>
               <button onClick={handleSignOut} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors">
