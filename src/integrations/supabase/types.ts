@@ -52,6 +52,54 @@ export type Database = {
           },
         ]
       }
+      artist_scorecards: {
+        Row: {
+          artist_name: string
+          audience_growth: number
+          business_cooperation: number
+          content_brand: number
+          created_at: string
+          discipline: number
+          id: string
+          live_performance: number
+          music_output: number
+          review_month: string
+          tier: string | null
+          total_score: number | null
+          updated_at: string
+        }
+        Insert: {
+          artist_name: string
+          audience_growth?: number
+          business_cooperation?: number
+          content_brand?: number
+          created_at?: string
+          discipline?: number
+          id?: string
+          live_performance?: number
+          music_output?: number
+          review_month: string
+          tier?: string | null
+          total_score?: number | null
+          updated_at?: string
+        }
+        Update: {
+          artist_name?: string
+          audience_growth?: number
+          business_cooperation?: number
+          content_brand?: number
+          created_at?: string
+          discipline?: number
+          id?: string
+          live_performance?: number
+          music_output?: number
+          review_month?: string
+          tier?: string | null
+          total_score?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       artists: {
         Row: {
           created_at: string
