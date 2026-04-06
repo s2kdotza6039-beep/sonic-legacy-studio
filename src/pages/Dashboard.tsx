@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import RevenuePipeline from "@/components/dashboard/RevenuePipeline";
 import RemindersPanel from "@/components/dashboard/RemindersPanel";
 import ArtistScorecard from "@/components/dashboard/ArtistScorecard";
 import IdeasBoard from "@/components/dashboard/IdeasBoard";
+import ContractVault from "@/components/dashboard/ContractVault";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -19,6 +20,7 @@ const TABS = [
   { key: "ideas", label: "Ideas", icon: Lightbulb },
   { key: "content", label: "Content", icon: Film },
   { key: "revenue", label: "Revenue", icon: DollarSign },
+  { key: "contracts", label: "Contracts", icon: FileText },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -96,6 +98,7 @@ const Dashboard = () => {
             {tab === "ideas" && <IdeasBoard />}
             {tab === "content" && <ContentEngine />}
             {tab === "revenue" && <RevenuePipeline />}
+            {tab === "contracts" && <ContractVault />}
           </div>
           <div>
             <RemindersPanel />
