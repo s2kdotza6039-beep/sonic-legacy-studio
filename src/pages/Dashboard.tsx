@@ -48,13 +48,13 @@ const Dashboard = () => {
                 <Music size={14} /> Royalty Audit
               </Link>
               <div className="flex items-center gap-4 bg-secondary/50 border border-border px-4 py-2">
-              <User size={14} className="text-primary" />
-              <span className="text-xs text-muted-foreground">{user?.email}</span>
-              <button onClick={handleSignOut} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors">
-                <LogOut size={12} /> Sign Out
-              </button>
+                <User size={14} className="text-primary" />
+                <span className="text-xs text-muted-foreground">{user?.email}</span>
+                <button onClick={handleSignOut} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors">
+                  <LogOut size={12} /> Sign Out
+                </button>
+              </div>
             </div>
-          </div>
         </div>
       </div>
 
