@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -10,11 +10,13 @@ import ContentEngine from "@/components/dashboard/ContentEngine";
 import RevenuePipeline from "@/components/dashboard/RevenuePipeline";
 import RemindersPanel from "@/components/dashboard/RemindersPanel";
 import ArtistScorecard from "@/components/dashboard/ArtistScorecard";
+import IdeasBoard from "@/components/dashboard/IdeasBoard";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "artists", label: "Artists", icon: Users },
   { key: "scorecard", label: "Scorecard", icon: Star },
+  { key: "ideas", label: "Ideas", icon: Lightbulb },
   { key: "content", label: "Content", icon: Film },
   { key: "revenue", label: "Revenue", icon: DollarSign },
 ] as const;
@@ -91,6 +93,7 @@ const Dashboard = () => {
             )}
             {tab === "artists" && <ArtistPipeline />}
             {tab === "scorecard" && <ArtistScorecard />}
+            {tab === "ideas" && <IdeasBoard />}
             {tab === "content" && <ContentEngine />}
             {tab === "revenue" && <RevenuePipeline />}
           </div>
