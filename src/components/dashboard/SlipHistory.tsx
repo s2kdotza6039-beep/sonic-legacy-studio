@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { History, CheckCircle, XCircle, Clock, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 
 interface SavedSlip {
   id: string;
@@ -83,6 +84,41 @@ const SlipHistory = () => {
   };
   const winRate = stats.total - stats.pending > 0 ? ((stats.won / (stats.total - stats.pending)) * 100).toFixed(1) : "—";
   const profit = stats.totalReturned - stats.totalStaked;
+
+  // Build win rate trend data grouped by match_date
+  const trendData = useMemo(() => {
+    const resolved = slips.filter(s => s.result === "won" || s.result === "lost");
+    if (resolved.length === 0) return [];
+
+    // Group by match_date
+    const byDate: Record<string, { won: number; total: number }> = {};
+    resolved
+      .sort((a, b) => a.match_date.localeCompare(b.match_date))
+      .forEach((s) => {
+        if (!byDate[s.match_date]) byDate[s.match_date] = { won: 0, total: 0 };
+        byDate[s.match_date].total++;
+        if (s.result === "won") byDate[s.match_date].won++;
+      });
+
+    let cumulativeWon = 0;
+    let cumulativeTotal = 0;
+    let cumulativeProfit = 0;
+
+    return Object.entries(byDate).map(([date, { won, total }]) => {
+      cumulativeWon += won;
+      cumulativeTotal += total;
+      const daySlips = resolved.filter(s => s.match_date === date);
+      daySlips.forEach(s => {
+        cumulativeProfit += s.result === "won" ? Number(s.actual_return || s.potential_return) - Number(s.stake) : -Number(s.stake);
+      });
+      return {
+        date: date.slice(5), // MM-DD
+        winRate: Math.round((cumulativeWon / cumulativeTotal) * 100),
+        profit: Math.round(cumulativeProfit),
+        dayWinRate: Math.round((won / total) * 100),
+      };
+    });
+  }, [slips]);
 
   return (
     <div className="space-y-4">
