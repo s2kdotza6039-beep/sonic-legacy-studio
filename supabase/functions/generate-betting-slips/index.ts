@@ -184,6 +184,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const budget = body.budget || 100;
     const slipCount = body.slipCount || 8;
+    const minConfidence = body.minConfidence ?? 60;
 
     // Step 1: Fetch live odds from The Odds API
     console.log("Fetching live odds...");
