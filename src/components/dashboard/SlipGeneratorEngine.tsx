@@ -90,7 +90,8 @@ const SlipGeneratorEngine = () => {
       if (error) throw error;
       if (result.error) throw new Error(result.error);
       setData(result);
-      toast({ title: "Slips Generated", description: `${result.slips?.length || 0} slips ready for ${result.date}` });
+      setIsLiveData(result.data_source === "live_odds_api");
+      toast({ title: "Slips Generated", description: `${result.slips?.length || 0} slips ready for ${result.date}${result.data_source === "live_odds_api" ? " (LIVE odds)" : ""}` });
     } catch (e: any) {
       toast({ title: "Generation Failed", description: e.message, variant: "destructive" });
     } finally {
