@@ -41,6 +41,7 @@ interface Match {
   over25_prob: number;
   btts_prob: number;
   confidence: string;
+  confidence_score: number;
   is_core: boolean;
   pattern: string;
 }
@@ -228,17 +229,30 @@ const SlipGeneratorEngine = () => {
 
           {showMatches && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {data.matches?.map((m) => (
+              {data.matches?.map((m) => {
+                const score = m.confidence_score ?? 0;
+                const scoreColor = score >= 75 ? "text-primary" : score >= 50 ? "text-accent-foreground" : "text-destructive";
+                const scoreBg = score >= 75 ? "bg-primary" : score >= 50 ? "bg-accent" : "bg-destructive";
+                return (
                 <Card key={m.id} className={m.is_core ? "border-primary/30" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-muted-foreground">{m.league} • {m.kickoff}</span>
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-1">
                         {m.is_core && <Badge className="text-[10px]">CORE</Badge>}
                         <Badge variant="outline" className="text-[10px]">{m.confidence}</Badge>
+                        <Badge variant="outline" className={`text-[10px] font-bold ${scoreColor}`}>{score}/100</Badge>
                       </div>
                     </div>
                     <p className="font-medium text-sm">{m.home} vs {m.away}</p>
+                    {/* Confidence Score Bar */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-widest w-16">Confidence</span>
+                      <div className="flex-1 bg-muted rounded-full h-1.5">
+                        <div className={`rounded-full h-1.5 transition-all ${scoreBg}`} style={{ width: `${score}%` }} />
+                      </div>
+                      <span className={`text-xs font-bold ${scoreColor}`}>{score}</span>
+                    </div>
                     <div className="grid grid-cols-3 gap-2 mt-2 text-xs text-muted-foreground">
                       <span>Win: {m.win_prob}%</span>
                       <span>Draw: {m.draw_prob}%</span>
@@ -250,7 +264,8 @@ const SlipGeneratorEngine = () => {
                     <p className="text-xs text-primary mt-2">{m.pattern}</p>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
 

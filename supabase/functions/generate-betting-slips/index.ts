@@ -221,7 +221,7 @@ ${JSON.stringify(matchSummary, null, 2)}
 
 INSTRUCTIONS:
 1. Analyze ALL ${matchSummary.length} matches above. These are REAL matches with REAL odds.
-2. For each match, assess confidence as LOW/MEDIUM/HIGH based on the probability margins.
+2. For each match, assess confidence as LOW/MEDIUM/HIGH and assign a "confidence_score" from 0-100 (0=no confidence, 100=near certain). Base it on probability margins, odds consensus, and market clarity.
 3. Mark the strongest predictions as "is_core": true (pick 4-6 core picks).
 4. Identify patterns like "Strong home favorite", "Defensive match", "High scoring expected" etc.
 5. Generate ${slipCount + 1} betting slips:
