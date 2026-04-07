@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Selection {
   match_id: number;
