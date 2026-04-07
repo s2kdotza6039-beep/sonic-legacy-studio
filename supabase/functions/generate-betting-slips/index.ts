@@ -46,69 +46,69 @@ async function fetchLiveOdds(apiKey: string): Promise<LiveMatch[]> {
   const allEvents: LiveMatch[] = [];
   const markets = "h2h,totals";
 
-  for (const sportKey of SPORT_KEYS) {
-    try {
-      const url = `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=uk,eu&markets=${markets}&oddsFormat=decimal`;
+  // Fetch all leagues in parallel
+  const results = await Promise.allSettled(
+    SPORT_KEYS.map(async (sportKey) => {
+      const url = `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=uk&markets=${markets}&oddsFormat=decimal`;
       const response = await fetch(url);
-      if (!response.ok) { console.warn(`Odds API ${sportKey}: ${response.status}`); continue; }
-
+      if (!response.ok) { console.warn(`Odds API ${sportKey}: ${response.status}`); return []; }
       const events = await response.json();
-      for (const event of events) {
-        if (!event.bookmakers?.length) continue;
+      return events.map((event: any) => ({ ...event, _sportKey: sportKey }));
+    })
+  );
 
-        const h2hMarkets = event.bookmakers
-          .map((b: any) => b.markets.find((m: any) => m.key === "h2h"))
-          .filter(Boolean);
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    for (const event of result.value) {
+      if (!event.bookmakers?.length) continue;
+      const sportKey = event._sportKey;
 
-        const totalsMarkets = event.bookmakers
-          .map((b: any) => b.markets.find((m: any) => m.key === "totals"))
-          .filter(Boolean);
+      const h2hMarkets = event.bookmakers
+        .map((b: any) => b.markets.find((m: any) => m.key === "h2h"))
+        .filter(Boolean);
+      const totalsMarkets = event.bookmakers
+        .map((b: any) => b.markets.find((m: any) => m.key === "totals"))
+        .filter(Boolean);
 
-        let homeOdds = 0, drawOdds = 0, awayOdds = 0, count = 0;
-        for (const market of h2hMarkets) {
-          const home = market.outcomes.find((o: any) => o.name === event.home_team);
-          const draw = market.outcomes.find((o: any) => o.name === "Draw");
-          const away = market.outcomes.find((o: any) => o.name === event.away_team);
-          if (home && draw && away) {
-            homeOdds += home.price; drawOdds += draw.price; awayOdds += away.price; count++;
-          }
+      let homeOdds = 0, drawOdds = 0, awayOdds = 0, count = 0;
+      for (const market of h2hMarkets) {
+        const home = market.outcomes.find((o: any) => o.name === event.home_team);
+        const draw = market.outcomes.find((o: any) => o.name === "Draw");
+        const away = market.outcomes.find((o: any) => o.name === event.away_team);
+        if (home && draw && away) {
+          homeOdds += home.price; drawOdds += draw.price; awayOdds += away.price; count++;
         }
-        if (count === 0) continue;
-
-        homeOdds /= count; drawOdds /= count; awayOdds /= count;
-        const winProb = Math.round((1 / homeOdds) * 100);
-        const drawProb = Math.round((1 / drawOdds) * 100);
-        const loseProb = Math.round((1 / awayOdds) * 100);
-
-        let over15Prob = 0, over25Prob = 0;
-        for (const market of totalsMarkets) {
-          const over = market.outcomes.find((o: any) => o.name === "Over");
-          if (over) {
-            over25Prob = Math.round((1 / over.price) * 100);
-            over15Prob = Math.min(95, over25Prob + 20);
-          }
-        }
-        const bttsProb = Math.round(Math.min(winProb + loseProb, 80) * 0.7 + 15);
-
-        const kickoff = new Date(event.commence_time);
-        const kickoffStr = `${kickoff.getUTCHours().toString().padStart(2, "0")}:${kickoff.getUTCMinutes().toString().padStart(2, "0")}`;
-
-        allEvents.push({
-          id: event.id,
-          home: event.home_team,
-          away: event.away_team,
-          league: LEAGUE_NAMES[sportKey] || sportKey,
-          kickoff: kickoffStr,
-          commence_time: event.commence_time,
-          home_odds: parseFloat(homeOdds.toFixed(2)),
-          draw_odds: parseFloat(drawOdds.toFixed(2)),
-          away_odds: parseFloat(awayOdds.toFixed(2)),
-          win_prob: winProb, draw_prob: drawProb, lose_prob: loseProb,
-          over15_prob: over15Prob, over25_prob: over25Prob, btts_prob: bttsProb,
-        });
       }
-    } catch (err) {
-      console.warn(`Error fetching ${sportKey}:`, err);
+      if (count === 0) continue;
+
+      homeOdds /= count; drawOdds /= count; awayOdds /= count;
+      const winProb = Math.round((1 / homeOdds) * 100);
+      const drawProb = Math.round((1 / drawOdds) * 100);
+      const loseProb = Math.round((1 / awayOdds) * 100);
+
+      let over15Prob = 0, over25Prob = 0;
+      for (const market of totalsMarkets) {
+        const over = market.outcomes.find((o: any) => o.name === "Over");
+        if (over) {
+          over25Prob = Math.round((1 / over.price) * 100);
+          over15Prob = Math.min(95, over25Prob + 20);
+        }
+      }
+      const bttsProb = Math.round(Math.min(winProb + loseProb, 80) * 0.7 + 15);
+
+      const kickoff = new Date(event.commence_time);
+      const kickoffStr = `${kickoff.getUTCHours().toString().padStart(2, "0")}:${kickoff.getUTCMinutes().toString().padStart(2, "0")}`;
+
+      allEvents.push({
+        id: event.id, home: event.home_team, away: event.away_team,
+        league: LEAGUE_NAMES[sportKey] || sportKey,
+        kickoff: kickoffStr, commence_time: event.commence_time,
+        home_odds: parseFloat(homeOdds.toFixed(2)),
+        draw_odds: parseFloat(drawOdds.toFixed(2)),
+        away_odds: parseFloat(awayOdds.toFixed(2)),
+        win_prob: winProb, draw_prob: drawProb, lose_prob: loseProb,
+        over15_prob: over15Prob, over25_prob: over25Prob, btts_prob: bttsProb,
+      });
     }
   }
 
@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
 
     // Step 1: Fetch live odds from The Odds API
     console.log("Fetching live odds...");
-    const liveMatches = await fetchLiveOdds(ODDS_API_KEY);
+    let liveMatches = await fetchLiveOdds(ODDS_API_KEY);
     console.log(`Fetched ${liveMatches.length} live matches`);
 
     if (liveMatches.length === 0) {
@@ -146,6 +146,13 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Limit to 20 best matches to avoid AI timeout
+    // Prioritize by highest probability spread (clearest favorites)
+    liveMatches = liveMatches
+      .sort((a, b) => Math.max(b.win_prob, b.lose_prob) - Math.max(a.win_prob, a.lose_prob))
+      .slice(0, 20);
+    console.log(`Using top ${liveMatches.length} matches for analysis`);
 
     // Step 2: Send real odds data to AI for analysis and slip generation
     const matchSummary = liveMatches.map((m, i) => ({
