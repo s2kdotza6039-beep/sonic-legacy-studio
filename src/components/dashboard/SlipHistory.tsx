@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { History, CheckCircle, XCircle, Clock, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 
 interface SavedSlip {
   id: string;
@@ -84,6 +85,41 @@ const SlipHistory = () => {
   const winRate = stats.total - stats.pending > 0 ? ((stats.won / (stats.total - stats.pending)) * 100).toFixed(1) : "—";
   const profit = stats.totalReturned - stats.totalStaked;
 
+  // Build win rate trend data grouped by match_date
+  const trendData = useMemo(() => {
+    const resolved = slips.filter(s => s.result === "won" || s.result === "lost");
+    if (resolved.length === 0) return [];
+
+    // Group by match_date
+    const byDate: Record<string, { won: number; total: number }> = {};
+    resolved
+      .sort((a, b) => a.match_date.localeCompare(b.match_date))
+      .forEach((s) => {
+        if (!byDate[s.match_date]) byDate[s.match_date] = { won: 0, total: 0 };
+        byDate[s.match_date].total++;
+        if (s.result === "won") byDate[s.match_date].won++;
+      });
+
+    let cumulativeWon = 0;
+    let cumulativeTotal = 0;
+    let cumulativeProfit = 0;
+
+    return Object.entries(byDate).map(([date, { won, total }]) => {
+      cumulativeWon += won;
+      cumulativeTotal += total;
+      const daySlips = resolved.filter(s => s.match_date === date);
+      daySlips.forEach(s => {
+        cumulativeProfit += s.result === "won" ? Number(s.actual_return || s.potential_return) - Number(s.stake) : -Number(s.stake);
+      });
+      return {
+        date: date.slice(5), // MM-DD
+        winRate: Math.round((cumulativeWon / cumulativeTotal) * 100),
+        profit: Math.round(cumulativeProfit),
+        dayWinRate: Math.round((won / total) * 100),
+      };
+    });
+  }, [slips]);
+
   return (
     <div className="space-y-4">
       {/* Stats */}
@@ -109,6 +145,39 @@ const SlipHistory = () => {
           <p className="text-xs text-muted-foreground">Profit/Loss</p>
         </div>
       </div>
+
+      {/* Win Rate Trend Chart */}
+      {trendData.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-widest flex items-center gap-2">
+              <TrendingUp size={14} className="text-primary" /> Win Rate & Profit Trend
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="winRateGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" domain={[0, 100]} unit="%" />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="R" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4, fontSize: 12 }}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                />
+                <Area yAxisId="left" type="monotone" dataKey="winRate" stroke="hsl(var(--primary))" fill="url(#winRateGrad)" name="Win Rate %" strokeWidth={2} />
+                <Line yAxisId="right" type="monotone" dataKey="profit" stroke="hsl(var(--destructive))" name="Cum. Profit (R)" strokeWidth={2} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Slip List */}
       {loading ? (
