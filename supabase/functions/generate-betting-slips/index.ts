@@ -68,8 +68,8 @@ Return valid JSON with this exact structure:
   "slips": [
     {
       "id": 1,
-      "category": "SAFE",
-      "stake": ${(budget / slipCount).toFixed(0)},
+      "category": "DAILY_SAFE",
+      "stake": ${(budget / (slipCount + 1)).toFixed(0)},
       "estimated_odds": 3.5,
       "potential_return": 35,
       "selections": [
@@ -79,8 +79,8 @@ Return valid JSON with this exact structure:
   ],
   "bankroll": {
     "budget": ${budget},
-    "total_slips": ${slipCount},
-    "stake_per_slip": ${(budget / slipCount).toFixed(0)}
+    "total_slips": ${slipCount + 1},
+    "stake_per_slip": ${(budget / (slipCount + 1)).toFixed(0)}
   }
 }`;
 
