@@ -75,6 +75,7 @@ const SlipGeneratorEngine = () => {
   const [slipCount, setSlipCount] = useState("8");
   const [expandedSlip, setExpandedSlip] = useState<number | null>(null);
   const [showMatches, setShowMatches] = useState(false);
+  const [isLiveData, setIsLiveData] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
