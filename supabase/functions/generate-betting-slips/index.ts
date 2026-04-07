@@ -32,12 +32,14 @@ INSTRUCTIONS:
 2. For each match calculate: win_prob, draw_prob, lose_prob, over15_prob, over25_prob, btts_prob, confidence (LOW/MEDIUM/HIGH).
 3. Filter to only HIGH confidence matches (8-12 matches).
 4. Select 5-6 CORE picks (strongest predictions).
-5. Generate ${slipCount} betting slips:
-   - Slips 1-3: SAFE (Double Chance, Over 1.5, 3-5 matches, mostly CORE)
-   - Slips 4-6: BALANCED (Win, Over 2.5, BTTS, 4-6 matches, CORE + variations)
-   - Slips 7-${slipCount}: HIGH_RISK (Correct Score, Underdog Win, Over 3.5, 2-4 matches)
+5. Generate ${slipCount + 1} betting slips:
+   - Slip 1: DAILY_SAFE — includes ALL safe/high-confidence picks of the day (Double Chance, Over 1.5, safe markets only). This slip should have the most selections.
+   - Slips 2-4: SAFE (Double Chance, Over 1.5, 3-5 matches, mostly CORE)
+   - Slips 5-7: BALANCED (Win, Over 2.5, BTTS, 4-6 matches, CORE + variations)
+   - Slips 8-${slipCount + 1}: HIGH_RISK (Correct Score, Underdog Win, Over 3.5, 2-4 matches)
 6. Each slip must keep 3-4 CORE picks and vary 1-2 selections.
-7. Budget: R${budget}, stake per slip: R${(budget / slipCount).toFixed(0)}
+7. IMPORTANT: Each selection MUST include "kickoff" (match time e.g. "15:00") and "league" (e.g. "Premier League") fields.
+8. Budget: R${budget}, stake per slip: R${(budget / (slipCount + 1)).toFixed(0)}
 
 Return valid JSON with this exact structure:
 {
@@ -66,19 +68,19 @@ Return valid JSON with this exact structure:
   "slips": [
     {
       "id": 1,
-      "category": "SAFE",
-      "stake": ${(budget / slipCount).toFixed(0)},
+      "category": "DAILY_SAFE",
+      "stake": ${(budget / (slipCount + 1)).toFixed(0)},
       "estimated_odds": 3.5,
       "potential_return": 35,
       "selections": [
-        { "match_id": 1, "home": "Team A", "away": "Team B", "market": "Over 1.5 Goals", "probability": 82, "is_core": true }
+        { "match_id": 1, "home": "Team A", "away": "Team B", "market": "Over 1.5 Goals", "probability": 82, "is_core": true, "kickoff": "15:00", "league": "Premier League" }
       ]
     }
   ],
   "bankroll": {
     "budget": ${budget},
-    "total_slips": ${slipCount},
-    "stake_per_slip": ${(budget / slipCount).toFixed(0)}
+    "total_slips": ${slipCount + 1},
+    "stake_per_slip": ${(budget / (slipCount + 1)).toFixed(0)}
   }
 }`;
 

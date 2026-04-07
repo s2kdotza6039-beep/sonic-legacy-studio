@@ -14,11 +14,13 @@ interface Selection {
   market: string;
   probability: number;
   is_core: boolean;
+  kickoff?: string;
+  league?: string;
 }
 
 interface Slip {
   id: number;
-  category: "SAFE" | "BALANCED" | "HIGH_RISK";
+  category: "SAFE" | "BALANCED" | "HIGH_RISK" | "DAILY_SAFE";
   stake: number;
   estimated_odds: number;
   potential_return: number;
@@ -57,6 +59,7 @@ interface SlipData {
 }
 
 const categoryConfig = {
+  DAILY_SAFE: { color: "text-primary", border: "border-primary/40", bg: "bg-primary/10", icon: Shield, label: "🔒 DAILY SAFE" },
   SAFE: { color: "text-primary", border: "border-primary/30", bg: "bg-primary/5", icon: Shield, label: "SAFE" },
   BALANCED: { color: "text-accent-foreground", border: "border-accent/30", bg: "bg-accent/5", icon: TrendingUp, label: "BALANCED" },
   HIGH_RISK: { color: "text-destructive", border: "border-destructive/30", bg: "bg-destructive/5", icon: AlertTriangle, label: "HIGH RISK" },
@@ -226,14 +229,16 @@ const SlipGeneratorEngine = () => {
                       {isExpanded && (
                         <div className="mt-4 space-y-2 border-t border-border pt-3">
                           {slip.selections?.map((sel, i) => (
-                            <div key={i} className="flex items-center justify-between text-sm">
+                            <div key={i} className="flex items-center justify-between text-sm py-1">
                               <div className="flex items-center gap-2">
                                 {sel.is_core && <Badge className="text-[10px] py-0">CORE</Badge>}
                                 <span>{sel.home} vs {sel.away}</span>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-muted-foreground">{sel.market}</span>
-                                <span className="text-xs text-primary">{sel.probability}%</span>
+                              <div className="flex items-center gap-3 text-xs">
+                                {sel.league && <span className="text-muted-foreground">{sel.league}</span>}
+                                {sel.kickoff && <span className="text-muted-foreground">⏰ {sel.kickoff}</span>}
+                                <span className="text-muted-foreground">{sel.market}</span>
+                                <span className="text-primary">{sel.probability}%</span>
                               </div>
                             </div>
                           ))}
