@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save } from "lucide-react";
+import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +57,8 @@ interface SlipData {
   core_picks: CorePick[];
   slips: Slip[];
   bankroll: { budget: number; total_slips: number; stake_per_slip: number };
+  quota?: { used: number; remaining: number };
+  matches_fetched?: number;
 }
 
 const categoryConfig = {
