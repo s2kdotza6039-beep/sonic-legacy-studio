@@ -142,6 +142,104 @@ export type Database = {
         }
         Relationships: []
       }
+      betting_selections: {
+        Row: {
+          away: string
+          created_at: string
+          home: string
+          id: string
+          is_core: boolean
+          kickoff: string | null
+          league: string | null
+          market: string
+          probability: number
+          result: string
+          slip_id: string
+        }
+        Insert: {
+          away: string
+          created_at?: string
+          home: string
+          id?: string
+          is_core?: boolean
+          kickoff?: string | null
+          league?: string | null
+          market: string
+          probability?: number
+          result?: string
+          slip_id: string
+        }
+        Update: {
+          away?: string
+          created_at?: string
+          home?: string
+          id?: string
+          is_core?: boolean
+          kickoff?: string | null
+          league?: string | null
+          market?: string
+          probability?: number
+          result?: string
+          slip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "betting_selections_slip_id_fkey"
+            columns: ["slip_id"]
+            isOneToOne: false
+            referencedRelation: "betting_slips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      betting_slips: {
+        Row: {
+          actual_return: number | null
+          category: string
+          created_at: string
+          estimated_odds: number
+          id: string
+          match_date: string
+          notes: string | null
+          potential_return: number
+          result: string
+          slip_number: number
+          stake: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actual_return?: number | null
+          category?: string
+          created_at?: string
+          estimated_odds?: number
+          id?: string
+          match_date: string
+          notes?: string | null
+          potential_return?: number
+          result?: string
+          slip_number: number
+          stake?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actual_return?: number | null
+          category?: string
+          created_at?: string
+          estimated_odds?: number
+          id?: string
+          match_date?: string
+          notes?: string | null
+          potential_return?: number
+          result?: string
+          slip_number?: number
+          stake?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_posts: {
         Row: {
           created_at: string

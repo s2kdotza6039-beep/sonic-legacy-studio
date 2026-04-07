@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Target, TrendingUp, Shield, AlertTriangle, Zap, Brain, BarChart3, DollarSign, Filter, Layers, PlayCircle } from "lucide-react";
+import { Target, TrendingUp, Shield, AlertTriangle, Zap, Brain, BarChart3, DollarSign, Filter, Layers, PlayCircle, History } from "lucide-react";
 import SlipGeneratorEngine from "./SlipGeneratorEngine";
+import SlipHistory from "./SlipHistory";
 
 const systemSections = [
   {
@@ -219,6 +220,12 @@ const systemSections = [
     label: "⚡ Live Engine",
     icon: PlayCircle,
     content: <SlipGeneratorEngine />,
+  },
+  {
+    key: "history",
+    label: "📊 History",
+    icon: History,
+    content: <SlipHistory />,
   },
 ];
 

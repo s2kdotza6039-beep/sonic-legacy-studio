@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Selection {
   match_id: number;
@@ -67,16 +68,20 @@ const categoryConfig = {
 
 const SlipGeneratorEngine = () => {
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [data, setData] = useState<SlipData | null>(null);
   const [budget, setBudget] = useState("100");
   const [slipCount, setSlipCount] = useState("8");
   const [expandedSlip, setExpandedSlip] = useState<number | null>(null);
   const [showMatches, setShowMatches] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const generate = async () => {
     setLoading(true);
     setData(null);
+    setSaved(false);
     try {
       const { data: result, error } = await supabase.functions.invoke("generate-betting-slips", {
         body: { budget: Number(budget), slipCount: Number(slipCount) },
@@ -89,6 +94,50 @@ const SlipGeneratorEngine = () => {
       toast({ title: "Generation Failed", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveAllSlips = async () => {
+    if (!data || !user) return;
+    setSaving(true);
+    try {
+      for (const slip of data.slips) {
+        const { data: savedSlip, error: slipError } = await supabase
+          .from("betting_slips")
+          .insert({
+            user_id: user.id,
+            slip_number: slip.id,
+            category: slip.category,
+            stake: slip.stake,
+            estimated_odds: slip.estimated_odds,
+            potential_return: slip.potential_return,
+            match_date: data.date,
+          })
+          .select()
+          .single();
+
+        if (slipError) throw slipError;
+
+        const selections = slip.selections.map((sel) => ({
+          slip_id: savedSlip.id,
+          home: sel.home,
+          away: sel.away,
+          market: sel.market,
+          probability: sel.probability,
+          is_core: sel.is_core,
+          kickoff: sel.kickoff || null,
+          league: sel.league || null,
+        }));
+
+        const { error: selError } = await supabase.from("betting_selections").insert(selections);
+        if (selError) throw selError;
+      }
+      setSaved(true);
+      toast({ title: "Slips Saved", description: `${data.slips.length} slips saved to history` });
+    } catch (e: any) {
+      toast({ title: "Save Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -200,9 +249,15 @@ const SlipGeneratorEngine = () => {
 
           {/* Generated Slips */}
           <div className="space-y-3">
-            <h3 className="text-sm uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <DollarSign size={14} /> Generated Slips — {data.date}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <DollarSign size={14} /> Generated Slips — {data.date}
+              </h3>
+              <Button onClick={saveAllSlips} disabled={saving || saved} size="sm" variant="outline" className="gap-2">
+                {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                {saved ? "Saved ✓" : saving ? "Saving..." : "Save All Slips"}
+              </Button>
+            </div>
             {data.slips?.map((slip) => {
               const config = categoryConfig[slip.category] || categoryConfig.SAFE;
               const Icon = config.icon;
