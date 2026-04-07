@@ -74,6 +74,30 @@ const SlipHistory = () => {
     }
   };
 
+  const updateSelectionResult = async (selectionId: string, result: "won" | "lost", slip: SavedSlip) => {
+    const { error } = await supabase
+      .from("betting_selections")
+      .update({ result })
+      .eq("id", selectionId);
+
+    if (error) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    // Auto-determine slip result: if all selections are resolved, mark slip accordingly
+    const updatedSelections = slip.betting_selections.map(s => 
+      s.id === selectionId ? { ...s, result } : s
+    );
+    const allResolved = updatedSelections.every(s => s.result !== "pending");
+    if (allResolved) {
+      const allWon = updatedSelections.every(s => s.result === "won");
+      await updateResult(slip.id, allWon ? "won" : "lost", allWon ? Number(slip.potential_return) : 0);
+    } else {
+      fetchSlips();
+    }
+  };
+
   const stats = {
     total: slips.length,
     won: slips.filter(s => s.result === "won").length,
@@ -212,16 +236,29 @@ const SlipHistory = () => {
                     {isExpanded && (
                       <div className="mt-4 space-y-2 border-t border-border pt-3" onClick={(e) => e.stopPropagation()}>
                         {slip.betting_selections?.map((sel) => (
-                          <div key={sel.id} className="flex items-center justify-between text-sm py-1">
+                          <div key={sel.id} className="flex items-center justify-between text-sm py-1.5 border-b border-border/50 last:border-0">
                             <div className="flex items-center gap-2">
+                              {sel.result === "won" && <CheckCircle size={13} className="text-primary" />}
+                              {sel.result === "lost" && <XCircle size={13} className="text-destructive" />}
+                              {sel.result === "pending" && <Clock size={13} className="text-muted-foreground" />}
                               {sel.is_core && <Badge className="text-[10px] py-0">CORE</Badge>}
-                              <span>{sel.home} vs {sel.away}</span>
+                              <span className={sel.result === "lost" ? "line-through text-muted-foreground" : ""}>{sel.home} vs {sel.away}</span>
                             </div>
-                            <div className="flex items-center gap-3 text-xs">
-                              {sel.league && <span className="text-muted-foreground">{sel.league}</span>}
+                            <div className="flex items-center gap-2 text-xs">
+                              {sel.league && <span className="text-muted-foreground hidden md:inline">{sel.league}</span>}
                               {sel.kickoff && <span className="text-muted-foreground">⏰ {sel.kickoff}</span>}
                               <span className="text-muted-foreground">{sel.market}</span>
                               <span className="text-primary">{Number(sel.probability)}%</span>
+                              {sel.result === "pending" && (
+                                <div className="flex gap-1 ml-1">
+                                  <button onClick={() => updateSelectionResult(sel.id, "won", slip)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title="Won">
+                                    <CheckCircle size={14} />
+                                  </button>
+                                  <button onClick={() => updateSelectionResult(sel.id, "lost", slip)} className="p-0.5 rounded hover:bg-destructive/10 text-destructive" title="Lost">
+                                    <XCircle size={14} />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
