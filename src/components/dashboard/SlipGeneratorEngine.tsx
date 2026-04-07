@@ -150,6 +150,7 @@ const SlipGeneratorEngine = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm uppercase tracking-widest flex items-center gap-2">
             <Zap size={16} className="text-primary" /> Slip Generator Engine
+            {isLiveData && <Badge className="bg-green-600 text-white text-[10px] animate-pulse">🔴 LIVE ODDS</Badge>}
           </CardTitle>
         </CardHeader>
         <CardContent>
