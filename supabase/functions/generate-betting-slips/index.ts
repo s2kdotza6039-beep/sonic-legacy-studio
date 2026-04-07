@@ -79,18 +79,30 @@ interface LiveMatch {
   btts_prob: number;
 }
 
-async function fetchLiveOdds(apiKey: string): Promise<LiveMatch[]> {
+interface OddsResult {
+  events: LiveMatch[];
+  quota_used: number;
+  quota_remaining: number;
+}
+
+async function fetchLiveOdds(apiKey: string): Promise<OddsResult> {
   const allEvents: LiveMatch[] = [];
   const markets = "h2h,totals";
+  let quotaUsed = 0;
+  let quotaRemaining = 0;
 
   // Fetch all leagues in parallel
   const results = await Promise.allSettled(
     SPORT_KEYS.map(async (sportKey) => {
       const url = `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=uk&markets=${markets}&oddsFormat=decimal`;
       const response = await fetch(url);
-      if (!response.ok) { console.warn(`Odds API ${sportKey}: ${response.status}`); return []; }
+      if (!response.ok) { console.warn(`Odds API ${sportKey}: ${response.status}`); return { events: [], sportKey }; }
+      const remaining = response.headers.get("x-requests-remaining");
+      const used = response.headers.get("x-requests-used");
+      if (remaining) quotaRemaining = Math.min(quotaRemaining || Infinity, parseInt(remaining));
+      if (used) quotaUsed = Math.max(quotaUsed, parseInt(used));
       const events = await response.json();
-      return events.map((event: any) => ({ ...event, _sportKey: sportKey }));
+      return { events: events.map((e: any) => ({ ...e, _sportKey: sportKey })), sportKey };
     })
   );
 
