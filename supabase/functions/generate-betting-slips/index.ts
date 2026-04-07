@@ -108,7 +108,8 @@ async function fetchLiveOdds(apiKey: string): Promise<OddsResult> {
 
   for (const result of results) {
     if (result.status !== "fulfilled") continue;
-    for (const event of result.value) {
+    const { events: fetchedEvents } = result.value;
+    for (const event of fetchedEvents) {
       if (!event.bookmakers?.length) continue;
       const sportKey = event._sportKey;
 
