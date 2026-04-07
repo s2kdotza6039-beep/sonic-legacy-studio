@@ -74,6 +74,30 @@ const SlipHistory = () => {
     }
   };
 
+  const updateSelectionResult = async (selectionId: string, result: "won" | "lost", slip: SavedSlip) => {
+    const { error } = await supabase
+      .from("betting_selections")
+      .update({ result })
+      .eq("id", selectionId);
+
+    if (error) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    // Auto-determine slip result: if all selections are resolved, mark slip accordingly
+    const updatedSelections = slip.betting_selections.map(s => 
+      s.id === selectionId ? { ...s, result } : s
+    );
+    const allResolved = updatedSelections.every(s => s.result !== "pending");
+    if (allResolved) {
+      const allWon = updatedSelections.every(s => s.result === "won");
+      await updateResult(slip.id, allWon ? "won" : "lost", allWon ? Number(slip.potential_return) : 0);
+    } else {
+      fetchSlips();
+    }
+  };
+
   const stats = {
     total: slips.length,
     won: slips.filter(s => s.result === "won").length,
