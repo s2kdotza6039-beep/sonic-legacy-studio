@@ -102,6 +102,7 @@ const Dashboard = () => {
             {tab === "content" && <ContentEngine />}
             {tab === "revenue" && <RevenuePipeline />}
             {tab === "contracts" && <ContractVault />}
+            {tab === "betting" && <BettingSystem />}
           </div>
           <div>
             <RemindersPanel />
