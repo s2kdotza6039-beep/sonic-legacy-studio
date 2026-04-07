@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Target, TrendingUp, Shield, AlertTriangle, Zap, Brain, BarChart3, DollarSign, Filter, Layers } from "lucide-react";
+import { Target, TrendingUp, Shield, AlertTriangle, Zap, Brain, BarChart3, DollarSign, Filter, Layers, PlayCircle } from "lucide-react";
+import SlipGeneratorEngine from "./SlipGeneratorEngine";
 
 const systemSections = [
   {
