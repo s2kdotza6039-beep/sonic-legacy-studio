@@ -293,9 +293,9 @@ Return valid JSON with this exact structure:
     }
 
     const slipData = JSON.parse(content);
-    // Tag as live data
     slipData.data_source = "live_odds_api";
-    slipData.matches_fetched = liveMatches.length;
+    slipData.matches_fetched = oddsResult.events.length;
+    slipData.quota = { used: oddsResult.quota_used, remaining: oddsResult.quota_remaining };
 
     return new Response(JSON.stringify(slipData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
