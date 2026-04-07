@@ -1,6 +1,6 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Target, TrendingUp, Shield, AlertTriangle, Zap, Brain, BarChart3, DollarSign, Filter, Layers } from "lucide-react";
 
 const systemSections = [
@@ -82,9 +82,9 @@ const systemSections = [
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Only keep matches where <Badge variant="outline">Confidence = HIGH</Badge> AND one of:</p>
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm"><span className="text-green-400">✔</span> Win Probability &gt; 60%</div>
-          <div className="flex items-center gap-2 text-sm"><span className="text-green-400">✔</span> Over 1.5 &gt; 75%</div>
-          <div className="flex items-center gap-2 text-sm"><span className="text-green-400">✔</span> BTTS &gt; 65%</div>
+          <div className="flex items-center gap-2 text-sm"><span className="text-primary">✔</span> Win Probability &gt; 60%</div>
+          <div className="flex items-center gap-2 text-sm"><span className="text-primary">✔</span> Over 1.5 &gt; 75%</div>
+          <div className="flex items-center gap-2 text-sm"><span className="text-primary">✔</span> BTTS &gt; 65%</div>
         </div>
         <p className="text-xs text-primary">👉 Final selection: 8–12 matches</p>
       </div>
@@ -114,9 +114,9 @@ const systemSections = [
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Generate <strong className="text-foreground">5–10 slips daily</strong></p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="border border-green-500/30 bg-green-500/5 p-4 space-y-2">
+          <div className="border border-primary/30 bg-primary/5 p-4 space-y-2">
             <div className="flex items-center gap-2">
-              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">SAFE</Badge>
+              <Badge variant="outline" className="text-primary border-primary/30">SAFE</Badge>
               <span className="text-xs text-muted-foreground">Slip 1–3</span>
             </div>
             <ul className="text-xs text-muted-foreground space-y-1">
@@ -125,11 +125,11 @@ const systemSections = [
               <li>• 3–5 matches per slip</li>
               <li>• Mostly CORE picks</li>
             </ul>
-            <p className="text-xs text-green-400">High probability, Low risk</p>
+            <p className="text-xs text-primary">High probability, Low risk</p>
           </div>
-          <div className="border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-2">
+          <div className="border border-accent/30 bg-accent/5 p-4 space-y-2">
             <div className="flex items-center gap-2">
-              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">BALANCED</Badge>
+              <Badge variant="outline" className="text-accent-foreground border-accent/30">BALANCED</Badge>
               <span className="text-xs text-muted-foreground">Slip 4–7</span>
             </div>
             <ul className="text-xs text-muted-foreground space-y-1">
@@ -138,11 +138,11 @@ const systemSections = [
               <li>• 4–6 matches</li>
               <li>• CORE + 1–2 variations</li>
             </ul>
-            <p className="text-xs text-yellow-400">Medium risk, Better payout</p>
+            <p className="text-xs text-accent-foreground">Medium risk, Better payout</p>
           </div>
-          <div className="border border-red-500/30 bg-red-500/5 p-4 space-y-2">
+          <div className="border border-destructive/30 bg-destructive/5 p-4 space-y-2">
             <div className="flex items-center gap-2">
-              <Badge className="bg-red-500/20 text-red-400 border-red-500/30">HIGH RISK</Badge>
+              <Badge variant="outline" className="text-destructive border-destructive/30">HIGH RISK</Badge>
               <span className="text-xs text-muted-foreground">Slip 8–10</span>
             </div>
             <ul className="text-xs text-muted-foreground space-y-1">
@@ -151,7 +151,7 @@ const systemSections = [
               <li>• Over 3.5</li>
               <li>• 2–4 matches</li>
             </ul>
-            <p className="text-xs text-red-400">High payout (optional use)</p>
+            <p className="text-xs text-destructive">High payout (optional use)</p>
           </div>
         </div>
       </div>
@@ -216,6 +216,8 @@ const systemSections = [
 ];
 
 const BettingSystem = () => {
+  const [activeTab, setActiveTab] = useState("purpose");
+
   return (
     <div className="space-y-6">
       <Card className="border-primary/20">
@@ -250,53 +252,7 @@ const BettingSystem = () => {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="purpose" className="w-full">
-        <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-transparent p-0">
-          {systemSections.map((s) => (
-            <button
-              key={s.key}
-              value={s.key}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs uppercase tracking-widest border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors data-[state=active]:border-primary data-[state=active]:text-primary"
-              // We'll use a custom tab approach below
-            >
-              <s.icon size={12} /> {s.label}
-            </button>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      {/* Using a simple state-based approach matching the dashboard pattern */}
-      <BettingTabs />
-
-      {/* Final Summary */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-6">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">🔥 System Result</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div className="flex items-center gap-2"><span className="text-green-400">✔</span> Reduces risk</div>
-            <div className="flex items-center gap-2"><span className="text-green-400">✔</span> Uses probability</div>
-            <div className="flex items-center gap-2"><span className="text-green-400">✔</span> Structured strategy</div>
-            <div className="flex items-center gap-2"><span className="text-green-400">✔</span> Works daily</div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-primary/20 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground">Final Logic Rules:</p>
-            <p>No random picks • No emotional betting • Only HIGH confidence • Multiple slips • Always vary 1–2 selections</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-// Internal tabbed component
-import { useState } from "react";
-
-const BettingTabs = () => {
-  const [activeTab, setActiveTab] = useState("purpose");
-
-  return (
-    <div>
-      <div className="flex gap-1.5 flex-wrap mb-4">
+      <div className="flex gap-1.5 flex-wrap">
         {systemSections.map((s) => (
           <button
             key={s.key}
@@ -311,9 +267,26 @@ const BettingTabs = () => {
           </button>
         ))}
       </div>
+
       <Card>
         <CardContent className="p-6">
           {systemSections.find((s) => s.key === activeTab)?.content}
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-6">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">🔥 System Result</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="flex items-center gap-2"><span className="text-primary">✔</span> Reduces risk</div>
+            <div className="flex items-center gap-2"><span className="text-primary">✔</span> Uses probability</div>
+            <div className="flex items-center gap-2"><span className="text-primary">✔</span> Structured strategy</div>
+            <div className="flex items-center gap-2"><span className="text-primary">✔</span> Works daily</div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-primary/20 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">Final Logic Rules:</p>
+            <p>No random picks • No emotional betting • Only HIGH confidence • Multiple slips • Always vary 1–2 selections</p>
+          </div>
         </CardContent>
       </Card>
     </div>
