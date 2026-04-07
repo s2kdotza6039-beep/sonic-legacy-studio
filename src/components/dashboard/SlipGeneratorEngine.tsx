@@ -262,8 +262,14 @@ const SlipGeneratorEngine = () => {
                 const score = m.confidence_score ?? 0;
                 const scoreColor = score >= 75 ? "text-primary" : score >= 50 ? "text-accent-foreground" : "text-destructive";
                 const scoreBg = score >= 75 ? "bg-primary" : score >= 50 ? "bg-accent" : "bg-destructive";
+                // Gradient border: gold for high, muted for mid, destructive for low
+                const borderStyle = score >= 80
+                  ? { borderImage: `linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.3)) 1` }
+                  : score >= 60
+                    ? { borderImage: `linear-gradient(135deg, hsl(var(--muted-foreground)), hsl(var(--muted-foreground) / 0.2)) 1` }
+                    : { borderImage: `linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive) / 0.2)) 1` };
                 return (
-                <Card key={m.id} className={m.is_core ? "border-primary/30" : ""}>
+                <Card key={m.id} className="border-2" style={borderStyle}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-muted-foreground">{m.league} • {m.kickoff}</span>
