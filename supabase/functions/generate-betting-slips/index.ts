@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
 
     // Step 1: Fetch live odds from The Odds API
     console.log("Fetching live odds...");
-    const liveMatches = await fetchLiveOdds(ODDS_API_KEY);
+    let liveMatches = await fetchLiveOdds(ODDS_API_KEY);
     console.log(`Fetched ${liveMatches.length} live matches`);
 
     if (liveMatches.length === 0) {
@@ -146,6 +146,13 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Limit to 20 best matches to avoid AI timeout
+    // Prioritize by highest probability spread (clearest favorites)
+    liveMatches = liveMatches
+      .sort((a, b) => Math.max(b.win_prob, b.lose_prob) - Math.max(a.win_prob, a.lose_prob))
+      .slice(0, 20);
+    console.log(`Using top ${liveMatches.length} matches for analysis`);
 
     // Step 2: Send real odds data to AI for analysis and slip generation
     const matchSummary = liveMatches.map((m, i) => ({
