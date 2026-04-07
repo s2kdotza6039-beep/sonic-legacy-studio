@@ -12,6 +12,8 @@ import RemindersPanel from "@/components/dashboard/RemindersPanel";
 import ArtistScorecard from "@/components/dashboard/ArtistScorecard";
 import IdeasBoard from "@/components/dashboard/IdeasBoard";
 import ContractVault from "@/components/dashboard/ContractVault";
+import BettingSystem from "@/components/dashboard/BettingSystem";
+import { Target } from "lucide-react";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -21,6 +23,7 @@ const TABS = [
   { key: "content", label: "Content", icon: Film },
   { key: "revenue", label: "Revenue", icon: DollarSign },
   { key: "contracts", label: "Contracts", icon: FileText },
+  { key: "betting", label: "AI Betting", icon: Target },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -99,6 +102,7 @@ const Dashboard = () => {
             {tab === "content" && <ContentEngine />}
             {tab === "revenue" && <RevenuePipeline />}
             {tab === "contracts" && <ContractVault />}
+            {tab === "betting" && <BettingSystem />}
           </div>
           <div>
             <RemindersPanel />
