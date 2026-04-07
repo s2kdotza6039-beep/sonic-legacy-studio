@@ -162,7 +162,7 @@ async function fetchLiveOdds(apiKey: string): Promise<OddsResult> {
   }
 
   allEvents.sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime());
-  return allEvents;
+  return { events: allEvents, quota_used: quotaUsed, quota_remaining: quotaRemaining };
 }
 
 Deno.serve(async (req) => {
