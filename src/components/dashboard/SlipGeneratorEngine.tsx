@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save, Activity } from "lucide-react";
+import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save, Activity, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -79,6 +79,7 @@ const SlipGeneratorEngine = () => {
   const [expandedSlip, setExpandedSlip] = useState<number | null>(null);
   const [showMatches, setShowMatches] = useState(false);
   const [isLiveData, setIsLiveData] = useState(false);
+  const [matchSort, setMatchSort] = useState<"confidence" | "kickoff">("confidence");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -222,14 +223,29 @@ const SlipGeneratorEngine = () => {
       {data && (
         <>
           {/* Match Analysis Toggle */}
-          <button onClick={() => setShowMatches(!showMatches)} className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">
-            {showMatches ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {showMatches ? "Hide" : "Show"} Match Analysis ({data.matches?.length || 0} matches)
-          </button>
+          <div className="flex items-center justify-between">
+            <button onClick={() => setShowMatches(!showMatches)} className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">
+              {showMatches ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              {showMatches ? "Hide" : "Show"} Match Analysis ({data.matches?.length || 0} matches)
+            </button>
+            {showMatches && (
+              <button
+                onClick={() => setMatchSort(matchSort === "confidence" ? "kickoff" : "confidence")}
+                className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors border border-border px-2 py-1"
+              >
+                <ArrowUpDown size={10} />
+                Sort: {matchSort === "confidence" ? "Confidence ↓" : "Kickoff ↑"}
+              </button>
+            )}
+          </div>
 
           {showMatches && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {data.matches?.map((m) => {
+              {[...(data.matches || [])].sort((a, b) =>
+                matchSort === "confidence"
+                  ? (b.confidence_score ?? 0) - (a.confidence_score ?? 0)
+                  : (a.kickoff || "").localeCompare(b.kickoff || "")
+              ).map((m) => {
                 const score = m.confidence_score ?? 0;
                 const scoreColor = score >= 75 ? "text-primary" : score >= 50 ? "text-accent-foreground" : "text-destructive";
                 const scoreBg = score >= 75 ? "bg-primary" : score >= 50 ? "bg-accent" : "bg-destructive";
