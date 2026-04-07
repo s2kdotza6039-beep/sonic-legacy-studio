@@ -75,6 +75,7 @@ const SlipGeneratorEngine = () => {
   const [slipCount, setSlipCount] = useState("8");
   const [expandedSlip, setExpandedSlip] = useState<number | null>(null);
   const [showMatches, setShowMatches] = useState(false);
+  const [isLiveData, setIsLiveData] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -89,7 +90,8 @@ const SlipGeneratorEngine = () => {
       if (error) throw error;
       if (result.error) throw new Error(result.error);
       setData(result);
-      toast({ title: "Slips Generated", description: `${result.slips?.length || 0} slips ready for ${result.date}` });
+      setIsLiveData(result.data_source === "live_odds_api");
+      toast({ title: "Slips Generated", description: `${result.slips?.length || 0} slips ready for ${result.date}${result.data_source === "live_odds_api" ? " (LIVE odds)" : ""}` });
     } catch (e: any) {
       toast({ title: "Generation Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -148,6 +150,7 @@ const SlipGeneratorEngine = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm uppercase tracking-widest flex items-center gap-2">
             <Zap size={16} className="text-primary" /> Slip Generator Engine
+            {isLiveData && <Badge className="bg-green-600 text-white text-[10px] animate-pulse">🔴 LIVE ODDS</Badge>}
           </CardTitle>
         </CardHeader>
         <CardContent>
