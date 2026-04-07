@@ -196,20 +196,20 @@ const SlipGeneratorEngine = () => {
                 <p className="text-xs text-muted-foreground">Per Slip</p>
               </div>
               {data.quota && (
-                <div className={`border p-2 ${data.quota.remaining < 50 ? "border-destructive/50 bg-destructive/5" : "border-border"}`}>
+                <div className={`border p-2 ${data.quota.remaining < 20 ? "border-destructive/50 bg-destructive/5" : "border-border"}`}>
                   <div className="flex items-center justify-center gap-1">
-                    <Activity size={12} className={data.quota.remaining < 50 ? "text-destructive" : "text-muted-foreground"} />
-                    <p className={`text-lg font-bold ${data.quota.remaining < 50 ? "text-destructive" : "text-primary"}`}>{data.quota.remaining}</p>
+                    <Activity size={12} className={data.quota.remaining < 20 ? "text-destructive" : "text-muted-foreground"} />
+                    <p className={`text-lg font-bold ${data.quota.remaining < 20 ? "text-destructive" : "text-primary"}`}>{data.quota.remaining}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">API Requests Left</p>
                   <div className="mt-1 w-full bg-muted rounded-full h-1.5">
                     <div
-                      className={`rounded-full h-1.5 transition-all ${data.quota.remaining < 50 ? "bg-destructive" : "bg-primary"}`}
+                      className={`rounded-full h-1.5 transition-all ${data.quota.remaining < 20 ? "bg-destructive" : "bg-primary"}`}
                       style={{ width: `${Math.max(2, (data.quota.remaining / (data.quota.used + data.quota.remaining)) * 100)}%` }}
                     />
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {data.quota.used} used {data.quota.remaining < 50 && "⚠️"}
+                    {data.quota.used} used {data.quota.remaining < 20 && "⚠️"}
                   </p>
                 </div>
               )}
