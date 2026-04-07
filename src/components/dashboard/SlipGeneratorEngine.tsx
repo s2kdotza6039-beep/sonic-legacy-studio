@@ -94,6 +94,13 @@ const SlipGeneratorEngine = () => {
       setData(result);
       setIsLiveData(result.data_source === "live_odds_api");
       toast({ title: "Slips Generated", description: `${result.slips?.length || 0} slips ready for ${result.date}${result.data_source === "live_odds_api" ? " (LIVE odds)" : ""}` });
+      if (result.quota?.remaining < 50) {
+        toast({
+          title: "⚠️ Low API Quota",
+          description: `Only ${result.quota.remaining} requests remaining this month. Consider upgrading your plan.`,
+          variant: "destructive",
+        });
+      }
     } catch (e: any) {
       toast({ title: "Generation Failed", description: e.message, variant: "destructive" });
     } finally {
