@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save, Activity, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -80,6 +81,7 @@ const SlipGeneratorEngine = () => {
   const [showMatches, setShowMatches] = useState(false);
   const [isLiveData, setIsLiveData] = useState(false);
   const [matchSort, setMatchSort] = useState<"confidence" | "kickoff">("confidence");
+  const [minConfidence, setMinConfidence] = useState(60);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -89,7 +91,7 @@ const SlipGeneratorEngine = () => {
     setSaved(false);
     try {
       const { data: result, error } = await supabase.functions.invoke("generate-betting-slips", {
-        body: { budget: Number(budget), slipCount: Number(slipCount) },
+        body: { budget: Number(budget), slipCount: Number(slipCount), minConfidence },
       });
       if (error) throw error;
       if (result.error) throw new Error(result.error);
@@ -173,6 +175,17 @@ const SlipGeneratorEngine = () => {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground uppercase tracking-widest">Slips</label>
               <Input value={slipCount} onChange={(e) => setSlipCount(e.target.value)} className="w-20" type="number" min={3} max={10} />
+            </div>
+            <div className="space-y-1 min-w-[160px]">
+              <label className="text-xs text-muted-foreground uppercase tracking-widest">Min Confidence: {minConfidence}</label>
+              <Slider
+                value={[minConfidence]}
+                onValueChange={(v) => setMinConfidence(v[0])}
+                min={0}
+                max={100}
+                step={5}
+                className="w-full"
+              />
             </div>
             <Button onClick={generate} disabled={loading} className="gap-2">
               {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
