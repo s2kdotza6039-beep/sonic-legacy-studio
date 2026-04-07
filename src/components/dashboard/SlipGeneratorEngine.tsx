@@ -94,6 +94,13 @@ const SlipGeneratorEngine = () => {
       setData(result);
       setIsLiveData(result.data_source === "live_odds_api");
       toast({ title: "Slips Generated", description: `${result.slips?.length || 0} slips ready for ${result.date}${result.data_source === "live_odds_api" ? " (LIVE odds)" : ""}` });
+      if (result.quota?.remaining < 50) {
+        toast({
+          title: "⚠️ Low API Quota",
+          description: `Only ${result.quota.remaining} requests remaining this month. Consider upgrading your plan.`,
+          variant: "destructive",
+        });
+      }
     } catch (e: any) {
       toast({ title: "Generation Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -189,19 +196,21 @@ const SlipGeneratorEngine = () => {
                 <p className="text-xs text-muted-foreground">Per Slip</p>
               </div>
               {data.quota && (
-                <div className="border border-border p-2">
+                <div className={`border p-2 ${data.quota.remaining < 50 ? "border-destructive/50 bg-destructive/5" : "border-border"}`}>
                   <div className="flex items-center justify-center gap-1">
-                    <Activity size={12} className="text-muted-foreground" />
-                    <p className="text-lg font-bold text-primary">{data.quota.remaining}</p>
+                    <Activity size={12} className={data.quota.remaining < 50 ? "text-destructive" : "text-muted-foreground"} />
+                    <p className={`text-lg font-bold ${data.quota.remaining < 50 ? "text-destructive" : "text-primary"}`}>{data.quota.remaining}</p>
                   </div>
                   <p className="text-xs text-muted-foreground">API Requests Left</p>
                   <div className="mt-1 w-full bg-muted rounded-full h-1.5">
                     <div
-                      className="bg-primary rounded-full h-1.5 transition-all"
+                      className={`rounded-full h-1.5 transition-all ${data.quota.remaining < 50 ? "bg-destructive" : "bg-primary"}`}
                       style={{ width: `${Math.max(2, (data.quota.remaining / (data.quota.used + data.quota.remaining)) * 100)}%` }}
                     />
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{data.quota.used} used</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {data.quota.used} used {data.quota.remaining < 50 && "⚠️"}
+                  </p>
                 </div>
               )}
             </div>
