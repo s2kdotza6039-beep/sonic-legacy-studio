@@ -186,12 +186,13 @@ Deno.serve(async (req) => {
 
     // Step 1: Fetch live odds from The Odds API
     console.log("Fetching live odds...");
-    let liveMatches = await fetchLiveOdds(ODDS_API_KEY);
-    console.log(`Fetched ${liveMatches.length} live matches`);
+    const oddsResult = await fetchLiveOdds(ODDS_API_KEY);
+    let liveMatches = oddsResult.events;
+    console.log(`Fetched ${liveMatches.length} live matches (quota: ${oddsResult.quota_used} used, ${oddsResult.quota_remaining} remaining)`);
 
     if (liveMatches.length === 0) {
       return new Response(
-        JSON.stringify({ error: "No upcoming matches found. Try again closer to match day." }),
+        JSON.stringify({ error: "No upcoming matches found. Try again closer to match day.", quota: { used: oddsResult.quota_used, remaining: oddsResult.quota_remaining } }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
