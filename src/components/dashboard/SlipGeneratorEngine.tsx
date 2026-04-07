@@ -249,9 +249,15 @@ const SlipGeneratorEngine = () => {
 
           {/* Generated Slips */}
           <div className="space-y-3">
-            <h3 className="text-sm uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <DollarSign size={14} /> Generated Slips — {data.date}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <DollarSign size={14} /> Generated Slips — {data.date}
+              </h3>
+              <Button onClick={saveAllSlips} disabled={saving || saved} size="sm" variant="outline" className="gap-2">
+                {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                {saved ? "Saved ✓" : saving ? "Saving..." : "Save All Slips"}
+              </Button>
+            </div>
             {data.slips?.map((slip) => {
               const config = categoryConfig[slip.category] || categoryConfig.SAFE;
               const Icon = config.icon;
