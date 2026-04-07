@@ -5,23 +5,51 @@ const corsHeaders = {
 
 const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
 
-// Soccer sport keys for major leagues
 const SPORT_KEYS = [
-  "soccer_epl",           // Premier League
-  "soccer_spain_la_liga",  // La Liga
-  "soccer_italy_serie_a",  // Serie A
-  "soccer_germany_bundesliga", // Bundesliga
-  "soccer_france_ligue_one",   // Ligue 1
-  "soccer_uefa_champs_league", // Champions League
+  "soccer_epl", "soccer_spain_la_liga", "soccer_italy_serie_a",
+  "soccer_germany_bundesliga", "soccer_france_ligue_one",
+  "soccer_uefa_champs_league", "soccer_uefa_europa_league", "soccer_uefa_europa_conference_league",
+  "soccer_efl_champ", "soccer_england_league1", "soccer_england_league2",
+  "soccer_fa_cup", "soccer_england_efl_cup",
+  "soccer_spain_segunda_division", "soccer_italy_serie_b",
+  "soccer_netherlands_eredivisie", "soccer_portugal_primeira_liga",
+  "soccer_turkey_super_league", "soccer_belgium_first_div",
+  "soccer_switzerland_superleague", "soccer_austria_bundesliga",
+  "soccer_denmark_superliga", "soccer_sweden_allsvenskan",
+  "soccer_norway_eliteserien", "soccer_finland_veikkausliiga",
+  "soccer_greece_super_league", "soccer_poland_ekstraklasa",
+  "soccer_league_of_ireland",
+  "soccer_fifa_world_cup", "soccer_uefa_european_championship",
+  "soccer_conmebol_copa_libertadores", "soccer_africa_cup_of_nations",
+  "soccer_concacaf_gold_cup", "soccer_concacaf_leagues_cup",
+  "soccer_usa_mls", "soccer_argentina_primera_division",
+  "soccer_brazil_campeonato", "soccer_brazil_serie_b",
+  "soccer_australia_aleague", "soccer_china_superleague",
+  "soccer_japan_j_league", "soccer_korea_kleague1",
 ];
 
 const LEAGUE_NAMES: Record<string, string> = {
-  soccer_epl: "Premier League",
-  soccer_spain_la_liga: "La Liga",
-  soccer_italy_serie_a: "Serie A",
-  soccer_germany_bundesliga: "Bundesliga",
-  soccer_france_ligue_one: "Ligue 1",
-  soccer_uefa_champs_league: "Champions League",
+  soccer_epl: "Premier League", soccer_spain_la_liga: "La Liga",
+  soccer_italy_serie_a: "Serie A", soccer_germany_bundesliga: "Bundesliga",
+  soccer_france_ligue_one: "Ligue 1", soccer_uefa_champs_league: "Champions League",
+  soccer_uefa_europa_league: "Europa League", soccer_uefa_europa_conference_league: "Conference League",
+  soccer_efl_champ: "Championship", soccer_england_league1: "League One",
+  soccer_england_league2: "League Two", soccer_fa_cup: "FA Cup",
+  soccer_england_efl_cup: "EFL Cup", soccer_spain_segunda_division: "La Liga 2",
+  soccer_italy_serie_b: "Serie B", soccer_netherlands_eredivisie: "Eredivisie",
+  soccer_portugal_primeira_liga: "Primeira Liga", soccer_turkey_super_league: "Süper Lig",
+  soccer_belgium_first_div: "Belgian Pro League", soccer_switzerland_superleague: "Swiss Super League",
+  soccer_austria_bundesliga: "Austrian Bundesliga", soccer_denmark_superliga: "Danish Superliga",
+  soccer_sweden_allsvenskan: "Allsvenskan", soccer_norway_eliteserien: "Eliteserien",
+  soccer_finland_veikkausliiga: "Veikkausliiga", soccer_greece_super_league: "Super League Greece",
+  soccer_poland_ekstraklasa: "Ekstraklasa", soccer_league_of_ireland: "League of Ireland",
+  soccer_fifa_world_cup: "FIFA World Cup", soccer_uefa_european_championship: "UEFA Euro",
+  soccer_conmebol_copa_libertadores: "Copa Libertadores", soccer_africa_cup_of_nations: "Africa Cup of Nations",
+  soccer_concacaf_gold_cup: "CONCACAF Gold Cup", soccer_concacaf_leagues_cup: "Leagues Cup",
+  soccer_usa_mls: "MLS", soccer_argentina_primera_division: "Argentine Primera",
+  soccer_brazil_campeonato: "Brasileirão Série A", soccer_brazil_serie_b: "Brasileirão Série B",
+  soccer_australia_aleague: "A-League", soccer_china_superleague: "Chinese Super League",
+  soccer_japan_j_league: "J-League", soccer_korea_kleague1: "K-League 1",
 };
 
 interface OddsOutcome {
