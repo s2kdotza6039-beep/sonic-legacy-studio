@@ -68,12 +68,15 @@ const categoryConfig = {
 
 const SlipGeneratorEngine = () => {
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [data, setData] = useState<SlipData | null>(null);
   const [budget, setBudget] = useState("100");
   const [slipCount, setSlipCount] = useState("8");
   const [expandedSlip, setExpandedSlip] = useState<number | null>(null);
   const [showMatches, setShowMatches] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const generate = async () => {
     setLoading(true);
