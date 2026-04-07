@@ -214,6 +214,12 @@ const systemSections = [
       </div>
     ),
   },
+  {
+    key: "engine",
+    label: "⚡ Live Engine",
+    icon: PlayCircle,
+    content: <SlipGeneratorEngine />,
+  },
 ];
 
 const BettingSystem = () => {
