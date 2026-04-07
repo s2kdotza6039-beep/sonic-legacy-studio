@@ -81,6 +81,7 @@ const SlipGeneratorEngine = () => {
   const generate = async () => {
     setLoading(true);
     setData(null);
+    setSaved(false);
     try {
       const { data: result, error } = await supabase.functions.invoke("generate-betting-slips", {
         body: { budget: Number(budget), slipCount: Number(slipCount) },
@@ -93,6 +94,50 @@ const SlipGeneratorEngine = () => {
       toast({ title: "Generation Failed", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveAllSlips = async () => {
+    if (!data || !user) return;
+    setSaving(true);
+    try {
+      for (const slip of data.slips) {
+        const { data: savedSlip, error: slipError } = await supabase
+          .from("betting_slips")
+          .insert({
+            user_id: user.id,
+            slip_number: slip.id,
+            category: slip.category,
+            stake: slip.stake,
+            estimated_odds: slip.estimated_odds,
+            potential_return: slip.potential_return,
+            match_date: data.date,
+          })
+          .select()
+          .single();
+
+        if (slipError) throw slipError;
+
+        const selections = slip.selections.map((sel) => ({
+          slip_id: savedSlip.id,
+          home: sel.home,
+          away: sel.away,
+          market: sel.market,
+          probability: sel.probability,
+          is_core: sel.is_core,
+          kickoff: sel.kickoff || null,
+          league: sel.league || null,
+        }));
+
+        const { error: selError } = await supabase.from("betting_selections").insert(selections);
+        if (selError) throw selError;
+      }
+      setSaved(true);
+      toast({ title: "Slips Saved", description: `${data.slips.length} slips saved to history` });
+    } catch (e: any) {
+      toast({ title: "Save Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
