@@ -79,18 +79,30 @@ interface LiveMatch {
   btts_prob: number;
 }
 
-async function fetchLiveOdds(apiKey: string): Promise<LiveMatch[]> {
+interface OddsResult {
+  events: LiveMatch[];
+  quota_used: number;
+  quota_remaining: number;
+}
+
+async function fetchLiveOdds(apiKey: string): Promise<OddsResult> {
   const allEvents: LiveMatch[] = [];
   const markets = "h2h,totals";
+  let quotaUsed = 0;
+  let quotaRemaining = 0;
 
   // Fetch all leagues in parallel
   const results = await Promise.allSettled(
     SPORT_KEYS.map(async (sportKey) => {
       const url = `${ODDS_API_BASE}/sports/${sportKey}/odds/?apiKey=${apiKey}&regions=uk&markets=${markets}&oddsFormat=decimal`;
       const response = await fetch(url);
-      if (!response.ok) { console.warn(`Odds API ${sportKey}: ${response.status}`); return []; }
+      if (!response.ok) { console.warn(`Odds API ${sportKey}: ${response.status}`); return { events: [], sportKey }; }
+      const remaining = response.headers.get("x-requests-remaining");
+      const used = response.headers.get("x-requests-used");
+      if (remaining) quotaRemaining = Math.min(quotaRemaining || Infinity, parseInt(remaining));
+      if (used) quotaUsed = Math.max(quotaUsed, parseInt(used));
       const events = await response.json();
-      return events.map((event: any) => ({ ...event, _sportKey: sportKey }));
+      return { events: events.map((e: any) => ({ ...e, _sportKey: sportKey })), sportKey };
     })
   );
 
@@ -150,7 +162,7 @@ async function fetchLiveOdds(apiKey: string): Promise<LiveMatch[]> {
   }
 
   allEvents.sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime());
-  return allEvents;
+  return { events: allEvents, quota_used: quotaUsed, quota_remaining: quotaRemaining };
 }
 
 Deno.serve(async (req) => {
@@ -174,12 +186,13 @@ Deno.serve(async (req) => {
 
     // Step 1: Fetch live odds from The Odds API
     console.log("Fetching live odds...");
-    let liveMatches = await fetchLiveOdds(ODDS_API_KEY);
-    console.log(`Fetched ${liveMatches.length} live matches`);
+    const oddsResult = await fetchLiveOdds(ODDS_API_KEY);
+    let liveMatches = oddsResult.events;
+    console.log(`Fetched ${liveMatches.length} live matches (quota: ${oddsResult.quota_used} used, ${oddsResult.quota_remaining} remaining)`);
 
     if (liveMatches.length === 0) {
       return new Response(
-        JSON.stringify({ error: "No upcoming matches found. Try again closer to match day." }),
+        JSON.stringify({ error: "No upcoming matches found. Try again closer to match day.", quota: { used: oddsResult.quota_used, remaining: oddsResult.quota_remaining } }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -280,9 +293,9 @@ Return valid JSON with this exact structure:
     }
 
     const slipData = JSON.parse(content);
-    // Tag as live data
     slipData.data_source = "live_odds_api";
-    slipData.matches_fetched = liveMatches.length;
+    slipData.matches_fetched = oddsResult.events.length;
+    slipData.quota = { used: oddsResult.quota_used, remaining: oddsResult.quota_remaining };
 
     return new Response(JSON.stringify(slipData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

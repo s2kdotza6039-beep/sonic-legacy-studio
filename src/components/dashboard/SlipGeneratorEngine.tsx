@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save } from "lucide-react";
+import { Loader2, Zap, Shield, AlertTriangle, RefreshCw, DollarSign, TrendingUp, ChevronDown, ChevronUp, Save, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +57,8 @@ interface SlipData {
   core_picks: CorePick[];
   slips: Slip[];
   bankroll: { budget: number; total_slips: number; stake_per_slip: number };
+  quota?: { used: number; remaining: number };
+  matches_fetched?: number;
 }
 
 const categoryConfig = {
@@ -169,10 +171,10 @@ const SlipGeneratorEngine = () => {
             </Button>
           </div>
           {data && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-center">
               <div className="border border-border p-2">
-                <p className="text-lg font-bold text-primary">{data.matches?.length || 0}</p>
-                <p className="text-xs text-muted-foreground">Matches Analyzed</p>
+                <p className="text-lg font-bold text-primary">{data.matches_fetched || data.matches?.length || 0}</p>
+                <p className="text-xs text-muted-foreground">Matches Found</p>
               </div>
               <div className="border border-border p-2">
                 <p className="text-lg font-bold text-primary">{data.core_picks?.length || 0}</p>
@@ -186,6 +188,22 @@ const SlipGeneratorEngine = () => {
                 <p className="text-lg font-bold text-primary">R{data.bankroll?.stake_per_slip || 0}</p>
                 <p className="text-xs text-muted-foreground">Per Slip</p>
               </div>
+              {data.quota && (
+                <div className="border border-border p-2">
+                  <div className="flex items-center justify-center gap-1">
+                    <Activity size={12} className="text-muted-foreground" />
+                    <p className="text-lg font-bold text-primary">{data.quota.remaining}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">API Requests Left</p>
+                  <div className="mt-1 w-full bg-muted rounded-full h-1.5">
+                    <div
+                      className="bg-primary rounded-full h-1.5 transition-all"
+                      style={{ width: `${Math.max(2, (data.quota.remaining / (data.quota.used + data.quota.remaining)) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{data.quota.used} used</p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
