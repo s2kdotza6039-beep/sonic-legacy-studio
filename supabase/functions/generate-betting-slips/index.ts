@@ -240,7 +240,7 @@ Return valid JSON with this exact structure:
       "id": 1, "home": "...", "away": "...", "league": "...", "kickoff": "...",
       "win_prob": 65, "draw_prob": 20, "lose_prob": 15,
       "over15_prob": 82, "over25_prob": 58, "btts_prob": 67,
-      "confidence": "HIGH", "is_core": true,
+      "confidence": "HIGH", "confidence_score": 85, "is_core": true,
       "pattern": "Strong home team, high scoring"
     }
   ],
