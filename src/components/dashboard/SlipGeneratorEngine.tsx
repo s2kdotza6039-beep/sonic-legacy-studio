@@ -275,6 +275,7 @@ const SlipGeneratorEngine = () => {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-muted-foreground">{m.league} • {m.kickoff}</span>
                       <div className="flex items-center gap-1">
+                        {belowThreshold && <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30">BELOW MIN</Badge>}
                         {m.is_core && <Badge className="text-[10px]">CORE</Badge>}
                         <Badge variant="outline" className="text-[10px]">{m.confidence}</Badge>
                         <Badge variant="outline" className={`text-[10px] font-bold ${scoreColor}`}>{score}/100</Badge>
