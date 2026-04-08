@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, FileText, Pencil, Trash2, Upload, Download, Search, Filter, Eye } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2, Upload, Download, Search, Filter, Eye, BookTemplate } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import ContractTemplates from "./ContractTemplates";
 
 interface Contract {
   id: string;
@@ -87,6 +89,8 @@ const ContractVault = () => {
 
   useEffect(() => { load(); }, [filterStatus, filterType, search]);
 
+  const [activeTab, setActiveTab] = useState("contracts");
+
   const openAdd = () => { setEditingId(null); setForm(emptyForm); setOpen(true); };
   const openEdit = (c: Contract) => {
     setEditingId(c.id);
@@ -95,6 +99,19 @@ const ContractVault = () => {
       status: c.status, party_name: c.party_name || "", value: c.value?.toString() || "",
       start_date: c.start_date || "", end_date: c.end_date || "", notes: c.notes || "",
     });
+    setOpen(true);
+  };
+
+  const handleUseTemplate = (template: any) => {
+    setEditingId(null);
+    setForm({
+      ...emptyForm,
+      title: `${template.title} - Copy`,
+      description: template.description || "",
+      contract_type: template.contract_type,
+      notes: template.content || "",
+    });
+    setActiveTab("contracts");
     setOpen(true);
   };
 
@@ -175,151 +192,165 @@ const ContractVault = () => {
           <h3 className="text-sm uppercase tracking-widest font-bold">Contract Vault</h3>
           <span className="text-[10px] text-muted-foreground ml-1">{counts.total} contracts</span>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
-          <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="gap-1" onClick={openAdd}><Plus size={14} /> New Contract</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editingId ? "Edit Contract" : "Add Contract"}</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <Input placeholder="Contract title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-              <Input placeholder="Party / counterpart name" value={form.party_name} onChange={(e) => setForm({ ...form, party_name: e.target.value })} />
-              <Textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v })}>
-                  <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                  <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                  <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <Input placeholder="Contract value (R)" type="number" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} />
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Start Date</label>
-                  <Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-widest">End Date</label>
-                  <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
-                </div>
-              </div>
-              <Textarea placeholder="Internal notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
-              <Button onClick={handleSave} className="w-full">{editingId ? "Update Contract" : "Add Contract"}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
-      {/* Summary bar */}
-      <div className="flex gap-4 px-4 py-3 border-b border-border overflow-x-auto">
-        {[
-          { label: "Active", count: counts.active, color: "text-green-400" },
-          { label: "Pending", count: counts.pending, color: "text-yellow-400" },
-          { label: "Draft", count: counts.draft, color: "text-muted-foreground" },
-          { label: "Total Value", count: `R${counts.totalValue.toLocaleString()}`, color: "text-primary" },
-        ].map(s => (
-          <div key={s.label} className="flex items-center gap-1.5">
-            <span className={`text-lg font-bold font-display ${s.color}`}>{s.count}</span>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.label}</span>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="px-4 pt-3">
+          <TabsList className="h-8">
+            <TabsTrigger value="contracts" className="text-xs gap-1"><FileText size={12} /> Contracts</TabsTrigger>
+            <TabsTrigger value="templates" className="text-xs gap-1"><BookTemplate size={12} /> Templates</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="contracts" className="mt-0">
+          {/* Summary bar */}
+          <div className="flex gap-4 px-4 py-3 border-b border-border overflow-x-auto">
+            {[
+              { label: "Active", count: counts.active, color: "text-green-400" },
+              { label: "Pending", count: counts.pending, color: "text-yellow-400" },
+              { label: "Draft", count: counts.draft, color: "text-muted-foreground" },
+              { label: "Total Value", count: `R${counts.totalValue.toLocaleString()}`, color: "text-primary" },
+            ].map(s => (
+              <div key={s.label} className="flex items-center gap-1.5">
+                <span className={`text-lg font-bold font-display ${s.color}`}>{s.count}</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.label}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 px-4 py-2 border-b border-border items-center flex-wrap">
-        <Search size={12} className="text-muted-foreground" />
-        <Input placeholder="Search contracts..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-[160px] text-xs" />
-        <Filter size={12} className="text-muted-foreground ml-1" />
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            {STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Contract list */}
-      <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
-        {contracts.length === 0 && (
-          <p className="p-8 text-center text-muted-foreground text-sm">No contracts yet. Add one to get started.</p>
-        )}
-        {contracts.map(contract => (
-          <div key={contract.id} className="p-4 hover:bg-secondary/20 transition-colors">
-            <div className="flex items-start gap-3">
-              <FileText size={18} className="text-primary mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h4 className="text-sm font-bold">{contract.title}</h4>
-                  <Badge className={`text-[10px] ${statusColor[contract.status]}`}>{statusLabel[contract.status]}</Badge>
-                  <Badge variant="outline" className="text-[10px]">{contract.contract_type}</Badge>
-                  {contract.value > 0 && <Badge variant="outline" className="text-[10px] text-primary">R{contract.value.toLocaleString()}</Badge>}
+          {/* Filters */}
+          <div className="flex gap-2 px-4 py-2 border-b border-border items-center flex-wrap">
+            <Search size={12} className="text-muted-foreground" />
+            <Input placeholder="Search contracts..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-[160px] text-xs" />
+            <Filter size={12} className="text-muted-foreground ml-1" />
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1 ml-auto" onClick={openAdd}><Plus size={14} /> New Contract</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>{editingId ? "Edit Contract" : "Add Contract"}</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <Input placeholder="Contract title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  <Input placeholder="Party / counterpart name" value={form.party_name} onChange={(e) => setForm({ ...form, party_name: e.target.value })} />
+                  <Textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={form.contract_type} onValueChange={(v) => setForm({ ...form, contract_type: v })}>
+                      <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                      <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                      <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                      <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <Input placeholder="Contract value (R)" type="number" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground uppercase tracking-widest">Start Date</label>
+                      <Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground uppercase tracking-widest">End Date</label>
+                      <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+                    </div>
+                  </div>
+                  <Textarea placeholder="Internal notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+                  <Button onClick={handleSave} className="w-full">{editingId ? "Update Contract" : "Add Contract"}</Button>
                 </div>
-                {contract.party_name && <p className="text-xs text-muted-foreground mb-1">Party: <span className="text-foreground">{contract.party_name}</span></p>}
-                {contract.description && <p className="text-xs text-muted-foreground line-clamp-1 mb-1">{contract.description}</p>}
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                  {contract.start_date && <span>Start: {contract.start_date}</span>}
-                  {contract.end_date && <span>End: {contract.end_date}</span>}
-                  {contract.file_name && <span className="flex items-center gap-1"><FileText size={10} />{contract.file_name}</span>}
-                  <span>{new Date(contract.created_at).toLocaleDateString()}</span>
-                </div>
-                {contract.notes && <p className="text-[10px] text-muted-foreground mt-1 italic">Note: {contract.notes}</p>}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-0.5 shrink-0">
-                <Select value={contract.status} onValueChange={(v) => handleStatusChange(contract.id, v)}>
-                  <SelectTrigger className="h-7 w-[90px] text-[10px] border-none bg-transparent"><SelectValue /></SelectTrigger>
-                  <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}</SelectContent>
-                </Select>
-
-                {/* File upload */}
-                <label className="cursor-pointer">
-                  <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(contract.id, e.target.files[0]); }} />
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild disabled={uploading}>
-                    <span><Upload size={13} /></span>
-                  </Button>
-                </label>
-
-                {contract.file_url && (
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDownload(contract)}>
-                    <Download size={13} />
-                  </Button>
-                )}
-
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(contract)}>
-                  <Pencil size={13} />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete contract?</AlertDialogTitle>
-                      <AlertDialogDescription>This will permanently delete "{contract.title}" and its uploaded file.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(contract.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
+              </DialogContent>
+            </Dialog>
           </div>
-        ))}
-      </div>
+
+          {/* Contract list */}
+          <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
+            {contracts.length === 0 && (
+              <p className="p-8 text-center text-muted-foreground text-sm">No contracts yet. Add one to get started.</p>
+            )}
+            {contracts.map(contract => (
+              <div key={contract.id} className="p-4 hover:bg-secondary/20 transition-colors">
+                <div className="flex items-start gap-3">
+                  <FileText size={18} className="text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h4 className="text-sm font-bold">{contract.title}</h4>
+                      <Badge className={`text-[10px] ${statusColor[contract.status]}`}>{statusLabel[contract.status]}</Badge>
+                      <Badge variant="outline" className="text-[10px]">{contract.contract_type}</Badge>
+                      {contract.value > 0 && <Badge variant="outline" className="text-[10px] text-primary">R{contract.value.toLocaleString()}</Badge>}
+                    </div>
+                    {contract.party_name && <p className="text-xs text-muted-foreground mb-1">Party: <span className="text-foreground">{contract.party_name}</span></p>}
+                    {contract.description && <p className="text-xs text-muted-foreground line-clamp-1 mb-1">{contract.description}</p>}
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                      {contract.start_date && <span>Start: {contract.start_date}</span>}
+                      {contract.end_date && <span>End: {contract.end_date}</span>}
+                      {contract.file_name && <span className="flex items-center gap-1"><FileText size={10} />{contract.file_name}</span>}
+                      <span>{new Date(contract.created_at).toLocaleDateString()}</span>
+                    </div>
+                    {contract.notes && <p className="text-[10px] text-muted-foreground mt-1 italic">Note: {contract.notes}</p>}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Select value={contract.status} onValueChange={(v) => handleStatusChange(contract.id, v)}>
+                      <SelectTrigger className="h-7 w-[90px] text-[10px] border-none bg-transparent"><SelectValue /></SelectTrigger>
+                      <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}</SelectContent>
+                    </Select>
+
+                    <label className="cursor-pointer">
+                      <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(contract.id, e.target.files[0]); }} />
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild disabled={uploading}>
+                        <span><Upload size={13} /></span>
+                      </Button>
+                    </label>
+
+                    {contract.file_url && (
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDownload(contract)}>
+                        <Download size={13} />
+                      </Button>
+                    )}
+
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(contract)}>
+                      <Pencil size={13} />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete contract?</AlertDialogTitle>
+                          <AlertDialogDescription>This will permanently delete "{contract.title}" and its uploaded file.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(contract.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="templates" className="mt-0 p-4">
+          <ContractTemplates onUseTemplate={handleUseTemplate} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
