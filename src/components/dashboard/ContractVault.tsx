@@ -89,6 +89,8 @@ const ContractVault = () => {
 
   useEffect(() => { load(); }, [filterStatus, filterType, search]);
 
+  const [activeTab, setActiveTab] = useState("contracts");
+
   const openAdd = () => { setEditingId(null); setForm(emptyForm); setOpen(true); };
   const openEdit = (c: Contract) => {
     setEditingId(c.id);
@@ -97,6 +99,19 @@ const ContractVault = () => {
       status: c.status, party_name: c.party_name || "", value: c.value?.toString() || "",
       start_date: c.start_date || "", end_date: c.end_date || "", notes: c.notes || "",
     });
+    setOpen(true);
+  };
+
+  const handleUseTemplate = (template: any) => {
+    setEditingId(null);
+    setForm({
+      ...emptyForm,
+      title: `${template.title} - Copy`,
+      description: template.description || "",
+      contract_type: template.contract_type,
+      notes: template.content || "",
+    });
+    setActiveTab("contracts");
     setOpen(true);
   };
 
