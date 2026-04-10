@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       artist_activities: {
         Row: {
           activity_type: string
@@ -237,6 +293,108 @@ export type Database = {
           stake?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      ceo_contacts: {
+        Row: {
+          category: string
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ceo_notes: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          is_pinned: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ceo_todos: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          is_done: boolean
+          priority: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_done?: boolean
+          priority?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_done?: boolean
+          priority?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -798,6 +956,57 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          auto_renew: boolean
+          billing_cycle: string
+          category: string
+          cost: number
+          created_at: string
+          description: string | null
+          expiry_date: string | null
+          id: string
+          notes: string | null
+          reminder_days: number
+          service_name: string
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          auto_renew?: boolean
+          billing_cycle?: string
+          category?: string
+          cost?: number
+          created_at?: string
+          description?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          reminder_days?: number
+          service_name: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_renew?: boolean
+          billing_cycle?: string
+          category?: string
+          cost?: number
+          created_at?: string
+          description?: string | null
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          reminder_days?: number
+          service_name?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -862,6 +1071,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      touring_log: {
+        Row: {
+          actual_cost: number | null
+          artist_name: string | null
+          budget: number | null
+          city: string | null
+          country: string
+          created_at: string
+          end_date: string | null
+          event_name: string
+          id: string
+          notes: string | null
+          start_date: string | null
+          status: string
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          actual_cost?: number | null
+          artist_name?: string | null
+          budget?: number | null
+          city?: string | null
+          country?: string
+          created_at?: string
+          end_date?: string | null
+          event_name: string
+          id?: string
+          notes?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          actual_cost?: number | null
+          artist_name?: string | null
+          budget?: number | null
+          city?: string | null
+          country?: string
+          created_at?: string
+          end_date?: string | null
+          event_name?: string
+          id?: string
+          notes?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

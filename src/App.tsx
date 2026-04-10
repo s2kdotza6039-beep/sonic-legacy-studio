@@ -21,6 +21,8 @@ import Dashboard from "./pages/Dashboard";
 import Royalties from "./pages/Royalties";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import Assistant from "./pages/Assistant";
+import FloatingAssistant from "./components/FloatingAssistant";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,8 +59,14 @@ const App = () => (
                 <Royalties />
               </ProtectedRoute>
             } />
+            <Route path="/assistant" element={
+              <ProtectedRoute>
+                <Assistant />
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <FloatingAssistant />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
