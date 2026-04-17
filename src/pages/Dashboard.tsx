@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -14,11 +14,13 @@ import IdeasBoard from "@/components/dashboard/IdeasBoard";
 import ContractVault from "@/components/dashboard/ContractVault";
 import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
+import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import { Target } from "lucide-react";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "ceo", label: "CEO Diary", icon: BookOpen },
+  { key: "notepad", label: "Notepad", icon: NotebookPen },
   { key: "artists", label: "Artists", icon: Users },
   { key: "scorecard", label: "Scorecard", icon: Star },
   { key: "ideas", label: "Ideas", icon: Lightbulb },
