@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarDays, Users, CheckSquare, Plane, Bell, BookOpen } from "lucide-react";
 import CeoCalendar from "./ceo/CeoCalendar";
@@ -6,7 +5,6 @@ import CeoContacts from "./ceo/CeoContacts";
 import CeoTodos from "./ceo/CeoTodos";
 import TouringLog from "./ceo/TouringLog";
 import SubscriptionsTracker from "./ceo/SubscriptionsTracker";
-import CeoNotepad from "./ceo/CeoNotepad";
 
 const CeoDiary = () => {
   return (
@@ -23,7 +21,6 @@ const CeoDiary = () => {
           <TabsTrigger value="todos" className="text-xs gap-1"><CheckSquare size={12} /> To-Do</TabsTrigger>
           <TabsTrigger value="touring" className="text-xs gap-1"><Plane size={12} /> Touring</TabsTrigger>
           <TabsTrigger value="subscriptions" className="text-xs gap-1"><Bell size={12} /> Subscriptions</TabsTrigger>
-          <TabsTrigger value="notepad" className="text-xs gap-1"><BookOpen size={12} /> Notepad</TabsTrigger>
         </TabsList>
 
         <TabsContent value="calendar"><CeoCalendar /></TabsContent>
@@ -31,7 +28,6 @@ const CeoDiary = () => {
         <TabsContent value="todos"><CeoTodos /></TabsContent>
         <TabsContent value="touring"><TouringLog /></TabsContent>
         <TabsContent value="subscriptions"><SubscriptionsTracker /></TabsContent>
-        <TabsContent value="notepad"><CeoNotepad /></TabsContent>
       </Tabs>
     </div>
   );
