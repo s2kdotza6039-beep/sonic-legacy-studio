@@ -99,6 +99,7 @@ const Dashboard = () => {
               </div>
             )}
             {tab === "ceo" && <CeoDiary />}
+            {tab === "notepad" && <CeoNotepad />}
             {tab === "artists" && <ArtistPipeline />}
             {tab === "scorecard" && <ArtistScorecard />}
             {tab === "ideas" && <IdeasBoard />}

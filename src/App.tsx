@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import FounderRoute from "@/components/FounderRoute";
 import Index from "./pages/Index";
 import About from "./pages/About";
 import Artists from "./pages/Artists";
@@ -50,19 +51,19 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={
-              <ProtectedRoute>
+              <FounderRoute>
                 <Dashboard />
-              </ProtectedRoute>
+              </FounderRoute>
             } />
             <Route path="/royalties" element={
-              <ProtectedRoute>
+              <FounderRoute>
                 <Royalties />
-              </ProtectedRoute>
+              </FounderRoute>
             } />
             <Route path="/assistant" element={
-              <ProtectedRoute>
+              <FounderRoute>
                 <Assistant />
-              </ProtectedRoute>
+              </FounderRoute>
             } />
             <Route path="*" element={<NotFound />} />
           </Routes>
