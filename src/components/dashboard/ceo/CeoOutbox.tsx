@@ -259,6 +259,23 @@ const CeoOutbox = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmSend} onOpenChange={o => !o && setConfirmSend(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send this email now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{confirmSend?.subject}" will be delivered to <strong>{confirmSend?.recipient_email}</strong> via your verified domain (notify.s2kdotza.com). This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmSend && sendViaSystem(confirmSend)}>
+              <Send size={12} className="mr-1" /> Send now
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
