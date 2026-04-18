@@ -200,7 +200,7 @@ const CeoOutbox = () => {
               </div>
               {d.status === "draft" && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Button size="sm" onClick={() => sendViaSystem(d)} disabled={sending === d.id} className="gap-1 text-xs h-7">
+                  <Button size="sm" onClick={() => setConfirmSend(d)} disabled={sending === d.id} className="gap-1 text-xs h-7">
                     <Send size={11} /> {sending === d.id ? "Sending..." : "Send via system"}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => openInMailClient(d)} className="gap-1 text-xs h-7">
