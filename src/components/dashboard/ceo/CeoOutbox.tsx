@@ -35,6 +35,7 @@ const CeoOutbox = () => {
   const [filter, setFilter] = useState<"draft" | "sent" | "all">("draft");
   const [editing, setEditing] = useState<typeof empty | null>(null);
   const [sending, setSending] = useState<string | null>(null);
+  const [confirmSend, setConfirmSend] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchDrafts = async () => {
