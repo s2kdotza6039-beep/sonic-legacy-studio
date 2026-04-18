@@ -27,24 +27,60 @@ type Draft = {
   created_at: string;
 };
 
+type DeliveryStatus = {
+  status: string;
+  error_message: string | null;
+  created_at: string;
+};
+
 const empty = { id: "", recipient_email: "", recipient_name: "", subject: "", body: "" };
+
+const deliveryBadgeVariant = (s: string): "default" | "secondary" | "destructive" | "outline" => {
+  if (s === "sent" || s === "delivered") return "default";
+  if (s === "bounced" || s === "complained" || s === "dlq" || s === "failed") return "destructive";
+  if (s === "suppressed") return "secondary";
+  return "outline";
+};
 
 const CeoOutbox = () => {
   const { toast } = useToast();
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [deliveries, setDeliveries] = useState<Record<string, DeliveryStatus>>({});
   const [filter, setFilter] = useState<"draft" | "sent" | "all">("draft");
   const [editing, setEditing] = useState<typeof empty | null>(null);
   const [sending, setSending] = useState<string | null>(null);
   const [confirmSend, setConfirmSend] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchDeliveries = async (draftIds: string[]) => {
+    if (!draftIds.length) { setDeliveries({}); return; }
+    const messageIds = draftIds.map(id => `outbox-${id}`);
+    const { data } = await supabase
+      .from("email_send_log")
+      .select("message_id, status, error_message, created_at")
+      .in("message_id", messageIds)
+      .order("created_at", { ascending: false });
+    // Latest row per message_id
+    const map: Record<string, DeliveryStatus> = {};
+    (data || []).forEach((row: any) => {
+      const draftId = row.message_id?.replace(/^outbox-/, "");
+      if (draftId && !map[draftId]) {
+        map[draftId] = { status: row.status, error_message: row.error_message, created_at: row.created_at };
+      }
+    });
+    setDeliveries(map);
+  };
+
   const fetchDrafts = async () => {
     setLoading(true);
     let q = supabase.from("email_drafts").select("*").order("created_at", { ascending: false });
     if (filter !== "all") q = q.eq("status", filter);
     const { data } = await q;
-    setDrafts((data as Draft[]) || []);
+    const list = (data as Draft[]) || [];
+    setDrafts(list);
     setLoading(false);
+    const sentIds = list.filter(d => d.status === "sent" && d.sent_via === "system").map(d => d.id);
+    fetchDeliveries(sentIds);
   };
 
   useEffect(() => { fetchDrafts(); }, [filter]);
@@ -193,6 +229,32 @@ const CeoOutbox = () => {
                     {" • "}{formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}
                     {d.sent_at && ` • sent via ${d.sent_via}`}
                   </div>
+                  {d.status === "sent" && d.sent_via === "system" && (
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Delivery:</span>
+                      {deliveries[d.id] ? (
+                        <>
+                          <Badge variant={deliveryBadgeVariant(deliveries[d.id].status)} className="text-[10px] capitalize">
+                            {deliveries[d.id].status}
+                          </Badge>
+                          {deliveries[d.id].error_message && (
+                            <span className="text-[10px] text-destructive truncate max-w-md" title={deliveries[d.id].error_message!}>
+                              {deliveries[d.id].error_message}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px]">pending</Badge>
+                      )}
+                    </div>
+                  )}
+                  {d.status === "sent" && d.sent_via === "mailto" && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Delivery:</span>
+                      <Badge variant="secondary" className="text-[10px]">external</Badge>
+                      <span className="text-[10px] text-muted-foreground">(sent from your mail client — no tracking)</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3 bg-secondary/20 p-2 border border-border/50">
