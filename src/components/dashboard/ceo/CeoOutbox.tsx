@@ -7,6 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Mail, Send, Trash2, ExternalLink, Sparkles, Plus, Edit3, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -31,6 +35,7 @@ const CeoOutbox = () => {
   const [filter, setFilter] = useState<"draft" | "sent" | "all">("draft");
   const [editing, setEditing] = useState<typeof empty | null>(null);
   const [sending, setSending] = useState<string | null>(null);
+  const [confirmSend, setConfirmSend] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchDrafts = async () => {
@@ -92,7 +97,6 @@ const CeoOutbox = () => {
   };
 
   const sendViaSystem = async (d: Draft) => {
-    if (!confirm(`Send "${d.subject}" to ${d.recipient_email}?`)) return;
     setSending(d.id);
     try {
       const { data, error } = await supabase.functions.invoke("send-transactional-email", {
@@ -118,6 +122,7 @@ const CeoOutbox = () => {
       toast({ title: "Send failed", description: e.message || "Unknown error", variant: "destructive" });
     } finally {
       setSending(null);
+      setConfirmSend(null);
     }
   };
 
@@ -195,7 +200,7 @@ const CeoOutbox = () => {
               </div>
               {d.status === "draft" && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Button size="sm" onClick={() => sendViaSystem(d)} disabled={sending === d.id} className="gap-1 text-xs h-7">
+                  <Button size="sm" onClick={() => setConfirmSend(d)} disabled={sending === d.id} className="gap-1 text-xs h-7">
                     <Send size={11} /> {sending === d.id ? "Sending..." : "Send via system"}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => openInMailClient(d)} className="gap-1 text-xs h-7">
@@ -254,6 +259,23 @@ const CeoOutbox = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmSend} onOpenChange={o => !o && setConfirmSend(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send this email now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{confirmSend?.subject}" will be delivered to <strong>{confirmSend?.recipient_email}</strong> via your verified domain (notify.s2kdotza.com). This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmSend && sendViaSystem(confirmSend)}>
+              <Send size={12} className="mr-1" /> Send now
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
