@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, X, Maximize2 } from "lucide-react";
+import { Bot, Send, X, Maximize2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -12,6 +14,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/front-desk-a
 
 const FloatingAssistant = () => {
   const { isFounder } = useUserRole();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -87,6 +90,22 @@ const FloatingAssistant = () => {
     }
   };
 
+  const saveAsDraft = async (content: string) => {
+    const recipient = window.prompt("Recipient email:");
+    if (!recipient) return;
+    const subject = window.prompt("Subject:", "");
+    if (!subject) return;
+    const { error } = await supabase.from("email_drafts").insert({
+      recipient_email: recipient.trim(),
+      subject: subject.trim(),
+      body: content,
+      status: "draft",
+      source: "ai_assistant",
+    });
+    if (error) toast({ title: "Failed", description: error.message, variant: "destructive" });
+    else toast({ title: "Draft saved", description: "Open CEO Diary → Outbox to send." });
+  };
+
   return (
     <>
       {/* Floating button */}
@@ -122,14 +141,21 @@ const FloatingAssistant = () => {
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex gap-2 ${m.role === "user" ? "justify-end" : ""}`}>
-                <div className={`max-w-[85%] p-2 text-xs ${
-                  m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary border border-border"
-                }`}>
-                  {m.role === "assistant" ? (
-                    <div className="prose prose-xs prose-invert max-w-none">
-                      <ReactMarkdown>{m.content}</ReactMarkdown>
-                    </div>
-                  ) : m.content}
+                <div className={`max-w-[85%] flex flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}>
+                  <div className={`p-2 text-xs ${
+                    m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary border border-border"
+                  }`}>
+                    {m.role === "assistant" ? (
+                      <div className="prose prose-xs prose-invert max-w-none">
+                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                      </div>
+                    ) : m.content}
+                  </div>
+                  {m.role === "assistant" && m.content.length > 40 && (
+                    <button onClick={() => saveAsDraft(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
+                      <Mail size={9} /> Save as draft
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
