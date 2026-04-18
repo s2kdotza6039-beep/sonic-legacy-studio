@@ -14,30 +14,22 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Fetch context from database for the assistant
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Gather business context
-    let contextParts: string[] = [];
+    const contextParts: string[] = [];
 
-    // Get upcoming reminders
     const { data: reminders } = await supabase
-      .from("reminders")
-      .select("*")
-      .eq("is_done", false)
-      .order("due_at", { ascending: true })
-      .limit(10);
+      .from("reminders").select("*").eq("is_done", false)
+      .order("due_at", { ascending: true }).limit(10);
     if (reminders?.length) {
       contextParts.push(`PENDING REMINDERS:\n${reminders.map(r => `- ${r.message} (due: ${r.due_at}, type: ${r.reminder_type})`).join("\n")}`);
     }
 
-    // Get subscriptions expiring soon
     const { data: subs } = await supabase
-      .from("subscriptions")
-      .select("*")
-      .eq("status", "active")
+      .from("subscriptions").select("*").eq("status", "active")
       .order("expiry_date", { ascending: true });
     if (subs?.length) {
       const now = new Date();
@@ -53,51 +45,39 @@ serve(async (req) => {
       }
     }
 
-    // Get pending todos
     const { data: todos } = await supabase
-      .from("ceo_todos")
-      .select("*")
-      .eq("is_done", false)
-      .order("due_date", { ascending: true })
-      .limit(15);
+      .from("ceo_todos").select("*").eq("is_done", false)
+      .order("due_date", { ascending: true }).limit(15);
     if (todos?.length) {
       contextParts.push(`PENDING TO-DOs:\n${todos.map(t => `- [${t.priority}] ${t.title}${t.due_date ? ` (due: ${t.due_date})` : ''}`).join("\n")}`);
     }
 
-    // Get recent deals
     const { data: deals } = await supabase
-      .from("deals")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .from("deals").select("*").order("created_at", { ascending: false }).limit(10);
     if (deals?.length) {
       contextParts.push(`ACTIVE DEALS:\n${deals.map(d => `- ${d.deal_title} (${d.client_name}): ${d.stage}, R${d.amount || 0}`).join("\n")}`);
     }
 
-    // Get artist pipeline
     const { data: artists } = await supabase
-      .from("artists")
-      .select("name, status, genre, email")
-      .limit(20);
+      .from("artists").select("name, status, genre, email").limit(20);
     if (artists?.length) {
-      contextParts.push(`ARTIST ROSTER:\n${artists.map(a => `- ${a.name} (${a.status}${a.genre ? `, ${a.genre}` : ''})`).join("\n")}`);
+      contextParts.push(`ARTIST ROSTER:\n${artists.map(a => `- ${a.name} (${a.status}${a.genre ? `, ${a.genre}` : ''})${a.email ? ` <${a.email}>` : ''}`).join("\n")}`);
     }
 
-    // Get upcoming tours
+    const { data: contacts } = await supabase
+      .from("ceo_contacts").select("name, email, role, company, category").limit(30);
+    if (contacts?.length) {
+      contextParts.push(`CEO CONTACTS:\n${contacts.map(c => `- ${c.name}${c.role ? `, ${c.role}` : ''}${c.company ? ` @ ${c.company}` : ''}${c.email ? ` <${c.email}>` : ''}`).join("\n")}`);
+    }
+
     const { data: tours } = await supabase
-      .from("touring_log")
-      .select("*")
-      .order("start_date", { ascending: true })
-      .limit(10);
+      .from("touring_log").select("*").order("start_date", { ascending: true }).limit(10);
     if (tours?.length) {
       contextParts.push(`TOURING SCHEDULE:\n${tours.map(t => `- ${t.event_name} at ${t.venue || 'TBD'}, ${t.city} (${t.start_date || 'TBD'}): ${t.status}`).join("\n")}`);
     }
 
-    // Get contracts summary
     const { data: contracts } = await supabase
-      .from("contracts")
-      .select("title, status, contract_type, party_name, end_date, value")
-      .limit(15);
+      .from("contracts").select("title, status, contract_type, party_name, end_date, value").limit(15);
     if (contracts?.length) {
       contextParts.push(`CONTRACTS:\n${contracts.map(c => `- ${c.title} (${c.contract_type}, ${c.status}): ${c.party_name || 'N/A'}, R${c.value || 0}${c.end_date ? `, ends: ${c.end_date}` : ''}`).join("\n")}`);
     }
@@ -109,67 +89,106 @@ serve(async (req) => {
     const systemPrompt = `You are the "Front Desk Assistant" for S2K DOT ZA, a South African music entertainment and record label company. You serve as an AI-powered personal business assistant to the CEO/Founder.
 
 YOUR CAPABILITIES:
-1. **Business Strategy** — Provide strategies for maximum productivity, growth planning, market positioning
-2. **Business Mentorship** — Offer guidance on running a music label, artist management best practices
-3. **Event Strategy** — Plan release strategies, concert logistics, festival applications, showcases
-4. **Professional Planning** — Help plan releases (singles, EPs, albums), music videos, content calendars
-5. **Contract Drafting** — Help draft and review contract clauses, suggest terms for artist/distribution/licensing agreements
-6. **Email Drafting** — Draft professional emails for business communications (always present for confirmation before sending)
-7. **Subscription Management** — Track and alert about subscription renewals, recommend cost optimizations
-8. **Daily Operations** — Help with day-to-day tasks, scheduling, prioritization, follow-ups
-9. **Reminders** — Suggest reminders for important deadlines, follow-ups, and payments
+1. Business Strategy, Mentorship, Event Planning, Release Planning
+2. Contract Drafting and Review
+3. Email Drafting — use the draft_email tool to queue emails into the founder's Outbox for review and one-click confirmation. NEVER claim to have sent an email; you only DRAFT.
+4. Subscription Management, Daily Operations, Reminders
 
-YOUR PERSONALITY:
-- Professional yet approachable, like a trusted executive assistant
-- Proactive — flag issues before they become problems
-- South African business context aware (SAMRO, CAPASSO, RISA, etc.)
-- Music industry knowledgeable
-- Always present email drafts for confirmation, never send directly
+EMAIL DRAFTING RULES:
+- When the user asks you to email someone, ALWAYS call the draft_email tool with recipient_email, subject, and body.
+- If the user mentions a contact by name only and you can match them in CEO CONTACTS or ARTIST ROSTER above, use that email automatically.
+- If recipient_email is unknown, ask for it before calling the tool.
+- After calling the tool, briefly confirm the draft is in the Outbox and summarize what you wrote in 1-2 lines. Do NOT repeat the full email body in chat.
+- Body should be plain text with paragraph breaks (use double newlines). No HTML, no markdown.
+- Subject should be concise and specific — never generic like "Following up".
+- Sign off with the founder's name when known, otherwise "s2kDOTza Entertainment".
 
-FORMATTING:
-- Use markdown for structured responses
-- Use bullet points for action items
-- Bold important dates and deadlines
-- Flag urgent items with ⚠️
-${businessContext}
+PERSONALITY: Professional, proactive, South African music industry aware (SAMRO, CAPASSO, RISA).
+FORMATTING: Markdown, bullets, bold dates, ⚠️ for urgent.
+${businessContext}`;
 
-When the user asks about subscriptions, contracts, or deadlines, reference the live data above. If you detect subscriptions expiring soon, proactively mention them.`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "draft_email",
+          description: "Create a draft email in the founder's Outbox for review before sending. Use this whenever the user asks you to write, draft, or send an email.",
+          parameters: {
+            type: "object",
+            properties: {
+              recipient_email: { type: "string", description: "The recipient's email address" },
+              recipient_name: { type: "string", description: "Optional recipient display name" },
+              subject: { type: "string", description: "Concise, specific email subject" },
+              body: { type: "string", description: "Full plain-text email body. Use double newlines for paragraph breaks. Do not include the subject in the body." },
+            },
+            required: ["recipient_email", "subject", "body"],
+          },
+        },
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
+    ];
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI service temporarily unavailable" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const callAI = async (msgs: any[], stream: boolean) =>
+      fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "system", content: systemPrompt }, ...msgs],
+          tools,
+          stream,
+        }),
       });
+
+    // First call: non-streaming so we can detect tool calls reliably.
+    const first = await callAI(messages, false);
+    if (!first.ok) {
+      if (first.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (first.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const t = await first.text();
+      console.error("AI gateway error:", first.status, t);
+      return new Response(JSON.stringify({ error: "AI service temporarily unavailable" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return new Response(response.body, {
+    const firstJson = await first.json();
+    const choice = firstJson.choices?.[0];
+    const toolCalls = choice?.message?.tool_calls;
+
+    let followupMessages = messages;
+    if (toolCalls && toolCalls.length > 0) {
+      const assistantMsg = { role: "assistant", content: choice.message.content || "", tool_calls: toolCalls };
+      const toolResults: any[] = [];
+      for (const tc of toolCalls) {
+        if (tc.function?.name === "draft_email") {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const { error: dErr, data: draft } = await supabase.from("email_drafts").insert({
+              recipient_email: args.recipient_email,
+              recipient_name: args.recipient_name || null,
+              subject: args.subject,
+              body: args.body,
+              status: "draft",
+              source: "ai_assistant",
+              conversation_id: conversation_id || null,
+            }).select().single();
+            if (dErr) throw dErr;
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, draft_id: draft.id, message: "Draft saved to Outbox. Tell the user to review it in CEO Diary → Outbox." }) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
+        }
+      }
+      followupMessages = [...messages, assistantMsg, ...toolResults];
+    }
+
+    // Second call: streaming for the user-visible reply.
+    const second = await callAI(followupMessages, true);
+    if (!second.ok) {
+      const t = await second.text();
+      console.error("AI followup error:", second.status, t);
+      return new Response(JSON.stringify({ error: "AI service temporarily unavailable" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    return new Response(second.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2 } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -156,6 +156,26 @@ const Assistant = () => {
     }
   };
 
+  const saveAsDraft = async (content: string) => {
+    const recipient = window.prompt("Recipient email:");
+    if (!recipient) return;
+    const subject = window.prompt("Subject:", "");
+    if (!subject) return;
+    const { error } = await supabase.from("email_drafts").insert({
+      recipient_email: recipient.trim(),
+      subject: subject.trim(),
+      body: content,
+      status: "draft",
+      source: "ai_assistant",
+      conversation_id: activeConvo,
+    });
+    if (error) {
+      toast({ title: "Failed to save draft", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Draft saved", description: "Open CEO Diary → Outbox to review and send." });
+    }
+  };
+
   return (
     <Layout>
       <div className="min-h-[calc(100vh-200px)] flex">
@@ -220,16 +240,26 @@ const Assistant = () => {
                       <Bot size={14} className="text-primary" />
                     </div>
                   )}
-                  <div className={`max-w-[80%] p-3 text-sm ${
-                    m.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card border border-border"
-                  }`}>
-                    {m.role === "assistant" ? (
-                      <div className="prose prose-sm prose-invert max-w-none">
-                        <ReactMarkdown>{m.content}</ReactMarkdown>
-                      </div>
-                    ) : m.content}
+                  <div className={`max-w-[80%] flex flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}>
+                    <div className={`p-3 text-sm ${
+                      m.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border border-border"
+                    }`}>
+                      {m.role === "assistant" ? (
+                        <div className="prose prose-sm prose-invert max-w-none">
+                          <ReactMarkdown>{m.content}</ReactMarkdown>
+                        </div>
+                      ) : m.content}
+                    </div>
+                    {m.role === "assistant" && m.content.length > 40 && (
+                      <button
+                        onClick={() => saveAsDraft(m.content)}
+                        className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1"
+                      >
+                        <Mail size={10} /> Save as draft
+                      </button>
+                    )}
                   </div>
                   {m.role === "user" && (
                     <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center shrink-0">
