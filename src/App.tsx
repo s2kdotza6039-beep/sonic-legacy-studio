@@ -24,6 +24,7 @@ import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Assistant from "./pages/Assistant";
 import FloatingAssistant from "./components/FloatingAssistant";
+import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
                 <Assistant />
               </FounderRoute>
             } />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <FloatingAssistant />
