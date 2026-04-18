@@ -97,7 +97,6 @@ const CeoOutbox = () => {
   };
 
   const sendViaSystem = async (d: Draft) => {
-    if (!confirm(`Send "${d.subject}" to ${d.recipient_email}?`)) return;
     setSending(d.id);
     try {
       const { data, error } = await supabase.functions.invoke("send-transactional-email", {
@@ -123,6 +122,7 @@ const CeoOutbox = () => {
       toast({ title: "Send failed", description: e.message || "Unknown error", variant: "destructive" });
     } finally {
       setSending(null);
+      setConfirmSend(null);
     }
   };
 
