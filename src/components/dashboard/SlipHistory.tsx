@@ -330,11 +330,15 @@ const SlipHistory = () => {
       {/* Slip List */}
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading history...</p>
-      ) : slips.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-8">No saved slips yet. Generate and save slips from the Live Engine.</p>
+      ) : filteredSlips.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">
+          {slips.length === 0
+            ? "No saved slips yet. Generate and save slips from the Live Engine."
+            : "No slips match the current filters."}
+        </p>
       ) : (
         <div className="space-y-2">
-          {slips.map((slip) => {
+          {filteredSlips.map((slip) => {
             const rc = resultConfig[slip.result as keyof typeof resultConfig] || resultConfig.pending;
             const Icon = rc.icon;
             const isExpanded = expandedSlip === slip.id;
