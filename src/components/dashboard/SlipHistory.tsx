@@ -53,6 +53,9 @@ const SlipHistory = () => {
   const [slips, setSlips] = useState<SavedSlip[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedSlip, setExpandedSlip] = useState<string | null>(null);
+  const [resultFilter, setResultFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [clearScope, setClearScope] = useState<"filtered" | "lost" | "all" | null>(null);
   const { toast } = useToast();
 
   const fetchSlips = async () => {
@@ -60,7 +63,7 @@ const SlipHistory = () => {
       .from("betting_slips")
       .select("*, betting_selections(*)")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (error) {
       toast({ title: "Error loading history", description: error.message, variant: "destructive" });
@@ -71,6 +74,42 @@ const SlipHistory = () => {
   };
 
   useEffect(() => { fetchSlips(); }, []);
+
+  const filteredSlips = useMemo(() => {
+    return slips.filter((s) => {
+      if (resultFilter !== "all" && s.result !== resultFilter) return false;
+      if (categoryFilter !== "all" && s.category !== categoryFilter) return false;
+      return true;
+    });
+  }, [slips, resultFilter, categoryFilter]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(slips.map((s) => s.category))).filter(Boolean),
+    [slips]
+  );
+
+  const handleClear = async () => {
+    if (!clearScope) return;
+    let targetIds: string[] = [];
+    if (clearScope === "all") targetIds = slips.map((s) => s.id);
+    else if (clearScope === "lost") targetIds = slips.filter((s) => s.result === "lost").map((s) => s.id);
+    else if (clearScope === "filtered") targetIds = filteredSlips.map((s) => s.id);
+
+    if (targetIds.length === 0) {
+      toast({ title: "Nothing to clear", description: "No slips matched the selected scope." });
+      setClearScope(null);
+      return;
+    }
+
+    const { error } = await supabase.from("betting_slips").delete().in("id", targetIds);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "History cleared", description: `${targetIds.length} slip(s) removed.` });
+      fetchSlips();
+    }
+    setClearScope(null);
+  };
 
   const updateResult = async (slipId: string, result: "won" | "lost", actualReturn?: number) => {
     const { error } = await supabase
