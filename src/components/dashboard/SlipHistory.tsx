@@ -150,12 +150,12 @@ const SlipHistory = () => {
   };
 
   const stats = {
-    total: slips.length,
-    won: slips.filter(s => s.result === "won").length,
-    lost: slips.filter(s => s.result === "lost").length,
-    pending: slips.filter(s => s.result === "pending").length,
-    totalStaked: slips.reduce((sum, s) => sum + Number(s.stake), 0),
-    totalReturned: slips.filter(s => s.result === "won").reduce((sum, s) => sum + Number(s.actual_return || s.potential_return), 0),
+    total: filteredSlips.length,
+    won: filteredSlips.filter(s => s.result === "won").length,
+    lost: filteredSlips.filter(s => s.result === "lost").length,
+    pending: filteredSlips.filter(s => s.result === "pending").length,
+    totalStaked: filteredSlips.reduce((sum, s) => sum + Number(s.stake), 0),
+    totalReturned: filteredSlips.filter(s => s.result === "won").reduce((sum, s) => sum + Number(s.actual_return || s.potential_return), 0),
   };
   const winRate = stats.total - stats.pending > 0 ? ((stats.won / (stats.total - stats.pending)) * 100).toFixed(1) : "—";
   const profit = stats.totalReturned - stats.totalStaked;
@@ -197,6 +197,79 @@ const SlipHistory = () => {
 
   return (
     <div className="space-y-4">
+      {/* Filters & Clear */}
+      <div className="flex flex-wrap items-center gap-2 border border-border p-3">
+        <Filter size={14} className="text-primary" />
+        <span className="text-xs uppercase tracking-widest text-muted-foreground mr-2">Filter</span>
+
+        <Select value={resultFilter} onValueChange={setResultFilter}>
+          <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Result" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Results</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="won">Won</SelectItem>
+            <SelectItem value="lost">Lost</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(resultFilter !== "all" || categoryFilter !== "all") && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setResultFilter("all"); setCategoryFilter("all"); }}>
+            Reset
+          </Button>
+        )}
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          Showing {filteredSlips.length} of {slips.length}
+        </span>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1 text-destructive border-destructive/30 hover:bg-destructive/10">
+              <Trash2 size={12} /> Clear History
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear betting history</AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose what to delete. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2 my-2">
+              <Button variant="outline" className="w-full justify-start" onClick={() => setClearScope("filtered")}>
+                Delete current filtered view ({filteredSlips.length})
+              </Button>
+              <Button variant="outline" className="w-full justify-start text-destructive" onClick={() => setClearScope("lost")}>
+                Delete all LOST slips ({slips.filter(s => s.result === "lost").length})
+              </Button>
+              <Button variant="outline" className="w-full justify-start text-destructive" onClick={() => setClearScope("all")}>
+                Delete ALL history ({slips.length})
+              </Button>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setClearScope(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!clearScope}
+                onClick={handleClear}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Confirm Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
         <div className="border border-border p-3">
