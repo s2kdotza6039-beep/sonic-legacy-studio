@@ -2,10 +2,22 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { History, CheckCircle, XCircle, Clock, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { CheckCircle, XCircle, Clock, TrendingUp, ChevronDown, ChevronUp, Trash2, Filter } from "lucide-react";
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 
 interface SavedSlip {
   id: string;
@@ -41,6 +53,9 @@ const SlipHistory = () => {
   const [slips, setSlips] = useState<SavedSlip[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedSlip, setExpandedSlip] = useState<string | null>(null);
+  const [resultFilter, setResultFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [clearScope, setClearScope] = useState<"filtered" | "lost" | "all" | null>(null);
   const { toast } = useToast();
 
   const fetchSlips = async () => {
@@ -48,7 +63,7 @@ const SlipHistory = () => {
       .from("betting_slips")
       .select("*, betting_selections(*)")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (error) {
       toast({ title: "Error loading history", description: error.message, variant: "destructive" });
@@ -59,6 +74,42 @@ const SlipHistory = () => {
   };
 
   useEffect(() => { fetchSlips(); }, []);
+
+  const filteredSlips = useMemo(() => {
+    return slips.filter((s) => {
+      if (resultFilter !== "all" && s.result !== resultFilter) return false;
+      if (categoryFilter !== "all" && s.category !== categoryFilter) return false;
+      return true;
+    });
+  }, [slips, resultFilter, categoryFilter]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(slips.map((s) => s.category))).filter(Boolean),
+    [slips]
+  );
+
+  const handleClear = async () => {
+    if (!clearScope) return;
+    let targetIds: string[] = [];
+    if (clearScope === "all") targetIds = slips.map((s) => s.id);
+    else if (clearScope === "lost") targetIds = slips.filter((s) => s.result === "lost").map((s) => s.id);
+    else if (clearScope === "filtered") targetIds = filteredSlips.map((s) => s.id);
+
+    if (targetIds.length === 0) {
+      toast({ title: "Nothing to clear", description: "No slips matched the selected scope." });
+      setClearScope(null);
+      return;
+    }
+
+    const { error } = await supabase.from("betting_slips").delete().in("id", targetIds);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "History cleared", description: `${targetIds.length} slip(s) removed.` });
+      fetchSlips();
+    }
+    setClearScope(null);
+  };
 
   const updateResult = async (slipId: string, result: "won" | "lost", actualReturn?: number) => {
     const { error } = await supabase
@@ -99,12 +150,12 @@ const SlipHistory = () => {
   };
 
   const stats = {
-    total: slips.length,
-    won: slips.filter(s => s.result === "won").length,
-    lost: slips.filter(s => s.result === "lost").length,
-    pending: slips.filter(s => s.result === "pending").length,
-    totalStaked: slips.reduce((sum, s) => sum + Number(s.stake), 0),
-    totalReturned: slips.filter(s => s.result === "won").reduce((sum, s) => sum + Number(s.actual_return || s.potential_return), 0),
+    total: filteredSlips.length,
+    won: filteredSlips.filter(s => s.result === "won").length,
+    lost: filteredSlips.filter(s => s.result === "lost").length,
+    pending: filteredSlips.filter(s => s.result === "pending").length,
+    totalStaked: filteredSlips.reduce((sum, s) => sum + Number(s.stake), 0),
+    totalReturned: filteredSlips.filter(s => s.result === "won").reduce((sum, s) => sum + Number(s.actual_return || s.potential_return), 0),
   };
   const winRate = stats.total - stats.pending > 0 ? ((stats.won / (stats.total - stats.pending)) * 100).toFixed(1) : "—";
   const profit = stats.totalReturned - stats.totalStaked;
@@ -146,6 +197,79 @@ const SlipHistory = () => {
 
   return (
     <div className="space-y-4">
+      {/* Filters & Clear */}
+      <div className="flex flex-wrap items-center gap-2 border border-border p-3">
+        <Filter size={14} className="text-primary" />
+        <span className="text-xs uppercase tracking-widest text-muted-foreground mr-2">Filter</span>
+
+        <Select value={resultFilter} onValueChange={setResultFilter}>
+          <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Result" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Results</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="won">Won</SelectItem>
+            <SelectItem value="lost">Lost</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(resultFilter !== "all" || categoryFilter !== "all") && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setResultFilter("all"); setCategoryFilter("all"); }}>
+            Reset
+          </Button>
+        )}
+
+        <span className="text-xs text-muted-foreground ml-auto">
+          Showing {filteredSlips.length} of {slips.length}
+        </span>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1 text-destructive border-destructive/30 hover:bg-destructive/10">
+              <Trash2 size={12} /> Clear History
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear betting history</AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose what to delete. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2 my-2">
+              <Button variant="outline" className="w-full justify-start" onClick={() => setClearScope("filtered")}>
+                Delete current filtered view ({filteredSlips.length})
+              </Button>
+              <Button variant="outline" className="w-full justify-start text-destructive" onClick={() => setClearScope("lost")}>
+                Delete all LOST slips ({slips.filter(s => s.result === "lost").length})
+              </Button>
+              <Button variant="outline" className="w-full justify-start text-destructive" onClick={() => setClearScope("all")}>
+                Delete ALL history ({slips.length})
+              </Button>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setClearScope(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!clearScope}
+                onClick={handleClear}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Confirm Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
         <div className="border border-border p-3">
@@ -206,11 +330,15 @@ const SlipHistory = () => {
       {/* Slip List */}
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading history...</p>
-      ) : slips.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-8">No saved slips yet. Generate and save slips from the Live Engine.</p>
+      ) : filteredSlips.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">
+          {slips.length === 0
+            ? "No saved slips yet. Generate and save slips from the Live Engine."
+            : "No slips match the current filters."}
+        </p>
       ) : (
         <div className="space-y-2">
-          {slips.map((slip) => {
+          {filteredSlips.map((slip) => {
             const rc = resultConfig[slip.result as keyof typeof resultConfig] || resultConfig.pending;
             const Icon = rc.icon;
             const isExpanded = expandedSlip === slip.id;
