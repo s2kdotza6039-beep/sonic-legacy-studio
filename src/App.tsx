@@ -18,6 +18,7 @@ import Careers from "./pages/Careers";
 import Contact from "./pages/Contact";
 import Watch from "./pages/Watch";
 import Listen from "./pages/Listen";
+import Events from "./pages/Events";
 import Dashboard from "./pages/Dashboard";
 import Royalties from "./pages/Royalties";
 import Login from "./pages/Login";
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/contact" element={<Contact />} />
             <Route path="/watch" element={<Watch />} />
             <Route path="/listen" element={<Listen />} />
+            <Route path="/events" element={<Events />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={

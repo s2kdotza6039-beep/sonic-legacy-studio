@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -15,10 +15,12 @@ import ContractVault from "@/components/dashboard/ContractVault";
 import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
 import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
+import AICommandCentre from "@/components/dashboard/AICommandCentre";
 import { Target } from "lucide-react";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "command", label: "AI Command", icon: ShieldCheck },
   { key: "ceo", label: "CEO Diary", icon: BookOpen },
   { key: "notepad", label: "Notepad", icon: NotebookPen },
   { key: "artists", label: "Artists", icon: Users },
@@ -100,6 +102,7 @@ const Dashboard = () => {
                 <RevenuePipeline />
               </div>
             )}
+            {tab === "command" && <AICommandCentre />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}
             {tab === "artists" && <ArtistPipeline />}

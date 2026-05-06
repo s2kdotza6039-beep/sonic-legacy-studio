@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_activity_log: {
+        Row: {
+          action: string
+          actor: string
+          actor_user_id: string | null
+          command: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          action: string
+          actor?: string
+          actor_user_id?: string | null
+          command?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          action?: string
+          actor?: string
+          actor_user_id?: string | null
+          command?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       ai_chat_conversations: {
         Row: {
           created_at: string
@@ -69,6 +105,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_drafts: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          command: string | null
+          conversation_id: string | null
+          created_at: string
+          created_by: string | null
+          draft_type: string
+          id: string
+          payload: Json
+          published_at: string | null
+          rejected_reason: string | null
+          source: string
+          status: string
+          target_id: string | null
+          target_table: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          command?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          draft_type: string
+          id?: string
+          payload?: Json
+          published_at?: string | null
+          rejected_reason?: string | null
+          source?: string
+          status?: string
+          target_id?: string | null
+          target_table?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          command?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          draft_type?: string
+          id?: string
+          payload?: Json
+          published_at?: string | null
+          rejected_reason?: string | null
+          source?: string
+          status?: string
+          target_id?: string | null
+          target_table?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      announcements: {
+        Row: {
+          banner_color: string | null
+          body: string
+          created_at: string
+          ends_at: string | null
+          id: string
+          published_at: string | null
+          starts_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          banner_color?: string | null
+          body?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          published_at?: string | null
+          starts_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          banner_color?: string | null
+          body?: string
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          published_at?: string | null
+          starts_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       artist_activities: {
         Row: {
@@ -293,6 +428,57 @@ export type Database = {
           stake?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      booking_enquiries: {
+        Row: {
+          artist_requested: string | null
+          budget: number | null
+          created_at: string
+          email: string
+          event_date: string | null
+          event_type: string | null
+          id: string
+          message: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          artist_requested?: string | null
+          budget?: number | null
+          created_at?: string
+          email: string
+          event_date?: string | null
+          event_type?: string | null
+          id?: string
+          message?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          artist_requested?: string | null
+          budget?: number | null
+          created_at?: string
+          email?: string
+          event_date?: string | null
+          event_type?: string | null
+          id?: string
+          message?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          venue?: string | null
         }
         Relationships: []
       }
@@ -703,6 +889,60 @@ export type Database = {
         }
         Relationships: []
       }
+      events: {
+        Row: {
+          artist_name: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          image_url: string | null
+          published_at: string | null
+          start_date: string
+          status: string
+          ticket_url: string | null
+          title: string
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          artist_name?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          start_date: string
+          status?: string
+          ticket_url?: string | null
+          title: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          artist_name?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          start_date?: string
+          status?: string
+          ticket_url?: string | null
+          title?: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Relationships: []
+      }
       idea_boards: {
         Row: {
           color: string
@@ -791,6 +1031,108 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invoices: {
+        Row: {
+          client_address: string | null
+          client_email: string | null
+          client_name: string
+          created_at: string
+          currency: string
+          due_date: string | null
+          file_url: string | null
+          id: string
+          invoice_number: string
+          issue_date: string | null
+          line_items: Json
+          notes: string | null
+          status: string
+          subtotal: number
+          tax: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          client_address?: string | null
+          client_email?: string | null
+          client_name: string
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          file_url?: string | null
+          id?: string
+          invoice_number: string
+          issue_date?: string | null
+          line_items?: Json
+          notes?: string | null
+          status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string
+          created_at?: string
+          currency?: string
+          due_date?: string | null
+          file_url?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string | null
+          line_items?: Json
+          notes?: string | null
+          status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      news_posts: {
+        Row: {
+          body: string
+          category: string
+          created_at: string
+          excerpt: string | null
+          id: string
+          image_url: string | null
+          published_at: string | null
+          slug: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          category?: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          slug?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          category?: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          slug?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -1009,6 +1351,51 @@ export type Database = {
         }
         Relationships: []
       }
+      sponsor_leads: {
+        Row: {
+          budget_range: string | null
+          company: string
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          industry: string | null
+          message: string | null
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          budget_range?: string | null
+          company: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          message?: string | null
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          budget_range?: string | null
+          company?: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          message?: string | null
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           auto_renew: boolean
@@ -1199,6 +1586,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_ai_draft: { Args: { _draft_id: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1230,6 +1618,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      reject_ai_draft: {
+        Args: { _draft_id: string; _reason?: string }
+        Returns: undefined
       }
     }
     Enums: {

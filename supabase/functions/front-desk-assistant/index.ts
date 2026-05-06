@@ -234,6 +234,15 @@ COMMAND EXECUTION RULES:
 - Never break the release sequence.
 
 ═══════════════════════════════════════════════════════════
+APPROVAL QUEUE — Command Centre drafts
+═══════════════════════════════════════════════════════════
+You have a tool called create_draft that queues content for the Founder to review and approve in the AI Command Centre. ALWAYS use it (in addition to showing the content in chat) when the user asks for any of these:
+- WRITE LATEST NEWS POST  → draft_type: "news_post"
+- CREATE EVENT ANNOUNCEMENT  → draft_type: "event"
+- DRAFT [PLATFORM] POST / RUN DAILY CONTENT social pieces  → draft_type: "social_caption"
+- PREPARE INVOICE  → draft_type: "invoice" (ask for client/amount if unknown)
+- Homepage / artist / music updates → draft_type: "homepage_update" / "artist_update" / "music_update"
+NEVER claim something is "live" or "published". You only DRAFT. The Founder must approve before anything goes public.
 ${businessContext}`;
 
     const tools = [
@@ -251,6 +260,31 @@ ${businessContext}`;
               body: { type: "string", description: "Full plain-text email body. Use double newlines for paragraph breaks. Do not include the subject in the body." },
             },
             required: ["recipient_email", "subject", "body"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "create_draft",
+          description: "Create a draft in the AI Command Centre approval queue. Use this for anything that would publish to the website (news posts, events, announcements, invoices, artist updates, music updates, social captions, homepage updates). The Founder reviews and approves before anything goes live.",
+          parameters: {
+            type: "object",
+            properties: {
+              draft_type: {
+                type: "string",
+                enum: ["news_post", "event", "announcement", "invoice", "artist_update", "music_update", "social_caption", "homepage_update", "booking_reply", "sponsor_reply", "other"],
+                description: "Type of draft. Determines which table it publishes to on approval.",
+              },
+              title: { type: "string", description: "Short title shown in the approval queue." },
+              command: { type: "string", description: "Originating command, e.g. 'RUN DAILY CONTENT'. Optional." },
+              payload: {
+                type: "object",
+                description: "Structured fields for the target table. Examples: news_post → {title,slug,excerpt,body,image_url,category}; event → {title,description,venue,city,start_date(ISO),end_date,ticket_url,artist_name}; announcement → {title,body,banner_color,starts_at,ends_at}; invoice → {invoice_number,client_name,client_email,line_items:[{description,qty,unit_price,total}],subtotal,tax,total,currency,due_date,notes}; social_caption / homepage_update / artist_update / music_update → {body,platform,notes}.",
+                additionalProperties: true,
+              },
+            },
+            required: ["draft_type", "title", "payload"],
           },
         },
       },
@@ -301,6 +335,27 @@ ${businessContext}`;
             }).select().single();
             if (dErr) throw dErr;
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, draft_id: draft.id, message: "Draft saved to Outbox. Tell the user to review it in CEO Diary → Outbox." }) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
+        } else if (tc.function?.name === "create_draft") {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const targetMap: Record<string, string> = {
+              news_post: "news_posts", event: "events", announcement: "announcements", invoice: "invoices",
+            };
+            const { error: dErr, data: draft } = await supabase.from("ai_drafts").insert({
+              draft_type: args.draft_type,
+              title: args.title,
+              payload: args.payload || {},
+              command: args.command || null,
+              source: "ai_assistant",
+              conversation_id: conversation_id || null,
+              target_table: targetMap[args.draft_type] || null,
+              status: "pending",
+            }).select().single();
+            if (dErr) throw dErr;
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, draft_id: draft.id, message: `Draft queued in AI Command Centre as '${args.draft_type}'. Awaiting Founder approval.` }) });
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
