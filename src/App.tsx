@@ -18,6 +18,7 @@ import Careers from "./pages/Careers";
 import Contact from "./pages/Contact";
 import Watch from "./pages/Watch";
 import Listen from "./pages/Listen";
+import Events from "./pages/Events";
 import Dashboard from "./pages/Dashboard";
 import Royalties from "./pages/Royalties";
 import Login from "./pages/Login";
