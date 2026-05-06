@@ -254,6 +254,31 @@ ${businessContext}`;
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "create_draft",
+          description: "Create a draft in the AI Command Centre approval queue. Use this for anything that would publish to the website (news posts, events, announcements, invoices, artist updates, music updates, social captions, homepage updates). The Founder reviews and approves before anything goes live.",
+          parameters: {
+            type: "object",
+            properties: {
+              draft_type: {
+                type: "string",
+                enum: ["news_post", "event", "announcement", "invoice", "artist_update", "music_update", "social_caption", "homepage_update", "booking_reply", "sponsor_reply", "other"],
+                description: "Type of draft. Determines which table it publishes to on approval.",
+              },
+              title: { type: "string", description: "Short title shown in the approval queue." },
+              command: { type: "string", description: "Originating command, e.g. 'RUN DAILY CONTENT'. Optional." },
+              payload: {
+                type: "object",
+                description: "Structured fields for the target table. Examples: news_post → {title,slug,excerpt,body,image_url,category}; event → {title,description,venue,city,start_date(ISO),end_date,ticket_url,artist_name}; announcement → {title,body,banner_color,starts_at,ends_at}; invoice → {invoice_number,client_name,client_email,line_items:[{description,qty,unit_price,total}],subtotal,tax,total,currency,due_date,notes}; social_caption / homepage_update / artist_update / music_update → {body,platform,notes}.",
+                additionalProperties: true,
+              },
+            },
+            required: ["draft_type", "title", "payload"],
+          },
+        },
+      },
     ];
 
     const callAI = async (msgs: any[], stream: boolean) =>
