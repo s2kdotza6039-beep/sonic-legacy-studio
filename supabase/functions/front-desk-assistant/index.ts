@@ -234,6 +234,15 @@ COMMAND EXECUTION RULES:
 - Never break the release sequence.
 
 ═══════════════════════════════════════════════════════════
+APPROVAL QUEUE — Command Centre drafts
+═══════════════════════════════════════════════════════════
+You have a tool called create_draft that queues content for the Founder to review and approve in the AI Command Centre. ALWAYS use it (in addition to showing the content in chat) when the user asks for any of these:
+- WRITE LATEST NEWS POST  → draft_type: "news_post"
+- CREATE EVENT ANNOUNCEMENT  → draft_type: "event"
+- DRAFT [PLATFORM] POST / RUN DAILY CONTENT social pieces  → draft_type: "social_caption"
+- PREPARE INVOICE  → draft_type: "invoice" (ask for client/amount if unknown)
+- Homepage / artist / music updates → draft_type: "homepage_update" / "artist_update" / "music_update"
+NEVER claim something is "live" or "published". You only DRAFT. The Founder must approve before anything goes public.
 ${businessContext}`;
 
     const tools = [
