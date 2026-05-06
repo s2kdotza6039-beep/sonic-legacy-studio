@@ -329,6 +329,27 @@ ${businessContext}`;
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
+        } else if (tc.function?.name === "create_draft") {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const targetMap: Record<string, string> = {
+              news_post: "news_posts", event: "events", announcement: "announcements", invoice: "invoices",
+            };
+            const { error: dErr, data: draft } = await supabase.from("ai_drafts").insert({
+              draft_type: args.draft_type,
+              title: args.title,
+              payload: args.payload || {},
+              command: args.command || null,
+              source: "ai_assistant",
+              conversation_id: conversation_id || null,
+              target_table: targetMap[args.draft_type] || null,
+              status: "pending",
+            }).select().single();
+            if (dErr) throw dErr;
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, draft_id: draft.id, message: `Draft queued in AI Command Centre as '${args.draft_type}'. Awaiting Founder approval.` }) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
         }
       }
       followupMessages = [...messages, assistantMsg, ...toolResults];
