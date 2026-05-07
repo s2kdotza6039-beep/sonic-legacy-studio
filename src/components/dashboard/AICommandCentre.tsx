@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import {
   Check, X, FileText, Calendar, Megaphone, Receipt, Sparkles, Clock, ShieldCheck,
-  Loader2, ListChecks, Rocket, Music, CalendarCheck, Inbox, Building2, UserPlus, Plus,
+  Loader2, ListChecks, Rocket, Music, CalendarCheck, Inbox, Building2, UserPlus, Plus, Zap,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 
