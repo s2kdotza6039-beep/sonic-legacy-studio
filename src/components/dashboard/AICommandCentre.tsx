@@ -149,6 +149,23 @@ const AICommandCentre = () => {
     else load();
   };
 
+  const [runningCmd, setRunningCmd] = useState<string | null>(null);
+  const runCommand = async (command: string) => {
+    setRunningCmd(command);
+    try {
+      const { error } = await supabase.functions.invoke("front-desk-assistant", {
+        body: { messages: [{ role: "user", content: command }] },
+      });
+      if (error) throw error;
+      setTimeout(load, 1500);
+      toast({ title: `Ran: ${command}`, description: "Drafts queued for approval." });
+    } catch (e: any) {
+      toast({ title: "Command failed", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setRunningCmd(null);
+    }
+  };
+
   const filteredDrafts = drafts.filter((d) =>
     filter === "all" ? true : d.status === filter
   );
