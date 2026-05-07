@@ -185,6 +185,7 @@ const AICommandCentre = () => {
           <p className="text-xs text-muted-foreground mt-1">
             Founder-only operations hub. AI proposes — you decide what goes live.
           </p>
+        </div>
       </div>
 
       {/* Command shortcuts */}
@@ -218,7 +219,6 @@ const AICommandCentre = () => {
           ))}
         </CardContent>
       </Card>
-      </div>
 
       {/* Section nav */}
       <div className="flex gap-1 flex-wrap border-b border-border">
