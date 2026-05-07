@@ -185,7 +185,39 @@ const AICommandCentre = () => {
           <p className="text-xs text-muted-foreground mt-1">
             Founder-only operations hub. AI proposes — you decide what goes live.
           </p>
-        </div>
+      </div>
+
+      {/* Command shortcuts */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xs uppercase tracking-widest flex items-center gap-2">
+            <Zap size={12} className="text-primary" /> Quick Commands
+          </CardTitle>
+          <p className="text-[10px] text-muted-foreground">One click → AI generates drafts → review in Pending Approvals.</p>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {[
+            "RUN DAILY CONTENT",
+            "WRITE LATEST NEWS POST",
+            "CREATE EVENT ANNOUNCEMENT",
+            "GIVE ME 5 CONTENT IDEAS TODAY",
+            "DRIVE TRAFFIC TO WEBSITE",
+            "WRITE FOUNDER MESSAGE",
+          ].map((cmd) => (
+            <Button
+              key={cmd}
+              size="sm"
+              variant="outline"
+              disabled={!!runningCmd}
+              onClick={() => runCommand(cmd)}
+              className="text-[11px] uppercase tracking-widest gap-1.5"
+            >
+              {runningCmd === cmd ? <Loader2 size={11} className="animate-spin" /> : <Zap size={11} />}
+              {cmd}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
       </div>
 
       {/* Section nav */}
