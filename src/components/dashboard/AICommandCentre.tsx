@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import {
   Check, X, FileText, Calendar, Megaphone, Receipt, Sparkles, Clock, ShieldCheck,
-  Loader2, ListChecks, Rocket, Music, CalendarCheck, Inbox, Building2, UserPlus, Plus,
+  Loader2, ListChecks, Rocket, Music, CalendarCheck, Inbox, Building2, UserPlus, Plus, Zap,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 
@@ -149,6 +149,23 @@ const AICommandCentre = () => {
     else load();
   };
 
+  const [runningCmd, setRunningCmd] = useState<string | null>(null);
+  const runCommand = async (command: string) => {
+    setRunningCmd(command);
+    try {
+      const { error } = await supabase.functions.invoke("front-desk-assistant", {
+        body: { messages: [{ role: "user", content: command }] },
+      });
+      if (error) throw error;
+      setTimeout(load, 1500);
+      toast({ title: `Ran: ${command}`, description: "Drafts queued for approval." });
+    } catch (e: any) {
+      toast({ title: "Command failed", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setRunningCmd(null);
+    }
+  };
+
   const filteredDrafts = drafts.filter((d) =>
     filter === "all" ? true : d.status === filter
   );
@@ -170,6 +187,38 @@ const AICommandCentre = () => {
           </p>
         </div>
       </div>
+
+      {/* Command shortcuts */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xs uppercase tracking-widest flex items-center gap-2">
+            <Zap size={12} className="text-primary" /> Quick Commands
+          </CardTitle>
+          <p className="text-[10px] text-muted-foreground">One click → AI generates drafts → review in Pending Approvals.</p>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {[
+            "RUN DAILY CONTENT",
+            "WRITE LATEST NEWS POST",
+            "CREATE EVENT ANNOUNCEMENT",
+            "GIVE ME 5 CONTENT IDEAS TODAY",
+            "DRIVE TRAFFIC TO WEBSITE",
+            "WRITE FOUNDER MESSAGE",
+          ].map((cmd) => (
+            <Button
+              key={cmd}
+              size="sm"
+              variant="outline"
+              disabled={!!runningCmd}
+              onClick={() => runCommand(cmd)}
+              className="text-[11px] uppercase tracking-widest gap-1.5"
+            >
+              {runningCmd === cmd ? <Loader2 size={11} className="animate-spin" /> : <Zap size={11} />}
+              {cmd}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Section nav */}
       <div className="flex gap-1 flex-wrap border-b border-border">
