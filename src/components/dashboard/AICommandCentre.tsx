@@ -743,6 +743,132 @@ const AICommandCentre = () => {
         </div>
       )}
 
+      {/* SCHEDULES */}
+      {!loading && section === "schedules" && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Repeat size={14} /> Schedule a Recurring Command</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Command</label>
+                  <select value={scheduleForm.command} onChange={(e) => setScheduleForm({ ...scheduleForm, command: e.target.value })}
+                    className="h-9 w-full px-2 text-xs border border-input bg-background rounded-md mt-1">
+                    {QUICK_COMMANDS.map((qc) => <option key={qc.command} value={qc.command}>{qc.command}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Frequency</label>
+                  <select value={scheduleForm.frequency} onChange={(e) => setScheduleForm({ ...scheduleForm, frequency: e.target.value })}
+                    className="h-9 w-full px-2 text-xs border border-input bg-background rounded-md mt-1">
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                </div>
+                {scheduleForm.frequency !== "hourly" && (
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Hour (0–23)</label>
+                    <Input type="number" min={0} max={23} value={scheduleForm.hour_of_day}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, hour_of_day: Number(e.target.value) })} className="h-9 text-xs mt-1" />
+                  </div>
+                )}
+                {scheduleForm.frequency === "weekly" && (
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Day of week</label>
+                    <select value={scheduleForm.day_of_week} onChange={(e) => setScheduleForm({ ...scheduleForm, day_of_week: Number(e.target.value) })}
+                      className="h-9 w-full px-2 text-xs border border-input bg-background rounded-md mt-1">
+                      {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d, i) => <option key={d} value={i}>{d}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <Button size="sm" onClick={createSchedule} className="gap-1 text-xs"><Plus size={12} /> Create schedule</Button>
+              <p className="text-[10px] text-muted-foreground">Drafts created by schedules still queue for your approval — nothing auto-publishes.</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle></CardHeader>
+            <CardContent>
+              {schedules.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No schedules yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {schedules.map((s) => (
+                    <li key={s.id} className="flex items-center justify-between gap-3 border-b border-border/40 pb-2 last:border-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{s.command}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                          {s.frequency}{s.frequency !== "hourly" ? ` · ${String(s.hour_of_day).padStart(2,"0")}:00` : ""}
+                          {s.frequency === "weekly" && s.day_of_week !== null ? ` · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][s.day_of_week]}` : ""}
+                          {s.next_run_at && ` · next ${formatDistanceToNow(new Date(s.next_run_at), { addSuffix: true })}`}
+                          {s.last_run_at && ` · last ${formatDistanceToNow(new Date(s.last_run_at), { addSuffix: true })}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant={s.is_active ? "default" : "outline"} className="text-[10px]">{s.is_active ? "Active" : "Paused"}</Badge>
+                        <Button size="sm" variant="outline" onClick={() => toggleSchedule(s)} className="h-7 px-2 text-xs gap-1">
+                          <Power size={10} /> {s.is_active ? "Pause" : "Resume"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => deleteSchedule(s.id)} className="h-7 px-2 text-xs"><Trash2 size={10} /></Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* COMMAND HISTORY */}
+      {!loading && section === "history" && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><History size={14} /> Command History ({runs.length})</CardTitle></CardHeader>
+          <CardContent>
+            {runs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No commands have run yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {runs.map((r) => (
+                  <li key={r.id} className="border-b border-border/40 pb-3 last:border-0">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <p className="text-sm font-medium">{r.command}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">{r.triggered_by}</Badge>
+                        <Badge variant={r.status === "completed" ? "default" : r.status === "failed" ? "destructive" : "outline"} className="text-[10px]">{r.status}</Badge>
+                      </div>
+                    </div>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
+                      {format(new Date(r.started_at), "d MMM yyyy HH:mm")} · {formatDistanceToNow(new Date(r.started_at), { addSuffix: true })}
+                      {r.draft_count > 0 && ` · ${r.draft_count} draft(s)`}
+                    </p>
+                    {r.error_message && <p className="text-xs text-destructive mt-1">{r.error_message}</p>}
+                    {r.draft_ids && r.draft_ids.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {r.draft_ids.map((id) => {
+                          const d = drafts.find((x) => x.id === id);
+                          return (
+                            <button key={id}
+                              onClick={() => { setSection("approvals"); setFilter("all"); setTimeout(() => {
+                                const el = document.getElementById(`draft-${id}`); el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                              }, 100); }}
+                              className="text-[10px] px-2 py-0.5 border border-border hover:border-primary/60 hover:text-primary transition">
+                              {d ? `${d.draft_type} · ${d.title.slice(0, 40)}` : id.slice(0, 8)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* INVOICES */}
       {!loading && section === "invoices" && (
         <Card>
