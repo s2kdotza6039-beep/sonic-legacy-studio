@@ -586,7 +586,7 @@ const AICommandCentre = () => {
               const isEditing = editingId === d.id;
               const fields = EDITABLE_FIELDS[d.draft_type] ?? EDITABLE_FIELDS.other;
               return (
-                <Card key={d.id}>
+                <Card key={d.id} id={`draft-${d.id}`}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
