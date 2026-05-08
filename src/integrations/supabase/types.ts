@@ -584,6 +584,98 @@ export type Database = {
         }
         Relationships: []
       }
+      command_runs: {
+        Row: {
+          command: string
+          completed_at: string | null
+          draft_count: number
+          draft_ids: string[]
+          error_message: string | null
+          id: string
+          schedule_id: string | null
+          started_at: string
+          status: string
+          triggered_by: string
+          triggered_by_user: string | null
+        }
+        Insert: {
+          command: string
+          completed_at?: string | null
+          draft_count?: number
+          draft_ids?: string[]
+          error_message?: string | null
+          id?: string
+          schedule_id?: string | null
+          started_at?: string
+          status?: string
+          triggered_by?: string
+          triggered_by_user?: string | null
+        }
+        Update: {
+          command?: string
+          completed_at?: string | null
+          draft_count?: number
+          draft_ids?: string[]
+          error_message?: string | null
+          id?: string
+          schedule_id?: string | null
+          started_at?: string
+          status?: string
+          triggered_by?: string
+          triggered_by_user?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "command_runs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "command_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      command_schedules: {
+        Row: {
+          command: string
+          created_at: string
+          day_of_week: number | null
+          frequency: string
+          hour_of_day: number
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          next_run_at: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          command: string
+          created_at?: string
+          day_of_week?: number | null
+          frequency?: string
+          hour_of_day?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          next_run_at?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          command?: string
+          created_at?: string
+          day_of_week?: number | null
+          frequency?: string
+          hour_of_day?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          next_run_at?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_posts: {
         Row: {
           created_at: string
