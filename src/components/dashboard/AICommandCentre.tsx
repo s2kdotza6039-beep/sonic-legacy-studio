@@ -323,18 +323,77 @@ const AICommandCentre = () => {
 
   const runCommand = async (command: string) => {
     setRunningCmd(command);
+    const startedAt = new Date().toISOString();
+    const { data: runRow } = await (supabase as any).from("command_runs").insert({
+      command, triggered_by: "manual", status: "running",
+    }).select().single();
     try {
       const { error } = await supabase.functions.invoke("front-desk-assistant", {
         body: { messages: [{ role: "user", content: command }] },
       });
       if (error) throw error;
-      setTimeout(load, 1500);
-      toast({ title: `Ran: ${command}`, description: "Drafts queued for approval." });
+      // Allow a moment for drafts to be inserted
+      await new Promise((r) => setTimeout(r, 1500));
+      const { data: newDrafts } = await supabase
+        .from("ai_drafts").select("id").eq("command", command).gte("created_at", startedAt);
+      const ids = (newDrafts ?? []).map((d: any) => d.id);
+      if (runRow) {
+        await (supabase as any).from("command_runs").update({
+          status: "completed", completed_at: new Date().toISOString(),
+          draft_ids: ids, draft_count: ids.length,
+        }).eq("id", runRow.id);
+      }
+      load();
+      toast({ title: `Ran: ${command}`, description: `${ids.length} draft(s) queued for approval.` });
     } catch (e: any) {
+      if (runRow) {
+        await (supabase as any).from("command_runs").update({
+          status: "failed", completed_at: new Date().toISOString(),
+          error_message: String(e?.message ?? e),
+        }).eq("id", runRow.id);
+      }
       toast({ title: "Command failed", description: e?.message ?? String(e), variant: "destructive" });
     } finally {
       setRunningCmd(null);
     }
+  };
+
+  const computeNextRunClient = (frequency: string, hour: number, dow: number) => {
+    const now = new Date();
+    const next = new Date(now); next.setMinutes(0, 0, 0);
+    if (frequency === "hourly") { next.setHours(now.getHours() + 1); return next; }
+    next.setHours(hour);
+    if (frequency === "daily") { if (next <= now) next.setDate(next.getDate() + 1); return next; }
+    if (frequency === "weekly") {
+      const diff = (dow - next.getDay() + 7) % 7;
+      next.setDate(next.getDate() + (diff === 0 && next <= now ? 7 : diff));
+      return next;
+    }
+    next.setDate(next.getDate() + 1); return next;
+  };
+
+  const createSchedule = async () => {
+    const next = computeNextRunClient(scheduleForm.frequency, scheduleForm.hour_of_day, scheduleForm.day_of_week);
+    const { error } = await (supabase as any).from("command_schedules").insert({
+      command: scheduleForm.command,
+      frequency: scheduleForm.frequency,
+      hour_of_day: scheduleForm.hour_of_day,
+      day_of_week: scheduleForm.frequency === "weekly" ? scheduleForm.day_of_week : null,
+      next_run_at: next.toISOString(),
+    });
+    if (error) toast({ title: "Failed to schedule", description: error.message, variant: "destructive" });
+    else { toast({ title: "Schedule created" }); load(); }
+  };
+
+  const toggleSchedule = async (s: Schedule) => {
+    await (supabase as any).from("command_schedules").update({ is_active: !s.is_active }).eq("id", s.id);
+    load();
+  };
+
+  const deleteSchedule = async (id: string) => {
+    if (!window.confirm("Delete this schedule?")) return;
+    await (supabase as any).from("command_schedules").delete().eq("id", id);
+    load();
   };
 
   const pendingCount = drafts.filter((d) => d.status === "pending").length;
