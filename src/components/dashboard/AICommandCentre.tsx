@@ -185,7 +185,7 @@ const AICommandCentre = () => {
 
   const load = async () => {
     setLoading(true);
-    const [d, l, t, i, b, s, a] = await Promise.all([
+    const [d, l, t, i, b, s, a, sch, rn] = await Promise.all([
       supabase.from("ai_drafts").select("*").order("created_at", { ascending: false }).limit(100),
       supabase.from("ai_activity_log").select("*").order("created_at", { ascending: false }).limit(50),
       supabase.from("ceo_todos").select("*").order("due_date", { ascending: true, nullsFirst: false }).limit(200),
@@ -193,6 +193,8 @@ const AICommandCentre = () => {
       supabase.from("booking_enquiries").select("*").order("created_at", { ascending: false }).limit(200),
       supabase.from("sponsor_leads").select("*").order("created_at", { ascending: false }).limit(200),
       supabase.from("artists").select("id, name, status, genre, created_at").order("created_at", { ascending: false }).limit(200),
+      (supabase as any).from("command_schedules").select("*").order("created_at", { ascending: false }),
+      (supabase as any).from("command_runs").select("*").order("started_at", { ascending: false }).limit(100),
     ]);
     setDrafts((d.data as Draft[]) || []);
     setLog((l.data as LogRow[]) || []);
@@ -201,6 +203,8 @@ const AICommandCentre = () => {
     setBookings((b.data as Booking[]) || []);
     setSponsors((s.data as Sponsor[]) || []);
     setApplications((a.data as Artist[]) || []);
+    setSchedules((sch.data as Schedule[]) || []);
+    setRuns((rn.data as CommandRun[]) || []);
     setLoading(false);
   };
 
