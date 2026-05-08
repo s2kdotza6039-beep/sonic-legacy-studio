@@ -10,8 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Check, X, FileText, Calendar, Megaphone, Receipt, Sparkles, Clock, ShieldCheck,
   Loader2, ListChecks, Rocket, Music, CalendarCheck, Inbox, Building2, UserPlus, Plus, Zap,
-  Pencil, Save, Search,
+  Pencil, Save, Search, History, Repeat, Trash2, Power,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatDistanceToNow, format } from "date-fns";
 
 type Draft = {
