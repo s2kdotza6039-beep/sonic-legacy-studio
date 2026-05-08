@@ -459,22 +459,54 @@ const AICommandCentre = () => {
           </CardTitle>
           <p className="text-[10px] text-muted-foreground">One click → AI generates drafts → review in Pending Approvals.</p>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {QUICK_COMMANDS.map((cmd) => (
-            <Button
-              key={cmd}
-              size="sm"
-              variant="outline"
+        <CardContent className="grid sm:grid-cols-2 gap-2">
+          {QUICK_COMMANDS.map((qc) => (
+            <button
+              key={qc.command}
               disabled={!!runningCmd}
-              onClick={() => runCommand(cmd)}
-              className="text-[11px] uppercase tracking-widest gap-1.5"
+              onClick={() => setConfirmCmd(qc)}
+              className="text-left border border-border hover:border-primary/60 hover:bg-primary/5 transition px-3 py-2 disabled:opacity-50"
             >
-              {runningCmd === cmd ? <Loader2 size={11} className="animate-spin" /> : <Zap size={11} />}
-              {cmd}
-            </Button>
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest">
+                {runningCmd === qc.command ? <Loader2 size={11} className="animate-spin text-primary" /> : <Zap size={11} className="text-primary" />}
+                <span className="font-medium">{qc.command}</span>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {qc.outputs.map((o) => (
+                  <Badge key={o} variant="outline" className="text-[9px] uppercase">{o}</Badge>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">{qc.description}</p>
+            </button>
           ))}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!confirmCmd} onOpenChange={(o) => !o && setConfirmCmd(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run "{confirmCmd?.command}"?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>{confirmCmd?.description}</p>
+                <div className="flex flex-wrap gap-1 items-center">
+                  <span className="text-xs">Generates:</span>
+                  {confirmCmd?.outputs.map((o) => (
+                    <Badge key={o} variant="outline" className="text-[10px]">{o}</Badge>
+                  ))}
+                </div>
+                <p className="text-xs">All drafts go to Pending Approvals — nothing is published until you approve.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (confirmCmd) runCommand(confirmCmd.command); setConfirmCmd(null); }}>
+              Run command
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Section nav */}
       <div className="flex gap-1 flex-wrap border-b border-border">
