@@ -69,6 +69,8 @@ const SECTIONS = [
   { key: "approvals", label: "Pending Approvals", icon: ShieldCheck },
   { key: "tasks", label: "Daily Tasks", icon: ListChecks },
   { key: "checklists", label: "Checklists", icon: Rocket },
+  { key: "schedules", label: "Schedules", icon: Repeat },
+  { key: "history", label: "Command History", icon: History },
   { key: "invoices", label: "Invoices", icon: Receipt },
   { key: "bookings", label: "Bookings", icon: Inbox },
   { key: "sponsors", label: "Sponsors", icon: Building2 },
