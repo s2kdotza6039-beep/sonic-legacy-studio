@@ -116,16 +116,28 @@ const EDITABLE_FIELDS: Record<string, { key: string; label: string; type: "text"
   other: [{ key: "body", label: "Body", type: "textarea" }],
 };
 
-const QUICK_COMMANDS = [
-  "RUN DAILY CONTENT",
-  "GENERATE DAILY NEWS",
-  "WRITE LATEST NEWS POST",
-  "WRITE ARTIST UPDATES",
-  "CREATE EVENT ANNOUNCEMENT",
-  "GIVE ME 5 CONTENT IDEAS TODAY",
-  "DRIVE TRAFFIC TO WEBSITE",
-  "WRITE FOUNDER MESSAGE",
+type QuickCommand = { command: string; outputs: string[]; description: string };
+const QUICK_COMMANDS: QuickCommand[] = [
+  { command: "RUN DAILY CONTENT",          outputs: ["News", "Social", "Checklist"],  description: "Generates news posts, social captions, and a daily content checklist." },
+  { command: "GENERATE DAILY NEWS",        outputs: ["News"],                          description: "Produces 1–3 news drafts based on label activity." },
+  { command: "WRITE LATEST NEWS POST",     outputs: ["News"],                          description: "Writes one polished news article draft." },
+  { command: "WRITE ARTIST UPDATES",       outputs: ["Artist", "Social"],              description: "Roster updates and supporting social captions." },
+  { command: "CREATE EVENT ANNOUNCEMENT",  outputs: ["Event", "Announcement"],         description: "Creates an event listing plus a homepage announcement." },
+  { command: "GIVE ME 5 CONTENT IDEAS TODAY", outputs: ["Other"],                      description: "Brainstorm draft with 5 content ideas." },
+  { command: "DRIVE TRAFFIC TO WEBSITE",   outputs: ["Social", "Homepage"],            description: "Traffic-driving social captions and a homepage tweak." },
+  { command: "WRITE FOUNDER MESSAGE",      outputs: ["News", "Homepage"],              description: "Founder message draft for site + news." },
 ];
+
+type Schedule = {
+  id: string; command: string; frequency: string; hour_of_day: number;
+  day_of_week: number | null; is_active: boolean; last_run_at: string | null;
+  next_run_at: string | null; notes: string | null; created_at: string;
+};
+type CommandRun = {
+  id: string; command: string; triggered_by: string; schedule_id: string | null;
+  started_at: string; completed_at: string | null; status: string;
+  error_message: string | null; draft_ids: string[]; draft_count: number;
+};
 
 const AICommandCentre = () => {
   const { toast } = useToast();
