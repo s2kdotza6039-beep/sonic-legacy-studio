@@ -721,24 +721,48 @@ const AICommandCentre = () => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     {isEditing ? (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-3 text-xs border border-border bg-secondary/30 p-3">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Original title</p>
+                            <p className="font-medium break-words">{d.title}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-primary mb-1">Edited title</p>
+                            <p className={`font-medium break-words ${editTitle !== d.title ? "text-primary" : ""}`}>{editTitle || "—"}</p>
+                          </div>
+                        </div>
                         {fields.map((f) => {
                           const val = editPayload?.[f.key] ?? "";
+                          const orig = d.payload?.[f.key] ?? "";
+                          const changed = String(val ?? "") !== String(orig ?? "");
                           const onChange = (v: string) =>
                             setEditPayload((p: any) => ({ ...p, [f.key]: f.type === "number" ? Number(v) : v }));
                           return (
-                            <div key={f.key} className="space-y-1">
-                              <label className="text-[10px] uppercase tracking-widest text-muted-foreground">{f.label}</label>
-                              {f.type === "textarea" ? (
-                                <Textarea value={String(val ?? "")} onChange={(e) => onChange(e.target.value)} className="min-h-[80px] text-sm" />
-                              ) : (
-                                <Input
-                                  type={f.type === "number" ? "number" : "text"}
-                                  value={String(val ?? "")}
-                                  onChange={(e) => onChange(e.target.value)}
-                                  className="h-9 text-sm"
-                                />
-                              )}
+                            <div key={f.key} className="space-y-2">
+                              <label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                {f.label}
+                                {changed && <Badge variant="default" className="text-[9px]">Changed</Badge>}
+                              </label>
+                              <div className="grid md:grid-cols-2 gap-3">
+                                <div className="border border-border bg-secondary/30 p-2 text-xs whitespace-pre-wrap break-words min-h-[60px]">
+                                  <p className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1">Original</p>
+                                  {String(orig ?? "") || <span className="text-muted-foreground italic">empty</span>}
+                                </div>
+                                <div className={`border p-2 ${changed ? "border-primary/60 bg-primary/5" : "border-border"}`}>
+                                  <p className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1">Edited</p>
+                                  {f.type === "textarea" ? (
+                                    <Textarea value={String(val ?? "")} onChange={(e) => onChange(e.target.value)} className="min-h-[60px] text-sm" />
+                                  ) : (
+                                    <Input
+                                      type={f.type === "number" ? "number" : "text"}
+                                      value={String(val ?? "")}
+                                      onChange={(e) => onChange(e.target.value)}
+                                      className="h-9 text-sm"
+                                    />
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
