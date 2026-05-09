@@ -635,7 +635,18 @@ const AICommandCentre = () => {
               <span className="text-xs text-muted-foreground">
                 {selected.size > 0 ? `${selected.size} selected` : `Select all (${pendingDrafts.length})`}
               </span>
-              <div className="ml-auto flex gap-2">
+              <div className="ml-auto flex gap-2 flex-wrap items-center">
+                <select
+                  value={bulkOwner}
+                  onChange={(e) => setBulkOwner(e.target.value)}
+                  className="h-8 px-2 text-xs border border-input bg-background rounded-md"
+                  aria-label="Assign to owner"
+                >
+                  {OWNERS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+                <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkBusy} onClick={bulkAssign} className="gap-1 text-xs">
+                  <UserPlus size={12} /> Assign
+                </Button>
                 <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkBusy} onClick={bulkReject} className="gap-1 text-xs">
                   <X size={12} /> Bulk Reject
                 </Button>
