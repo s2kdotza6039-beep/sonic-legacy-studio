@@ -464,6 +464,45 @@ const AICommandCentre = () => {
   const sponsorStatuses = useMemo(() => ["all", ...Array.from(new Set(sponsors.map((s) => s.status)))], [sponsors]);
   const appStatuses = useMemo(() => ["all", ...Array.from(new Set(applications.map((a) => a.status)))], [applications]);
 
+  const sortRows = <T,>(rows: T[], key: string, dir: "asc" | "desc"): T[] => {
+    const sorted = [...rows].sort((a: any, b: any) => {
+      const av = a[key]; const bv = b[key];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (key.includes("date") || key === "created_at") {
+        return new Date(av).getTime() - new Date(bv).getTime();
+      }
+      return String(av).localeCompare(String(bv));
+    });
+    return dir === "desc" ? sorted.reverse() : sorted;
+  };
+
+  const sortedBookings = useMemo(() => sortRows(filteredBookings, bookingSort.key, bookingSort.dir), [filteredBookings, bookingSort]);
+  const sortedSponsors = useMemo(() => sortRows(filteredSponsors, sponsorSort.key, sponsorSort.dir), [filteredSponsors, sponsorSort]);
+  const sortedApps = useMemo(() => sortRows(filteredApps, appSort.key, appSort.dir), [filteredApps, appSort]);
+
+  const pagedBookings = sortedBookings.slice((bookingPage - 1) * PAGE_SIZE, bookingPage * PAGE_SIZE);
+  const pagedSponsors = sortedSponsors.slice((sponsorPage - 1) * PAGE_SIZE, sponsorPage * PAGE_SIZE);
+  const pagedApps = sortedApps.slice((appPage - 1) * PAGE_SIZE, appPage * PAGE_SIZE);
+
+  const bulkAssign = async () => {
+    if (selected.size === 0 || !bulkOwner) return;
+    setBulkBusy(true);
+    let ok = 0, fail = 0;
+    for (const id of selected) {
+      const d = drafts.find((x) => x.id === id);
+      if (!d) { fail++; continue; }
+      const newPayload = { ...(d.payload || {}), _assigned_to: bulkOwner };
+      const { error } = await supabase.from("ai_drafts").update({ payload: newPayload }).eq("id", id);
+      if (error) fail++; else ok++;
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    toast({ title: `Assigned to ${bulkOwner}: ${ok} ok, ${fail} failed` });
+    load();
+  };
+
   const newBookings = bookings.filter((b) => b.status === "new").length;
   const newSponsors = sponsors.filter((s) => s.status === "new").length;
   const newApplications = applications.filter((a) => a.status === "New Artist").length;
