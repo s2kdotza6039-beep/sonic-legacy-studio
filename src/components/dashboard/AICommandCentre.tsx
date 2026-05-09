@@ -1185,6 +1185,50 @@ const FilterBar = ({
   </div>
 );
 
+const SortBar = ({
+  sort, onSort, fields,
+}: {
+  sort: { key: string; dir: "asc" | "desc" };
+  onSort: (s: { key: string; dir: "asc" | "desc" }) => void;
+  fields: { key: string; label: string }[];
+}) => (
+  <div className="flex gap-2 items-center text-xs">
+    <span className="text-muted-foreground">Sort:</span>
+    <select
+      value={sort.key}
+      onChange={(e) => onSort({ ...sort, key: e.target.value })}
+      className="h-8 px-2 text-xs border border-input bg-background rounded-md"
+    >
+      {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+    </select>
+    <Button
+      size="sm" variant="outline"
+      onClick={() => onSort({ ...sort, dir: sort.dir === "asc" ? "desc" : "asc" })}
+      className="h-8 px-2 text-xs"
+    >
+      {sort.dir === "asc" ? "Asc ↑" : "Desc ↓"}
+    </Button>
+  </div>
+);
+
+const PagerBar = ({
+  page, setPage, total, pageSize,
+}: { page: number; setPage: (p: number) => void; total: number; pageSize: number }) => {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (total <= pageSize) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+      <span className="text-[11px] text-muted-foreground">
+        Page {page} of {pages} · {total} records
+      </span>
+      <div className="flex gap-1">
+        <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(Math.max(1, page - 1))} className="h-7 px-2 text-xs">Prev</Button>
+        <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage(Math.min(pages, page + 1))} className="h-7 px-2 text-xs">Next</Button>
+      </div>
+    </div>
+  );
+};
+
 const DraftPreview = ({ type, payload }: { type: string; payload: any }) => {
   if (!payload || typeof payload !== "object") return <p className="text-xs text-muted-foreground">No payload.</p>;
   const text =
