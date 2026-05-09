@@ -687,6 +687,11 @@ const AICommandCentre = () => {
                           <div className="flex flex-wrap gap-2 mt-2 text-[10px] uppercase tracking-widest text-muted-foreground">
                             <Badge variant="outline" className="text-[10px]">{meta.label}</Badge>
                             <Badge variant={d.status === "pending" ? "default" : "outline"} className="text-[10px]">{d.status}</Badge>
+                            {d.payload?._assigned_to && (
+                              <Badge variant="secondary" className="text-[10px] gap-1">
+                                <UserPlus size={9} /> {d.payload._assigned_to}
+                              </Badge>
+                            )}
                             {d.command && <span>cmd: {d.command}</span>}
                             <span className="flex items-center gap-1"><Clock size={10} /> {formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}</span>
                           </div>
