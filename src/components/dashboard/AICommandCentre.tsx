@@ -128,6 +128,24 @@ const QUICK_COMMANDS: QuickCommand[] = [
   { command: "WRITE FOUNDER MESSAGE",      outputs: ["News", "Homepage"],              description: "Founder message draft for site + news." },
 ];
 
+const OWNERS = ["Founder", "Strategist", "Marketing", "A&R", "Finance", "Operations"];
+
+const downloadCsv = (filename: string, rows: Record<string, any>[]) => {
+  if (!rows.length) return;
+  const cols = Object.keys(rows[0]);
+  const esc = (v: any) => {
+    if (v === null || v === undefined) return "";
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+};
+
 type Schedule = {
   id: string; command: string; frequency: string; hour_of_day: number;
   day_of_week: number | null; is_active: boolean; last_run_at: string | null;
@@ -182,6 +200,18 @@ const AICommandCentre = () => {
   const [appSearch, setAppSearch] = useState("");
   const [appStatus, setAppStatus] = useState("all");
   const [appFrom, setAppFrom] = useState("");
+
+  // Pagination + sort per list
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingSort, setBookingSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  const [sponsorPage, setSponsorPage] = useState(1);
+  const [sponsorSort, setSponsorSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  const [appPage, setAppPage] = useState(1);
+  const [appSort, setAppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  const PAGE_SIZE = 25;
+
+  // Bulk assign
+  const [bulkOwner, setBulkOwner] = useState<string>(OWNERS[0]);
 
   const load = async () => {
     setLoading(true);
@@ -434,6 +464,45 @@ const AICommandCentre = () => {
   const sponsorStatuses = useMemo(() => ["all", ...Array.from(new Set(sponsors.map((s) => s.status)))], [sponsors]);
   const appStatuses = useMemo(() => ["all", ...Array.from(new Set(applications.map((a) => a.status)))], [applications]);
 
+  const sortRows = <T,>(rows: T[], key: string, dir: "asc" | "desc"): T[] => {
+    const sorted = [...rows].sort((a: any, b: any) => {
+      const av = a[key]; const bv = b[key];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (key.includes("date") || key === "created_at") {
+        return new Date(av).getTime() - new Date(bv).getTime();
+      }
+      return String(av).localeCompare(String(bv));
+    });
+    return dir === "desc" ? sorted.reverse() : sorted;
+  };
+
+  const sortedBookings = useMemo(() => sortRows(filteredBookings, bookingSort.key, bookingSort.dir), [filteredBookings, bookingSort]);
+  const sortedSponsors = useMemo(() => sortRows(filteredSponsors, sponsorSort.key, sponsorSort.dir), [filteredSponsors, sponsorSort]);
+  const sortedApps = useMemo(() => sortRows(filteredApps, appSort.key, appSort.dir), [filteredApps, appSort]);
+
+  const pagedBookings = sortedBookings.slice((bookingPage - 1) * PAGE_SIZE, bookingPage * PAGE_SIZE);
+  const pagedSponsors = sortedSponsors.slice((sponsorPage - 1) * PAGE_SIZE, sponsorPage * PAGE_SIZE);
+  const pagedApps = sortedApps.slice((appPage - 1) * PAGE_SIZE, appPage * PAGE_SIZE);
+
+  const bulkAssign = async () => {
+    if (selected.size === 0 || !bulkOwner) return;
+    setBulkBusy(true);
+    let ok = 0, fail = 0;
+    for (const id of selected) {
+      const d = drafts.find((x) => x.id === id);
+      if (!d) { fail++; continue; }
+      const newPayload = { ...(d.payload || {}), _assigned_to: bulkOwner };
+      const { error } = await supabase.from("ai_drafts").update({ payload: newPayload }).eq("id", id);
+      if (error) fail++; else ok++;
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    toast({ title: `Assigned to ${bulkOwner}: ${ok} ok, ${fail} failed` });
+    load();
+  };
+
   const newBookings = bookings.filter((b) => b.status === "new").length;
   const newSponsors = sponsors.filter((s) => s.status === "new").length;
   const newApplications = applications.filter((a) => a.status === "New Artist").length;
@@ -566,7 +635,18 @@ const AICommandCentre = () => {
               <span className="text-xs text-muted-foreground">
                 {selected.size > 0 ? `${selected.size} selected` : `Select all (${pendingDrafts.length})`}
               </span>
-              <div className="ml-auto flex gap-2">
+              <div className="ml-auto flex gap-2 flex-wrap items-center">
+                <select
+                  value={bulkOwner}
+                  onChange={(e) => setBulkOwner(e.target.value)}
+                  className="h-8 px-2 text-xs border border-input bg-background rounded-md"
+                  aria-label="Assign to owner"
+                >
+                  {OWNERS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+                <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkBusy} onClick={bulkAssign} className="gap-1 text-xs">
+                  <UserPlus size={12} /> Assign
+                </Button>
                 <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkBusy} onClick={bulkReject} className="gap-1 text-xs">
                   <X size={12} /> Bulk Reject
                 </Button>
@@ -607,6 +687,11 @@ const AICommandCentre = () => {
                           <div className="flex flex-wrap gap-2 mt-2 text-[10px] uppercase tracking-widest text-muted-foreground">
                             <Badge variant="outline" className="text-[10px]">{meta.label}</Badge>
                             <Badge variant={d.status === "pending" ? "default" : "outline"} className="text-[10px]">{d.status}</Badge>
+                            {d.payload?._assigned_to && (
+                              <Badge variant="secondary" className="text-[10px] gap-1">
+                                <UserPlus size={9} /> {d.payload._assigned_to}
+                              </Badge>
+                            )}
                             {d.command && <span>cmd: {d.command}</span>}
                             <span className="flex items-center gap-1"><Clock size={10} /> {formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}</span>
                           </div>
@@ -636,24 +721,48 @@ const AICommandCentre = () => {
                   </CardHeader>
                   <CardContent className="pt-0">
                     {isEditing ? (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-3 text-xs border border-border bg-secondary/30 p-3">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Original title</p>
+                            <p className="font-medium break-words">{d.title}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-primary mb-1">Edited title</p>
+                            <p className={`font-medium break-words ${editTitle !== d.title ? "text-primary" : ""}`}>{editTitle || "—"}</p>
+                          </div>
+                        </div>
                         {fields.map((f) => {
                           const val = editPayload?.[f.key] ?? "";
+                          const orig = d.payload?.[f.key] ?? "";
+                          const changed = String(val ?? "") !== String(orig ?? "");
                           const onChange = (v: string) =>
                             setEditPayload((p: any) => ({ ...p, [f.key]: f.type === "number" ? Number(v) : v }));
                           return (
-                            <div key={f.key} className="space-y-1">
-                              <label className="text-[10px] uppercase tracking-widest text-muted-foreground">{f.label}</label>
-                              {f.type === "textarea" ? (
-                                <Textarea value={String(val ?? "")} onChange={(e) => onChange(e.target.value)} className="min-h-[80px] text-sm" />
-                              ) : (
-                                <Input
-                                  type={f.type === "number" ? "number" : "text"}
-                                  value={String(val ?? "")}
-                                  onChange={(e) => onChange(e.target.value)}
-                                  className="h-9 text-sm"
-                                />
-                              )}
+                            <div key={f.key} className="space-y-2">
+                              <label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                {f.label}
+                                {changed && <Badge variant="default" className="text-[9px]">Changed</Badge>}
+                              </label>
+                              <div className="grid md:grid-cols-2 gap-3">
+                                <div className="border border-border bg-secondary/30 p-2 text-xs whitespace-pre-wrap break-words min-h-[60px]">
+                                  <p className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1">Original</p>
+                                  {String(orig ?? "") || <span className="text-muted-foreground italic">empty</span>}
+                                </div>
+                                <div className={`border p-2 ${changed ? "border-primary/60 bg-primary/5" : "border-border"}`}>
+                                  <p className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1">Edited</p>
+                                  {f.type === "textarea" ? (
+                                    <Textarea value={String(val ?? "")} onChange={(e) => onChange(e.target.value)} className="min-h-[60px] text-sm" />
+                                  ) : (
+                                    <Input
+                                      type={f.type === "number" ? "number" : "text"}
+                                      value={String(val ?? "")}
+                                      onChange={(e) => onChange(e.target.value)}
+                                      className="h-9 text-sm"
+                                    />
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
@@ -901,18 +1010,27 @@ const AICommandCentre = () => {
       {/* BOOKINGS */}
       {!loading && section === "bookings" && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Booking Enquiries ({filteredBookings.length}/{bookings.length})</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm">Booking Enquiries ({filteredBookings.length}/{bookings.length})</CardTitle>
+            <Button size="sm" variant="outline" disabled={!filteredBookings.length} onClick={() => downloadCsv(`bookings-${Date.now()}.csv`, filteredBookings)} className="gap-1 text-xs">
+              <FileText size={12} /> Export CSV
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
-              search={bookingSearch} onSearch={setBookingSearch} placeholder="Search name, email, event…"
-              status={bookingStatus} onStatus={setBookingStatus} statuses={bookingStatuses}
-              from={bookingFrom} onFrom={setBookingFrom}
+              search={bookingSearch} onSearch={(v) => { setBookingSearch(v); setBookingPage(1); }} placeholder="Search name, email, event…"
+              status={bookingStatus} onStatus={(v) => { setBookingStatus(v); setBookingPage(1); }} statuses={bookingStatuses}
+              from={bookingFrom} onFrom={(v) => { setBookingFrom(v); setBookingPage(1); }}
             />
-            {filteredBookings.length === 0 ? (
+            <SortBar sort={bookingSort} onSort={setBookingSort} fields={[
+              { key: "created_at", label: "Created" }, { key: "name", label: "Name" },
+              { key: "event_date", label: "Event date" }, { key: "status", label: "Status" },
+            ]} />
+            {pagedBookings.length === 0 ? (
               <p className="text-sm text-muted-foreground">No matches.</p>
             ) : (
               <div className="space-y-2">
-                {filteredBookings.map((b) => (
+                {pagedBookings.map((b) => (
                   <div key={b.id} className="border-b border-border/40 pb-2 last:border-0">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <p className="text-sm"><strong>{b.name}</strong> · {b.email}</p>
@@ -925,6 +1043,7 @@ const AICommandCentre = () => {
                 ))}
               </div>
             )}
+            <PagerBar page={bookingPage} setPage={setBookingPage} total={sortedBookings.length} pageSize={PAGE_SIZE} />
           </CardContent>
         </Card>
       )}
@@ -932,18 +1051,27 @@ const AICommandCentre = () => {
       {/* SPONSORS */}
       {!loading && section === "sponsors" && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Sponsor Leads ({filteredSponsors.length}/{sponsors.length})</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm">Sponsor Leads ({filteredSponsors.length}/{sponsors.length})</CardTitle>
+            <Button size="sm" variant="outline" disabled={!filteredSponsors.length} onClick={() => downloadCsv(`sponsors-${Date.now()}.csv`, filteredSponsors)} className="gap-1 text-xs">
+              <FileText size={12} /> Export CSV
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
-              search={sponsorSearch} onSearch={setSponsorSearch} placeholder="Search company, contact, industry…"
-              status={sponsorStatus} onStatus={setSponsorStatus} statuses={sponsorStatuses}
-              from={sponsorFrom} onFrom={setSponsorFrom}
+              search={sponsorSearch} onSearch={(v) => { setSponsorSearch(v); setSponsorPage(1); }} placeholder="Search company, contact, industry…"
+              status={sponsorStatus} onStatus={(v) => { setSponsorStatus(v); setSponsorPage(1); }} statuses={sponsorStatuses}
+              from={sponsorFrom} onFrom={(v) => { setSponsorFrom(v); setSponsorPage(1); }}
             />
-            {filteredSponsors.length === 0 ? (
+            <SortBar sort={sponsorSort} onSort={setSponsorSort} fields={[
+              { key: "created_at", label: "Created" }, { key: "company", label: "Company" },
+              { key: "industry", label: "Industry" }, { key: "status", label: "Status" },
+            ]} />
+            {pagedSponsors.length === 0 ? (
               <p className="text-sm text-muted-foreground">No matches.</p>
             ) : (
               <div className="space-y-2">
-                {filteredSponsors.map((s) => (
+                {pagedSponsors.map((s) => (
                   <div key={s.id} className="border-b border-border/40 pb-2 last:border-0">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <p className="text-sm"><strong>{s.company}</strong>{s.contact_name ? ` · ${s.contact_name}` : ""}</p>
@@ -956,6 +1084,7 @@ const AICommandCentre = () => {
                 ))}
               </div>
             )}
+            <PagerBar page={sponsorPage} setPage={setSponsorPage} total={sortedSponsors.length} pageSize={PAGE_SIZE} />
           </CardContent>
         </Card>
       )}
@@ -963,18 +1092,27 @@ const AICommandCentre = () => {
       {/* APPLICATIONS */}
       {!loading && section === "applications" && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Artist Applications ({filteredApps.length}/{applications.length})</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm">Artist Applications ({filteredApps.length}/{applications.length})</CardTitle>
+            <Button size="sm" variant="outline" disabled={!filteredApps.length} onClick={() => downloadCsv(`artist-applications-${Date.now()}.csv`, filteredApps)} className="gap-1 text-xs">
+              <FileText size={12} /> Export CSV
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
-              search={appSearch} onSearch={setAppSearch} placeholder="Search artist, genre…"
-              status={appStatus} onStatus={setAppStatus} statuses={appStatuses}
-              from={appFrom} onFrom={setAppFrom}
+              search={appSearch} onSearch={(v) => { setAppSearch(v); setAppPage(1); }} placeholder="Search artist, genre…"
+              status={appStatus} onStatus={(v) => { setAppStatus(v); setAppPage(1); }} statuses={appStatuses}
+              from={appFrom} onFrom={(v) => { setAppFrom(v); setAppPage(1); }}
             />
-            {filteredApps.length === 0 ? (
+            <SortBar sort={appSort} onSort={setAppSort} fields={[
+              { key: "created_at", label: "Created" }, { key: "name", label: "Name" },
+              { key: "genre", label: "Genre" }, { key: "status", label: "Status" },
+            ]} />
+            {pagedApps.length === 0 ? (
               <p className="text-sm text-muted-foreground">No matches.</p>
             ) : (
               <div className="space-y-2">
-                {filteredApps.map((a) => (
+                {pagedApps.map((a) => (
                   <div key={a.id} className="flex items-center justify-between gap-3 border-b border-border/40 pb-2 last:border-0">
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{a.name}</p>
@@ -987,6 +1125,7 @@ const AICommandCentre = () => {
                 ))}
               </div>
             )}
+            <PagerBar page={appPage} setPage={setAppPage} total={sortedApps.length} pageSize={PAGE_SIZE} />
           </CardContent>
         </Card>
       )}
@@ -1045,6 +1184,50 @@ const FilterBar = ({
     )}
   </div>
 );
+
+const SortBar = ({
+  sort, onSort, fields,
+}: {
+  sort: { key: string; dir: "asc" | "desc" };
+  onSort: (s: { key: string; dir: "asc" | "desc" }) => void;
+  fields: { key: string; label: string }[];
+}) => (
+  <div className="flex gap-2 items-center text-xs">
+    <span className="text-muted-foreground">Sort:</span>
+    <select
+      value={sort.key}
+      onChange={(e) => onSort({ ...sort, key: e.target.value })}
+      className="h-8 px-2 text-xs border border-input bg-background rounded-md"
+    >
+      {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+    </select>
+    <Button
+      size="sm" variant="outline"
+      onClick={() => onSort({ ...sort, dir: sort.dir === "asc" ? "desc" : "asc" })}
+      className="h-8 px-2 text-xs"
+    >
+      {sort.dir === "asc" ? "Asc ↑" : "Desc ↓"}
+    </Button>
+  </div>
+);
+
+const PagerBar = ({
+  page, setPage, total, pageSize,
+}: { page: number; setPage: (p: number) => void; total: number; pageSize: number }) => {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (total <= pageSize) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+      <span className="text-[11px] text-muted-foreground">
+        Page {page} of {pages} · {total} records
+      </span>
+      <div className="flex gap-1">
+        <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(Math.max(1, page - 1))} className="h-7 px-2 text-xs">Prev</Button>
+        <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage(Math.min(pages, page + 1))} className="h-7 px-2 text-xs">Next</Button>
+      </div>
+    </div>
+  );
+};
 
 const DraftPreview = ({ type, payload }: { type: string; payload: any }) => {
   if (!payload || typeof payload !== "object") return <p className="text-xs text-muted-foreground">No payload.</p>;
