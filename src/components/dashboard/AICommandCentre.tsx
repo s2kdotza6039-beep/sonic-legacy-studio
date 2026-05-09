@@ -1010,18 +1010,27 @@ const AICommandCentre = () => {
       {/* BOOKINGS */}
       {!loading && section === "bookings" && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Booking Enquiries ({filteredBookings.length}/{bookings.length})</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm">Booking Enquiries ({filteredBookings.length}/{bookings.length})</CardTitle>
+            <Button size="sm" variant="outline" disabled={!filteredBookings.length} onClick={() => downloadCsv(`bookings-${Date.now()}.csv`, filteredBookings)} className="gap-1 text-xs">
+              <FileText size={12} /> Export CSV
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
-              search={bookingSearch} onSearch={setBookingSearch} placeholder="Search name, email, event…"
-              status={bookingStatus} onStatus={setBookingStatus} statuses={bookingStatuses}
-              from={bookingFrom} onFrom={setBookingFrom}
+              search={bookingSearch} onSearch={(v) => { setBookingSearch(v); setBookingPage(1); }} placeholder="Search name, email, event…"
+              status={bookingStatus} onStatus={(v) => { setBookingStatus(v); setBookingPage(1); }} statuses={bookingStatuses}
+              from={bookingFrom} onFrom={(v) => { setBookingFrom(v); setBookingPage(1); }}
             />
-            {filteredBookings.length === 0 ? (
+            <SortBar sort={bookingSort} onSort={setBookingSort} fields={[
+              { key: "created_at", label: "Created" }, { key: "name", label: "Name" },
+              { key: "event_date", label: "Event date" }, { key: "status", label: "Status" },
+            ]} />
+            {pagedBookings.length === 0 ? (
               <p className="text-sm text-muted-foreground">No matches.</p>
             ) : (
               <div className="space-y-2">
-                {filteredBookings.map((b) => (
+                {pagedBookings.map((b) => (
                   <div key={b.id} className="border-b border-border/40 pb-2 last:border-0">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <p className="text-sm"><strong>{b.name}</strong> · {b.email}</p>
@@ -1034,6 +1043,7 @@ const AICommandCentre = () => {
                 ))}
               </div>
             )}
+            <PagerBar page={bookingPage} setPage={setBookingPage} total={sortedBookings.length} pageSize={PAGE_SIZE} />
           </CardContent>
         </Card>
       )}
@@ -1041,18 +1051,27 @@ const AICommandCentre = () => {
       {/* SPONSORS */}
       {!loading && section === "sponsors" && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Sponsor Leads ({filteredSponsors.length}/{sponsors.length})</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm">Sponsor Leads ({filteredSponsors.length}/{sponsors.length})</CardTitle>
+            <Button size="sm" variant="outline" disabled={!filteredSponsors.length} onClick={() => downloadCsv(`sponsors-${Date.now()}.csv`, filteredSponsors)} className="gap-1 text-xs">
+              <FileText size={12} /> Export CSV
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
-              search={sponsorSearch} onSearch={setSponsorSearch} placeholder="Search company, contact, industry…"
-              status={sponsorStatus} onStatus={setSponsorStatus} statuses={sponsorStatuses}
-              from={sponsorFrom} onFrom={setSponsorFrom}
+              search={sponsorSearch} onSearch={(v) => { setSponsorSearch(v); setSponsorPage(1); }} placeholder="Search company, contact, industry…"
+              status={sponsorStatus} onStatus={(v) => { setSponsorStatus(v); setSponsorPage(1); }} statuses={sponsorStatuses}
+              from={sponsorFrom} onFrom={(v) => { setSponsorFrom(v); setSponsorPage(1); }}
             />
-            {filteredSponsors.length === 0 ? (
+            <SortBar sort={sponsorSort} onSort={setSponsorSort} fields={[
+              { key: "created_at", label: "Created" }, { key: "company", label: "Company" },
+              { key: "industry", label: "Industry" }, { key: "status", label: "Status" },
+            ]} />
+            {pagedSponsors.length === 0 ? (
               <p className="text-sm text-muted-foreground">No matches.</p>
             ) : (
               <div className="space-y-2">
-                {filteredSponsors.map((s) => (
+                {pagedSponsors.map((s) => (
                   <div key={s.id} className="border-b border-border/40 pb-2 last:border-0">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <p className="text-sm"><strong>{s.company}</strong>{s.contact_name ? ` · ${s.contact_name}` : ""}</p>
@@ -1065,6 +1084,7 @@ const AICommandCentre = () => {
                 ))}
               </div>
             )}
+            <PagerBar page={sponsorPage} setPage={setSponsorPage} total={sortedSponsors.length} pageSize={PAGE_SIZE} />
           </CardContent>
         </Card>
       )}
@@ -1072,18 +1092,27 @@ const AICommandCentre = () => {
       {/* APPLICATIONS */}
       {!loading && section === "applications" && (
         <Card>
-          <CardHeader><CardTitle className="text-sm">Artist Applications ({filteredApps.length}/{applications.length})</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm">Artist Applications ({filteredApps.length}/{applications.length})</CardTitle>
+            <Button size="sm" variant="outline" disabled={!filteredApps.length} onClick={() => downloadCsv(`artist-applications-${Date.now()}.csv`, filteredApps)} className="gap-1 text-xs">
+              <FileText size={12} /> Export CSV
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
-              search={appSearch} onSearch={setAppSearch} placeholder="Search artist, genre…"
-              status={appStatus} onStatus={setAppStatus} statuses={appStatuses}
-              from={appFrom} onFrom={setAppFrom}
+              search={appSearch} onSearch={(v) => { setAppSearch(v); setAppPage(1); }} placeholder="Search artist, genre…"
+              status={appStatus} onStatus={(v) => { setAppStatus(v); setAppPage(1); }} statuses={appStatuses}
+              from={appFrom} onFrom={(v) => { setAppFrom(v); setAppPage(1); }}
             />
-            {filteredApps.length === 0 ? (
+            <SortBar sort={appSort} onSort={setAppSort} fields={[
+              { key: "created_at", label: "Created" }, { key: "name", label: "Name" },
+              { key: "genre", label: "Genre" }, { key: "status", label: "Status" },
+            ]} />
+            {pagedApps.length === 0 ? (
               <p className="text-sm text-muted-foreground">No matches.</p>
             ) : (
               <div className="space-y-2">
-                {filteredApps.map((a) => (
+                {pagedApps.map((a) => (
                   <div key={a.id} className="flex items-center justify-between gap-3 border-b border-border/40 pb-2 last:border-0">
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{a.name}</p>
@@ -1096,6 +1125,7 @@ const AICommandCentre = () => {
                 ))}
               </div>
             )}
+            <PagerBar page={appPage} setPage={setAppPage} total={sortedApps.length} pageSize={PAGE_SIZE} />
           </CardContent>
         </Card>
       )}
