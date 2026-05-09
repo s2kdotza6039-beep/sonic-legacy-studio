@@ -201,6 +201,18 @@ const AICommandCentre = () => {
   const [appStatus, setAppStatus] = useState("all");
   const [appFrom, setAppFrom] = useState("");
 
+  // Pagination + sort per list
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingSort, setBookingSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  const [sponsorPage, setSponsorPage] = useState(1);
+  const [sponsorSort, setSponsorSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  const [appPage, setAppPage] = useState(1);
+  const [appSort, setAppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  const PAGE_SIZE = 25;
+
+  // Bulk assign
+  const [bulkOwner, setBulkOwner] = useState<string>(OWNERS[0]);
+
   const load = async () => {
     setLoading(true);
     const [d, l, t, i, b, s, a, sch, rn] = await Promise.all([
