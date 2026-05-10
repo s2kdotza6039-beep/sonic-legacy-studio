@@ -116,17 +116,18 @@ const EDITABLE_FIELDS: Record<string, { key: string; label: string; type: "text"
   other: [{ key: "body", label: "Body", type: "textarea" }],
 };
 
-type QuickCommand = { command: string; outputs: string[]; description: string };
+type QuickCommand = { command: string; outputs: string[]; description: string; estimated: string; fields: string[] };
 const QUICK_COMMANDS: QuickCommand[] = [
-  { command: "RUN DAILY CONTENT",          outputs: ["News", "Social", "Checklist"],  description: "Generates news posts, social captions, and a daily content checklist." },
-  { command: "GENERATE DAILY NEWS",        outputs: ["News"],                          description: "Produces 1–3 news drafts based on label activity." },
-  { command: "WRITE LATEST NEWS POST",     outputs: ["News"],                          description: "Writes one polished news article draft." },
-  { command: "WRITE ARTIST UPDATES",       outputs: ["Artist", "Social"],              description: "Roster updates and supporting social captions." },
-  { command: "CREATE EVENT ANNOUNCEMENT",  outputs: ["Event", "Announcement"],         description: "Creates an event listing plus a homepage announcement." },
-  { command: "GIVE ME 5 CONTENT IDEAS TODAY", outputs: ["Other"],                      description: "Brainstorm draft with 5 content ideas." },
-  { command: "DRIVE TRAFFIC TO WEBSITE",   outputs: ["Social", "Homepage"],            description: "Traffic-driving social captions and a homepage tweak." },
-  { command: "WRITE FOUNDER MESSAGE",      outputs: ["News", "Homepage"],              description: "Founder message draft for site + news." },
+  { command: "RUN DAILY CONTENT",          outputs: ["News", "Social", "Checklist"],  description: "Generates news posts, social captions, and a daily content checklist.", estimated: "3–6 drafts", fields: ["title", "excerpt", "body", "category"] },
+  { command: "GENERATE DAILY NEWS",        outputs: ["News"],                          description: "Produces 1–3 news drafts based on label activity.",                       estimated: "1–3 drafts", fields: ["title", "excerpt", "body", "category"] },
+  { command: "WRITE LATEST NEWS POST",     outputs: ["News"],                          description: "Writes one polished news article draft.",                                 estimated: "1 draft",    fields: ["title", "excerpt", "body", "category", "image_url"] },
+  { command: "WRITE ARTIST UPDATES",       outputs: ["Artist", "Social"],              description: "Roster updates and supporting social captions.",                          estimated: "2–4 drafts", fields: ["title", "body"] },
+  { command: "CREATE EVENT ANNOUNCEMENT",  outputs: ["Event", "Announcement"],         description: "Creates an event listing plus a homepage announcement.",                  estimated: "2 drafts",   fields: ["title", "description", "venue", "city", "start_date", "ticket_url"] },
+  { command: "GIVE ME 5 CONTENT IDEAS TODAY", outputs: ["Other"],                      description: "Brainstorm draft with 5 content ideas.",                                  estimated: "1 draft",    fields: ["title", "body"] },
+  { command: "DRIVE TRAFFIC TO WEBSITE",   outputs: ["Social", "Homepage"],            description: "Traffic-driving social captions and a homepage tweak.",                   estimated: "2–3 drafts", fields: ["title", "body"] },
+  { command: "WRITE FOUNDER MESSAGE",      outputs: ["News", "Homepage"],              description: "Founder message draft for site + news.",                                  estimated: "1–2 drafts", fields: ["title", "body"] },
 ];
+const COMMAND_BY_NAME = (cmd: string) => QUICK_COMMANDS.find((q) => q.command === cmd);
 
 const OWNERS = ["Founder", "Strategist", "Marketing", "A&R", "Finance", "Operations"];
 
