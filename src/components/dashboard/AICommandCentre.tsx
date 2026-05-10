@@ -565,6 +565,13 @@ const AICommandCentre = () => {
                     <Badge key={o} variant="outline" className="text-[10px]">{o}</Badge>
                   ))}
                 </div>
+                <p className="text-xs"><strong>Estimated:</strong> {confirmCmd?.estimated}</p>
+                {confirmCmd?.fields && confirmCmd.fields.length > 0 && (
+                  <div className="text-xs">
+                    <strong>Expected fields:</strong>{" "}
+                    <span className="text-muted-foreground">{confirmCmd.fields.join(", ")}</span>
+                  </div>
+                )}
                 <p className="text-xs">All drafts go to Pending Approvals — nothing is published until you approve.</p>
               </div>
             </AlertDialogDescription>
