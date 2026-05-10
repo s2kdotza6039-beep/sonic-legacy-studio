@@ -676,6 +676,9 @@ const AICommandCentre = () => {
                     <span className="text-muted-foreground">{confirmCmd.fields.join(", ")}</span>
                   </div>
                 )}
+                {confirmCmd?.previews && confirmCmd.previews.length > 0 && (
+                  <PreviewPanel items={confirmCmd.previews} />
+                )}
                 <p className="text-xs">All drafts go to Pending Approvals — nothing is published until you approve.</p>
               </div>
             </AlertDialogDescription>
