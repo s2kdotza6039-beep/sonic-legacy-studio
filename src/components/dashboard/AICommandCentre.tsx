@@ -116,17 +116,18 @@ const EDITABLE_FIELDS: Record<string, { key: string; label: string; type: "text"
   other: [{ key: "body", label: "Body", type: "textarea" }],
 };
 
-type QuickCommand = { command: string; outputs: string[]; description: string };
+type QuickCommand = { command: string; outputs: string[]; description: string; estimated: string; fields: string[] };
 const QUICK_COMMANDS: QuickCommand[] = [
-  { command: "RUN DAILY CONTENT",          outputs: ["News", "Social", "Checklist"],  description: "Generates news posts, social captions, and a daily content checklist." },
-  { command: "GENERATE DAILY NEWS",        outputs: ["News"],                          description: "Produces 1–3 news drafts based on label activity." },
-  { command: "WRITE LATEST NEWS POST",     outputs: ["News"],                          description: "Writes one polished news article draft." },
-  { command: "WRITE ARTIST UPDATES",       outputs: ["Artist", "Social"],              description: "Roster updates and supporting social captions." },
-  { command: "CREATE EVENT ANNOUNCEMENT",  outputs: ["Event", "Announcement"],         description: "Creates an event listing plus a homepage announcement." },
-  { command: "GIVE ME 5 CONTENT IDEAS TODAY", outputs: ["Other"],                      description: "Brainstorm draft with 5 content ideas." },
-  { command: "DRIVE TRAFFIC TO WEBSITE",   outputs: ["Social", "Homepage"],            description: "Traffic-driving social captions and a homepage tweak." },
-  { command: "WRITE FOUNDER MESSAGE",      outputs: ["News", "Homepage"],              description: "Founder message draft for site + news." },
+  { command: "RUN DAILY CONTENT",          outputs: ["News", "Social", "Checklist"],  description: "Generates news posts, social captions, and a daily content checklist.", estimated: "3–6 drafts", fields: ["title", "excerpt", "body", "category"] },
+  { command: "GENERATE DAILY NEWS",        outputs: ["News"],                          description: "Produces 1–3 news drafts based on label activity.",                       estimated: "1–3 drafts", fields: ["title", "excerpt", "body", "category"] },
+  { command: "WRITE LATEST NEWS POST",     outputs: ["News"],                          description: "Writes one polished news article draft.",                                 estimated: "1 draft",    fields: ["title", "excerpt", "body", "category", "image_url"] },
+  { command: "WRITE ARTIST UPDATES",       outputs: ["Artist", "Social"],              description: "Roster updates and supporting social captions.",                          estimated: "2–4 drafts", fields: ["title", "body"] },
+  { command: "CREATE EVENT ANNOUNCEMENT",  outputs: ["Event", "Announcement"],         description: "Creates an event listing plus a homepage announcement.",                  estimated: "2 drafts",   fields: ["title", "description", "venue", "city", "start_date", "ticket_url"] },
+  { command: "GIVE ME 5 CONTENT IDEAS TODAY", outputs: ["Other"],                      description: "Brainstorm draft with 5 content ideas.",                                  estimated: "1 draft",    fields: ["title", "body"] },
+  { command: "DRIVE TRAFFIC TO WEBSITE",   outputs: ["Social", "Homepage"],            description: "Traffic-driving social captions and a homepage tweak.",                   estimated: "2–3 drafts", fields: ["title", "body"] },
+  { command: "WRITE FOUNDER MESSAGE",      outputs: ["News", "Homepage"],              description: "Founder message draft for site + news.",                                  estimated: "1–2 drafts", fields: ["title", "body"] },
 ];
+const COMMAND_BY_NAME = (cmd: string) => QUICK_COMMANDS.find((q) => q.command === cmd);
 
 const OWNERS = ["Founder", "Strategist", "Marketing", "A&R", "Finance", "Operations"];
 
@@ -178,6 +179,12 @@ const AICommandCentre = () => {
   const [runs, setRuns] = useState<CommandRun[]>([]);
   const [scheduleForm, setScheduleForm] = useState<{ command: string; frequency: string; hour_of_day: number; day_of_week: number }>({
     command: QUICK_COMMANDS[0].command, frequency: "daily", hour_of_day: 9, day_of_week: 1,
+  });
+  const [confirmSchedule, setConfirmSchedule] = useState(false);
+  const [runNowBusyId, setRunNowBusyId] = useState<string | null>(null);
+  const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
+  const [schedEdit, setSchedEdit] = useState<{ command: string; frequency: string; hour_of_day: number; day_of_week: number }>({
+    command: "", frequency: "daily", hour_of_day: 9, day_of_week: 1,
   });
 
   // Editing state
@@ -426,6 +433,61 @@ const AICommandCentre = () => {
     load();
   };
 
+  const startEditSchedule = (s: Schedule) => {
+    setEditingSchedId(s.id);
+    setSchedEdit({
+      command: s.command,
+      frequency: s.frequency,
+      hour_of_day: s.hour_of_day ?? 9,
+      day_of_week: s.day_of_week ?? 1,
+    });
+  };
+
+  const cancelEditSchedule = () => { setEditingSchedId(null); };
+
+  const saveEditSchedule = async (id: string) => {
+    const next = computeNextRunClient(schedEdit.frequency, schedEdit.hour_of_day, schedEdit.day_of_week);
+    const { error } = await (supabase as any).from("command_schedules").update({
+      command: schedEdit.command,
+      frequency: schedEdit.frequency,
+      hour_of_day: schedEdit.hour_of_day,
+      day_of_week: schedEdit.frequency === "weekly" ? schedEdit.day_of_week : null,
+      next_run_at: next.toISOString(),
+    }).eq("id", id);
+    if (error) toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    else { toast({ title: "Schedule updated" }); setEditingSchedId(null); load(); }
+  };
+
+  const runScheduleNow = async (s: Schedule) => {
+    setRunNowBusyId(s.id);
+    try {
+      await runCommand(s.command);
+      await (supabase as any).from("command_schedules").update({ last_run_at: new Date().toISOString() }).eq("id", s.id);
+    } finally {
+      setRunNowBusyId(null);
+      load();
+    }
+  };
+
+  const jumpToDraft = async (id: string) => {
+    setSection("approvals");
+    setFilter("all");
+    if (!drafts.find((d) => d.id === id)) {
+      const { data } = await supabase.from("ai_drafts").select("*").eq("id", id).maybeSingle();
+      if (data) setDrafts((prev) => (prev.find((p) => p.id === id) ? prev : [data as Draft, ...prev]));
+    }
+    for (let i = 0; i < 20; i++) {
+      const el = document.getElementById(`draft-${id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-primary");
+        setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  };
+
   const pendingCount = drafts.filter((d) => d.status === "pending").length;
   const dailyTasks = todos.filter((t) => !t.is_done);
 
@@ -564,6 +626,13 @@ const AICommandCentre = () => {
                     <Badge key={o} variant="outline" className="text-[10px]">{o}</Badge>
                   ))}
                 </div>
+                <p className="text-xs"><strong>Estimated:</strong> {confirmCmd?.estimated}</p>
+                {confirmCmd?.fields && confirmCmd.fields.length > 0 && (
+                  <div className="text-xs">
+                    <strong>Expected fields:</strong>{" "}
+                    <span className="text-muted-foreground">{confirmCmd.fields.join(", ")}</span>
+                  </div>
+                )}
                 <p className="text-xs">All drafts go to Pending Approvals — nothing is published until you approve.</p>
               </div>
             </AlertDialogDescription>
@@ -892,10 +961,50 @@ const AICommandCentre = () => {
                   </div>
                 )}
               </div>
-              <Button size="sm" onClick={createSchedule} className="gap-1 text-xs"><Plus size={12} /> Create schedule</Button>
+              <Button size="sm" onClick={() => setConfirmSchedule(true)} className="gap-1 text-xs"><Plus size={12} /> Create schedule</Button>
               <p className="text-[10px] text-muted-foreground">Drafts created by schedules still queue for your approval — nothing auto-publishes.</p>
             </CardContent>
           </Card>
+
+          <AlertDialog open={confirmSchedule} onOpenChange={setConfirmSchedule}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Create this schedule?</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Command:</strong> {scheduleForm.command}</p>
+                    <p>
+                      <strong>Runs:</strong> {scheduleForm.frequency}
+                      {scheduleForm.frequency !== "hourly" ? ` at ${String(scheduleForm.hour_of_day).padStart(2,"0")}:00` : ""}
+                      {scheduleForm.frequency === "weekly" ? ` on ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][scheduleForm.day_of_week]}` : ""}
+                    </p>
+                    {(() => {
+                      const meta = COMMAND_BY_NAME(scheduleForm.command);
+                      if (!meta) return null;
+                      return (
+                        <div className="space-y-1">
+                          <p>{meta.description}</p>
+                          <div className="flex flex-wrap gap-1 items-center">
+                            <span className="text-xs">Each run generates:</span>
+                            {meta.outputs.map((o) => <Badge key={o} variant="outline" className="text-[10px]">{o}</Badge>)}
+                          </div>
+                          <p className="text-xs"><strong>Estimated per run:</strong> {meta.estimated}</p>
+                          <p className="text-xs"><strong>Expected fields:</strong> <span className="text-muted-foreground">{meta.fields.join(", ")}</span></p>
+                        </div>
+                      );
+                    })()}
+                    <p className="text-xs">All scheduled drafts go to Pending Approvals — nothing auto-publishes.</p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { createSchedule(); setConfirmSchedule(false); }}>
+                  Create schedule
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle></CardHeader>
@@ -903,27 +1012,69 @@ const AICommandCentre = () => {
               {schedules.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No schedules yet.</p>
               ) : (
-                <ul className="space-y-2">
-                  {schedules.map((s) => (
-                    <li key={s.id} className="flex items-center justify-between gap-3 border-b border-border/40 pb-2 last:border-0">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{s.command}</p>
-                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                          {s.frequency}{s.frequency !== "hourly" ? ` · ${String(s.hour_of_day).padStart(2,"0")}:00` : ""}
-                          {s.frequency === "weekly" && s.day_of_week !== null ? ` · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][s.day_of_week]}` : ""}
-                          {s.next_run_at && ` · next ${formatDistanceToNow(new Date(s.next_run_at), { addSuffix: true })}`}
-                          {s.last_run_at && ` · last ${formatDistanceToNow(new Date(s.last_run_at), { addSuffix: true })}`}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant={s.is_active ? "default" : "outline"} className="text-[10px]">{s.is_active ? "Active" : "Paused"}</Badge>
-                        <Button size="sm" variant="outline" onClick={() => toggleSchedule(s)} className="h-7 px-2 text-xs gap-1">
-                          <Power size={10} /> {s.is_active ? "Pause" : "Resume"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => deleteSchedule(s.id)} className="h-7 px-2 text-xs"><Trash2 size={10} /></Button>
-                      </div>
-                    </li>
-                  ))}
+                <ul className="space-y-3">
+                  {schedules.map((s) => {
+                    const isEditing = editingSchedId === s.id;
+                    return (
+                      <li key={s.id} className="border-b border-border/40 pb-3 last:border-0">
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            <div className="grid sm:grid-cols-2 gap-2">
+                              <select value={schedEdit.command} onChange={(e) => setSchedEdit({ ...schedEdit, command: e.target.value })}
+                                className="h-9 w-full px-2 text-xs border border-input bg-background rounded-md">
+                                {QUICK_COMMANDS.map((qc) => <option key={qc.command} value={qc.command}>{qc.command}</option>)}
+                              </select>
+                              <select value={schedEdit.frequency} onChange={(e) => setSchedEdit({ ...schedEdit, frequency: e.target.value })}
+                                className="h-9 w-full px-2 text-xs border border-input bg-background rounded-md">
+                                <option value="hourly">Hourly</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                              </select>
+                              {schedEdit.frequency !== "hourly" && (
+                                <Input type="number" min={0} max={23} value={schedEdit.hour_of_day}
+                                  onChange={(e) => setSchedEdit({ ...schedEdit, hour_of_day: Number(e.target.value) })} className="h-9 text-xs" />
+                              )}
+                              {schedEdit.frequency === "weekly" && (
+                                <select value={schedEdit.day_of_week} onChange={(e) => setSchedEdit({ ...schedEdit, day_of_week: Number(e.target.value) })}
+                                  className="h-9 w-full px-2 text-xs border border-input bg-background rounded-md">
+                                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d, i) => <option key={d} value={i}>{d}</option>)}
+                                </select>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => saveEditSchedule(s.id)} className="gap-1 text-xs"><Save size={12} /> Save</Button>
+                              <Button size="sm" variant="outline" onClick={cancelEditSchedule} className="text-xs">Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{s.command}</p>
+                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                                {s.frequency}{s.frequency !== "hourly" ? ` · ${String(s.hour_of_day).padStart(2,"0")}:00` : ""}
+                                {s.frequency === "weekly" && s.day_of_week !== null ? ` · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][s.day_of_week]}` : ""}
+                                {s.next_run_at && ` · next ${formatDistanceToNow(new Date(s.next_run_at), { addSuffix: true })}`}
+                                {s.last_run_at && ` · last ${formatDistanceToNow(new Date(s.last_run_at), { addSuffix: true })}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                              <Badge variant={s.is_active ? "default" : "outline"} className="text-[10px]">{s.is_active ? "Active" : "Paused"}</Badge>
+                              <Button size="sm" onClick={() => runScheduleNow(s)} disabled={runNowBusyId === s.id || !!runningCmd} className="h-7 px-2 text-xs gap-1">
+                                {runNowBusyId === s.id ? <Loader2 size={10} className="animate-spin" /> : <Zap size={10} />} Run now
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => startEditSchedule(s)} className="h-7 px-2 text-xs gap-1">
+                                <Pencil size={10} /> Edit
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => toggleSchedule(s)} className="h-7 px-2 text-xs gap-1">
+                                <Power size={10} /> {s.is_active ? "Pause" : "Resume"}
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => deleteSchedule(s.id)} className="h-7 px-2 text-xs"><Trash2 size={10} /></Button>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </CardContent>
@@ -960,9 +1111,7 @@ const AICommandCentre = () => {
                           const d = drafts.find((x) => x.id === id);
                           return (
                             <button key={id}
-                              onClick={() => { setSection("approvals"); setFilter("all"); setTimeout(() => {
-                                const el = document.getElementById(`draft-${id}`); el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }, 100); }}
+                              onClick={() => jumpToDraft(id)}
                               className="text-[10px] px-2 py-0.5 border border-border hover:border-primary/60 hover:text-primary transition">
                               {d ? `${d.draft_type} · ${d.title.slice(0, 40)}` : id.slice(0, 8)}
                             </button>
