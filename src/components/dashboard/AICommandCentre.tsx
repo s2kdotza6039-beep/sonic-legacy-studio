@@ -433,6 +433,61 @@ const AICommandCentre = () => {
     load();
   };
 
+  const startEditSchedule = (s: Schedule) => {
+    setEditingSchedId(s.id);
+    setSchedEdit({
+      command: s.command,
+      frequency: s.frequency,
+      hour_of_day: s.hour_of_day ?? 9,
+      day_of_week: s.day_of_week ?? 1,
+    });
+  };
+
+  const cancelEditSchedule = () => { setEditingSchedId(null); };
+
+  const saveEditSchedule = async (id: string) => {
+    const next = computeNextRunClient(schedEdit.frequency, schedEdit.hour_of_day, schedEdit.day_of_week);
+    const { error } = await (supabase as any).from("command_schedules").update({
+      command: schedEdit.command,
+      frequency: schedEdit.frequency,
+      hour_of_day: schedEdit.hour_of_day,
+      day_of_week: schedEdit.frequency === "weekly" ? schedEdit.day_of_week : null,
+      next_run_at: next.toISOString(),
+    }).eq("id", id);
+    if (error) toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    else { toast({ title: "Schedule updated" }); setEditingSchedId(null); load(); }
+  };
+
+  const runScheduleNow = async (s: Schedule) => {
+    setRunNowBusyId(s.id);
+    try {
+      await runCommand(s.command);
+      await (supabase as any).from("command_schedules").update({ last_run_at: new Date().toISOString() }).eq("id", s.id);
+    } finally {
+      setRunNowBusyId(null);
+      load();
+    }
+  };
+
+  const jumpToDraft = async (id: string) => {
+    setSection("approvals");
+    setFilter("all");
+    if (!drafts.find((d) => d.id === id)) {
+      const { data } = await supabase.from("ai_drafts").select("*").eq("id", id).maybeSingle();
+      if (data) setDrafts((prev) => (prev.find((p) => p.id === id) ? prev : [data as Draft, ...prev]));
+    }
+    for (let i = 0; i < 20; i++) {
+      const el = document.getElementById(`draft-${id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-primary");
+        setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  };
+
   const pendingCount = drafts.filter((d) => d.status === "pending").length;
   const dailyTasks = todos.filter((t) => !t.is_done);
 
