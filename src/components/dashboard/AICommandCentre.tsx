@@ -1092,7 +1092,29 @@ const AICommandCentre = () => {
           </AlertDialog>
 
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle></CardHeader>
+            <CardHeader className="pb-2 flex-row items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle>
+              {schedules.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Checkbox
+                    checked={selectedSched.size > 0 && selectedSched.size === schedules.length}
+                    onCheckedChange={toggleSchedSelectAll}
+                  />
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {selectedSched.size > 0 ? `${selectedSched.size} selected` : `Select all`}
+                  </span>
+                  <Button
+                    size="sm"
+                    disabled={selectedSched.size === 0 || runSchedBulkBusy || !!runningCmd}
+                    onClick={() => setConfirmRunSched(true)}
+                    className="gap-1 text-xs"
+                  >
+                    {runSchedBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                    Run selected now
+                  </Button>
+                </div>
+              )}
+            </CardHeader>
             <CardContent>
               {schedules.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No schedules yet.</p>
