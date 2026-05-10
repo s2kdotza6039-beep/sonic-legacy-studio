@@ -226,6 +226,9 @@ const AICommandCentre = () => {
   const [confirmSchedule, setConfirmSchedule] = useState(false);
   const [runNowBusyId, setRunNowBusyId] = useState<string | null>(null);
   const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
+  const [selectedSched, setSelectedSched] = useState<Set<string>>(new Set());
+  const [confirmRunSched, setConfirmRunSched] = useState(false);
+  const [runSchedBulkBusy, setRunSchedBulkBusy] = useState(false);
   const [schedEdit, setSchedEdit] = useState<{ command: string; frequency: string; hour_of_day: number; day_of_week: number }>({
     command: "", frequency: "daily", hour_of_day: 9, day_of_week: 1,
   });
@@ -510,6 +513,41 @@ const AICommandCentre = () => {
       setRunNowBusyId(null);
       load();
     }
+  };
+
+  const toggleSchedSelect = (id: string) => {
+    setSelectedSched((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSchedSelectAll = () => {
+    if (selectedSched.size === schedules.length) setSelectedSched(new Set());
+    else setSelectedSched(new Set(schedules.map((s) => s.id)));
+  };
+
+  const runSelectedSchedules = async () => {
+    if (selectedSched.size === 0) return;
+    setRunSchedBulkBusy(true);
+    let ok = 0, fail = 0, totalDrafts = 0;
+    for (const id of selectedSched) {
+      const s = schedules.find((x) => x.id === id);
+      if (!s) { fail++; continue; }
+      try {
+        const before = new Date().toISOString();
+        await runCommand(s.command);
+        await (supabase as any).from("command_schedules").update({ last_run_at: new Date().toISOString() }).eq("id", s.id);
+        const { data } = await supabase.from("ai_drafts").select("id").eq("command", s.command).gte("created_at", before);
+        totalDrafts += (data ?? []).length;
+        ok++;
+      } catch { fail++; }
+    }
+    setRunSchedBulkBusy(false);
+    setSelectedSched(new Set());
+    toast({ title: `Ran ${ok} schedule(s)`, description: `${totalDrafts} draft(s) queued for approval${fail ? ` · ${fail} failed` : ""}.` });
+    load();
   };
 
   const jumpToDraft = async (id: string) => {
@@ -1054,7 +1092,29 @@ const AICommandCentre = () => {
           </AlertDialog>
 
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle></CardHeader>
+            <CardHeader className="pb-2 flex-row items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle>
+              {schedules.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Checkbox
+                    checked={selectedSched.size > 0 && selectedSched.size === schedules.length}
+                    onCheckedChange={toggleSchedSelectAll}
+                  />
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {selectedSched.size > 0 ? `${selectedSched.size} selected` : `Select all`}
+                  </span>
+                  <Button
+                    size="sm"
+                    disabled={selectedSched.size === 0 || runSchedBulkBusy || !!runningCmd}
+                    onClick={() => setConfirmRunSched(true)}
+                    className="gap-1 text-xs"
+                  >
+                    {runSchedBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                    Run selected now
+                  </Button>
+                </div>
+              )}
+            </CardHeader>
             <CardContent>
               {schedules.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No schedules yet.</p>
@@ -1095,14 +1155,21 @@ const AICommandCentre = () => {
                           </div>
                         ) : (
                           <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{s.command}</p>
-                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                                {s.frequency}{s.frequency !== "hourly" ? ` · ${String(s.hour_of_day).padStart(2,"0")}:00` : ""}
-                                {s.frequency === "weekly" && s.day_of_week !== null ? ` · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][s.day_of_week]}` : ""}
-                                {s.next_run_at && ` · next ${formatDistanceToNow(new Date(s.next_run_at), { addSuffix: true })}`}
-                                {s.last_run_at && ` · last ${formatDistanceToNow(new Date(s.last_run_at), { addSuffix: true })}`}
-                              </p>
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <Checkbox
+                                className="mt-1"
+                                checked={selectedSched.has(s.id)}
+                                onCheckedChange={() => toggleSchedSelect(s.id)}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{s.command}</p>
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                                  {s.frequency}{s.frequency !== "hourly" ? ` · ${String(s.hour_of_day).padStart(2,"0")}:00` : ""}
+                                  {s.frequency === "weekly" && s.day_of_week !== null ? ` · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][s.day_of_week]}` : ""}
+                                  {s.next_run_at && ` · next ${formatDistanceToNow(new Date(s.next_run_at), { addSuffix: true })}`}
+                                  {s.last_run_at && ` · last ${formatDistanceToNow(new Date(s.last_run_at), { addSuffix: true })}`}
+                                </p>
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0 flex-wrap">
                               <Badge variant={s.is_active ? "default" : "outline"} className="text-[10px]">{s.is_active ? "Active" : "Paused"}</Badge>
@@ -1126,6 +1193,43 @@ const AICommandCentre = () => {
               )}
             </CardContent>
           </Card>
+
+          <AlertDialog open={confirmRunSched} onOpenChange={setConfirmRunSched}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Run {selectedSched.size} schedule(s) now?</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2 text-sm">
+                    <p>Each selected command runs immediately and queues drafts in Pending Approvals — nothing publishes automatically.</p>
+                    <ul className="space-y-1.5 max-h-64 overflow-auto border border-border bg-secondary/30 p-2">
+                      {Array.from(selectedSched).map((id) => {
+                        const s = schedules.find((x) => x.id === id);
+                        const meta = s ? COMMAND_BY_NAME(s.command) : undefined;
+                        if (!s) return null;
+                        return (
+                          <li key={id} className="text-xs">
+                            <p className="font-medium">{s.command}</p>
+                            {meta && (
+                              <div className="flex flex-wrap gap-1 mt-1 items-center">
+                                {meta.outputs.map((o) => <Badge key={o} variant="outline" className="text-[9px]">{o}</Badge>)}
+                                <span className="text-[10px] text-muted-foreground">· {meta.estimated}</span>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { runSelectedSchedules(); setConfirmRunSched(false); }}>
+                  Run now
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
 
