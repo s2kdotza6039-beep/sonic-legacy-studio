@@ -515,6 +515,41 @@ const AICommandCentre = () => {
     }
   };
 
+  const toggleSchedSelect = (id: string) => {
+    setSelectedSched((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSchedSelectAll = () => {
+    if (selectedSched.size === schedules.length) setSelectedSched(new Set());
+    else setSelectedSched(new Set(schedules.map((s) => s.id)));
+  };
+
+  const runSelectedSchedules = async () => {
+    if (selectedSched.size === 0) return;
+    setRunSchedBulkBusy(true);
+    let ok = 0, fail = 0, totalDrafts = 0;
+    for (const id of selectedSched) {
+      const s = schedules.find((x) => x.id === id);
+      if (!s) { fail++; continue; }
+      try {
+        const before = new Date().toISOString();
+        await runCommand(s.command);
+        await (supabase as any).from("command_schedules").update({ last_run_at: new Date().toISOString() }).eq("id", s.id);
+        const { data } = await supabase.from("ai_drafts").select("id").eq("command", s.command).gte("created_at", before);
+        totalDrafts += (data ?? []).length;
+        ok++;
+      } catch { fail++; }
+    }
+    setRunSchedBulkBusy(false);
+    setSelectedSched(new Set());
+    toast({ title: `Ran ${ok} schedule(s)`, description: `${totalDrafts} draft(s) queued for approval${fail ? ` · ${fail} failed` : ""}.` });
+    load();
+  };
+
   const jumpToDraft = async (id: string) => {
     setSection("approvals");
     setFilter("all");
