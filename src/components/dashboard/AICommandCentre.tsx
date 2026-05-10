@@ -116,18 +116,61 @@ const EDITABLE_FIELDS: Record<string, { key: string; label: string; type: "text"
   other: [{ key: "body", label: "Body", type: "textarea" }],
 };
 
-type QuickCommand = { command: string; outputs: string[]; description: string; estimated: string; fields: string[] };
+type DraftPreviewItem = { section: string; title: string };
+type QuickCommand = { command: string; outputs: string[]; description: string; estimated: string; fields: string[]; previews: DraftPreviewItem[] };
 const QUICK_COMMANDS: QuickCommand[] = [
-  { command: "RUN DAILY CONTENT",          outputs: ["News", "Social", "Checklist"],  description: "Generates news posts, social captions, and a daily content checklist.", estimated: "3–6 drafts", fields: ["title", "excerpt", "body", "category"] },
-  { command: "GENERATE DAILY NEWS",        outputs: ["News"],                          description: "Produces 1–3 news drafts based on label activity.",                       estimated: "1–3 drafts", fields: ["title", "excerpt", "body", "category"] },
-  { command: "WRITE LATEST NEWS POST",     outputs: ["News"],                          description: "Writes one polished news article draft.",                                 estimated: "1 draft",    fields: ["title", "excerpt", "body", "category", "image_url"] },
-  { command: "WRITE ARTIST UPDATES",       outputs: ["Artist", "Social"],              description: "Roster updates and supporting social captions.",                          estimated: "2–4 drafts", fields: ["title", "body"] },
-  { command: "CREATE EVENT ANNOUNCEMENT",  outputs: ["Event", "Announcement"],         description: "Creates an event listing plus a homepage announcement.",                  estimated: "2 drafts",   fields: ["title", "description", "venue", "city", "start_date", "ticket_url"] },
-  { command: "GIVE ME 5 CONTENT IDEAS TODAY", outputs: ["Other"],                      description: "Brainstorm draft with 5 content ideas.",                                  estimated: "1 draft",    fields: ["title", "body"] },
-  { command: "DRIVE TRAFFIC TO WEBSITE",   outputs: ["Social", "Homepage"],            description: "Traffic-driving social captions and a homepage tweak.",                   estimated: "2–3 drafts", fields: ["title", "body"] },
-  { command: "WRITE FOUNDER MESSAGE",      outputs: ["News", "Homepage"],              description: "Founder message draft for site + news.",                                  estimated: "1–2 drafts", fields: ["title", "body"] },
+  { command: "RUN DAILY CONTENT", outputs: ["News", "Social", "Checklist"], description: "Generates news posts, social captions, and a daily content checklist.", estimated: "3–6 drafts", fields: ["title", "excerpt", "body", "category"], previews: [
+    { section: "News", title: "Daily label news roundup — {{today}}" },
+    { section: "Social", title: "Instagram caption — daily highlight" },
+    { section: "Social", title: "X/Twitter post — daily push" },
+    { section: "Checklist", title: "Daily Content checklist for {{today}}" },
+  ]},
+  { command: "GENERATE DAILY NEWS", outputs: ["News"], description: "Produces 1–3 news drafts based on label activity.", estimated: "1–3 drafts", fields: ["title", "excerpt", "body", "category"], previews: [
+    { section: "News", title: "Top label story of the day" },
+    { section: "News", title: "Artist activity update" },
+    { section: "News", title: "Industry note — South African music" },
+  ]},
+  { command: "WRITE LATEST NEWS POST", outputs: ["News"], description: "Writes one polished news article draft.", estimated: "1 draft", fields: ["title", "excerpt", "body", "category", "image_url"], previews: [
+    { section: "News", title: "Featured news article — latest s2kdotza milestone" },
+  ]},
+  { command: "WRITE ARTIST UPDATES", outputs: ["Artist", "Social"], description: "Roster updates and supporting social captions.", estimated: "2–4 drafts", fields: ["title", "body"], previews: [
+    { section: "Artist", title: "Pitch Black Afro — roster update" },
+    { section: "Artist", title: "WIJO da WEEKEND — roster update" },
+    { section: "Social", title: "Caption — roster spotlight" },
+  ]},
+  { command: "CREATE EVENT ANNOUNCEMENT", outputs: ["Event", "Announcement"], description: "Creates an event listing plus a homepage announcement.", estimated: "2 drafts", fields: ["title", "description", "venue", "city", "start_date", "ticket_url"], previews: [
+    { section: "Event", title: "New event — {{venue}}, {{city}}" },
+    { section: "Announcement", title: "Homepage banner — upcoming event" },
+  ]},
+  { command: "GIVE ME 5 CONTENT IDEAS TODAY", outputs: ["Other"], description: "Brainstorm draft with 5 content ideas.", estimated: "1 draft", fields: ["title", "body"], previews: [
+    { section: "Other", title: "5 content ideas — {{today}}" },
+  ]},
+  { command: "DRIVE TRAFFIC TO WEBSITE", outputs: ["Social", "Homepage"], description: "Traffic-driving social captions and a homepage tweak.", estimated: "2–3 drafts", fields: ["title", "body"], previews: [
+    { section: "Social", title: "Caption — drive site visits" },
+    { section: "Social", title: "Caption — featured artist link" },
+    { section: "Homepage", title: "Homepage hook update" },
+  ]},
+  { command: "WRITE FOUNDER MESSAGE", outputs: ["News", "Homepage"], description: "Founder message draft for site + news.", estimated: "1–2 drafts", fields: ["title", "body"], previews: [
+    { section: "News", title: "Letter from the Founder" },
+    { section: "Homepage", title: "Homepage Founder note" },
+  ]},
 ];
 const COMMAND_BY_NAME = (cmd: string) => QUICK_COMMANDS.find((q) => q.command === cmd);
+
+const PreviewPanel = ({ items }: { items: DraftPreviewItem[] }) => (
+  <div className="border border-border bg-secondary/30 p-2 space-y-1">
+    <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Drafts that will be generated</p>
+    <ul className="space-y-1">
+      {items.map((p, i) => (
+        <li key={i} className="flex items-start gap-2 text-xs">
+          <Badge variant="outline" className="text-[9px] uppercase shrink-0">{p.section}</Badge>
+          <span className="break-words">{p.title}</span>
+        </li>
+      ))}
+    </ul>
+    <p className="text-[10px] text-muted-foreground italic">Sample titles — AI may refine wording. Status, fields, and counts shown are guaranteed.</p>
+  </div>
+);
 
 const OWNERS = ["Founder", "Strategist", "Marketing", "A&R", "Finance", "Operations"];
 
