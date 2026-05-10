@@ -1155,14 +1155,21 @@ const AICommandCentre = () => {
                           </div>
                         ) : (
                           <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{s.command}</p>
-                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                                {s.frequency}{s.frequency !== "hourly" ? ` · ${String(s.hour_of_day).padStart(2,"0")}:00` : ""}
-                                {s.frequency === "weekly" && s.day_of_week !== null ? ` · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][s.day_of_week]}` : ""}
-                                {s.next_run_at && ` · next ${formatDistanceToNow(new Date(s.next_run_at), { addSuffix: true })}`}
-                                {s.last_run_at && ` · last ${formatDistanceToNow(new Date(s.last_run_at), { addSuffix: true })}`}
-                              </p>
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <Checkbox
+                                className="mt-1"
+                                checked={selectedSched.has(s.id)}
+                                onCheckedChange={() => toggleSchedSelect(s.id)}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{s.command}</p>
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                                  {s.frequency}{s.frequency !== "hourly" ? ` · ${String(s.hour_of_day).padStart(2,"0")}:00` : ""}
+                                  {s.frequency === "weekly" && s.day_of_week !== null ? ` · ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][s.day_of_week]}` : ""}
+                                  {s.next_run_at && ` · next ${formatDistanceToNow(new Date(s.next_run_at), { addSuffix: true })}`}
+                                  {s.last_run_at && ` · last ${formatDistanceToNow(new Date(s.last_run_at), { addSuffix: true })}`}
+                                </p>
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0 flex-wrap">
                               <Badge variant={s.is_active ? "default" : "outline"} className="text-[10px]">{s.is_active ? "Active" : "Paused"}</Badge>
