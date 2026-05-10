@@ -1111,9 +1111,7 @@ const AICommandCentre = () => {
                           const d = drafts.find((x) => x.id === id);
                           return (
                             <button key={id}
-                              onClick={() => { setSection("approvals"); setFilter("all"); setTimeout(() => {
-                                const el = document.getElementById(`draft-${id}`); el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }, 100); }}
+                              onClick={() => jumpToDraft(id)}
                               className="text-[10px] px-2 py-0.5 border border-border hover:border-primary/60 hover:text-primary transition">
                               {d ? `${d.draft_type} · ${d.title.slice(0, 40)}` : id.slice(0, 8)}
                             </button>
