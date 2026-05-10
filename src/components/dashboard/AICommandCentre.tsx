@@ -226,6 +226,9 @@ const AICommandCentre = () => {
   const [confirmSchedule, setConfirmSchedule] = useState(false);
   const [runNowBusyId, setRunNowBusyId] = useState<string | null>(null);
   const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
+  const [selectedSched, setSelectedSched] = useState<Set<string>>(new Set());
+  const [confirmRunSched, setConfirmRunSched] = useState(false);
+  const [runSchedBulkBusy, setRunSchedBulkBusy] = useState(false);
   const [schedEdit, setSchedEdit] = useState<{ command: string; frequency: string; hour_of_day: number; day_of_week: number }>({
     command: "", frequency: "daily", hour_of_day: 9, day_of_week: 1,
   });
