@@ -1193,6 +1193,43 @@ const AICommandCentre = () => {
               )}
             </CardContent>
           </Card>
+
+          <AlertDialog open={confirmRunSched} onOpenChange={setConfirmRunSched}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Run {selectedSched.size} schedule(s) now?</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2 text-sm">
+                    <p>Each selected command runs immediately and queues drafts in Pending Approvals — nothing publishes automatically.</p>
+                    <ul className="space-y-1.5 max-h-64 overflow-auto border border-border bg-secondary/30 p-2">
+                      {Array.from(selectedSched).map((id) => {
+                        const s = schedules.find((x) => x.id === id);
+                        const meta = s ? COMMAND_BY_NAME(s.command) : undefined;
+                        if (!s) return null;
+                        return (
+                          <li key={id} className="text-xs">
+                            <p className="font-medium">{s.command}</p>
+                            {meta && (
+                              <div className="flex flex-wrap gap-1 mt-1 items-center">
+                                {meta.outputs.map((o) => <Badge key={o} variant="outline" className="text-[9px]">{o}</Badge>)}
+                                <span className="text-[10px] text-muted-foreground">· {meta.estimated}</span>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { runSelectedSchedules(); setConfirmRunSched(false); }}>
+                  Run now
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
 
