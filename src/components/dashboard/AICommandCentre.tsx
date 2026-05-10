@@ -180,6 +180,12 @@ const AICommandCentre = () => {
   const [scheduleForm, setScheduleForm] = useState<{ command: string; frequency: string; hour_of_day: number; day_of_week: number }>({
     command: QUICK_COMMANDS[0].command, frequency: "daily", hour_of_day: 9, day_of_week: 1,
   });
+  const [confirmSchedule, setConfirmSchedule] = useState(false);
+  const [runNowBusyId, setRunNowBusyId] = useState<string | null>(null);
+  const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
+  const [schedEdit, setSchedEdit] = useState<{ command: string; frequency: string; hour_of_day: number; day_of_week: number }>({
+    command: "", frequency: "daily", hour_of_day: 9, day_of_week: 1,
+  });
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
