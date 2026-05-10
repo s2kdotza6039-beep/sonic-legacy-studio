@@ -1036,6 +1036,7 @@ const AICommandCentre = () => {
                           </div>
                           <p className="text-xs"><strong>Estimated per run:</strong> {meta.estimated}</p>
                           <p className="text-xs"><strong>Expected fields:</strong> <span className="text-muted-foreground">{meta.fields.join(", ")}</span></p>
+                          {meta.previews.length > 0 && <PreviewPanel items={meta.previews} />}
                         </div>
                       );
                     })()}
