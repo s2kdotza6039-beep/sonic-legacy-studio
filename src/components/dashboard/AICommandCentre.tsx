@@ -261,17 +261,28 @@ const AICommandCentre = () => {
   const [appStatus, setAppStatus] = useState("all");
   const [appFrom, setAppFrom] = useState("");
 
-  // Pagination + sort per list
-  const [bookingPage, setBookingPage] = useState(1);
-  const [bookingSort, setBookingSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
-  const [sponsorPage, setSponsorPage] = useState(1);
-  const [sponsorSort, setSponsorSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
-  const [appPage, setAppPage] = useState(1);
-  const [appSort, setAppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  // Pagination + sort per list (persisted in localStorage)
+  const [bookingPage, setBookingPage] = useState<number>(() => lsGet("ac:bookingPage", 1));
+  const [bookingSort, setBookingSort] = useState<{ key: string; dir: "asc" | "desc" }>(() => lsGet("ac:bookingSort", { key: "created_at", dir: "desc" as const }));
+  const [sponsorPage, setSponsorPage] = useState<number>(() => lsGet("ac:sponsorPage", 1));
+  const [sponsorSort, setSponsorSort] = useState<{ key: string; dir: "asc" | "desc" }>(() => lsGet("ac:sponsorSort", { key: "created_at", dir: "desc" as const }));
+  const [appPage, setAppPage] = useState<number>(() => lsGet("ac:appPage", 1));
+  const [appSort, setAppSort] = useState<{ key: string; dir: "asc" | "desc" }>(() => lsGet("ac:appSort", { key: "created_at", dir: "desc" as const }));
   const PAGE_SIZE = 25;
+
+  useEffect(() => { lsSet("ac:bookingPage", bookingPage); }, [bookingPage]);
+  useEffect(() => { lsSet("ac:bookingSort", bookingSort); }, [bookingSort]);
+  useEffect(() => { lsSet("ac:sponsorPage", sponsorPage); }, [sponsorPage]);
+  useEffect(() => { lsSet("ac:sponsorSort", sponsorSort); }, [sponsorSort]);
+  useEffect(() => { lsSet("ac:appPage", appPage); }, [appPage]);
+  useEffect(() => { lsSet("ac:appSort", appSort); }, [appSort]);
 
   // Bulk assign
   const [bulkOwner, setBulkOwner] = useState<string>(OWNERS[0]);
+
+  // Assigned-to filter (Approvals)
+  const [assignedFilter, setAssignedFilter] = useState<string>(() => lsGet("ac:assignedFilter", "all"));
+  useEffect(() => { lsSet("ac:assignedFilter", assignedFilter); }, [assignedFilter]);
 
   const load = async () => {
     setLoading(true);
