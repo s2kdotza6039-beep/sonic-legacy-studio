@@ -16,7 +16,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatDistanceToNow, format } from "date-fns";
+
+// ---- localStorage helpers (persist per-tab UI state) ----
+const lsGet = <T,>(k: string, fallback: T): T => {
+  try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
+};
+const lsSet = (k: string, v: any) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
 
 type Draft = {
   id: string; draft_type: string; title: string; payload: any; status: string;
@@ -254,17 +261,28 @@ const AICommandCentre = () => {
   const [appStatus, setAppStatus] = useState("all");
   const [appFrom, setAppFrom] = useState("");
 
-  // Pagination + sort per list
-  const [bookingPage, setBookingPage] = useState(1);
-  const [bookingSort, setBookingSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
-  const [sponsorPage, setSponsorPage] = useState(1);
-  const [sponsorSort, setSponsorSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
-  const [appPage, setAppPage] = useState(1);
-  const [appSort, setAppSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  // Pagination + sort per list (persisted in localStorage)
+  const [bookingPage, setBookingPage] = useState<number>(() => lsGet("ac:bookingPage", 1));
+  const [bookingSort, setBookingSort] = useState<{ key: string; dir: "asc" | "desc" }>(() => lsGet("ac:bookingSort", { key: "created_at", dir: "desc" as const }));
+  const [sponsorPage, setSponsorPage] = useState<number>(() => lsGet("ac:sponsorPage", 1));
+  const [sponsorSort, setSponsorSort] = useState<{ key: string; dir: "asc" | "desc" }>(() => lsGet("ac:sponsorSort", { key: "created_at", dir: "desc" as const }));
+  const [appPage, setAppPage] = useState<number>(() => lsGet("ac:appPage", 1));
+  const [appSort, setAppSort] = useState<{ key: string; dir: "asc" | "desc" }>(() => lsGet("ac:appSort", { key: "created_at", dir: "desc" as const }));
   const PAGE_SIZE = 25;
+
+  useEffect(() => { lsSet("ac:bookingPage", bookingPage); }, [bookingPage]);
+  useEffect(() => { lsSet("ac:bookingSort", bookingSort); }, [bookingSort]);
+  useEffect(() => { lsSet("ac:sponsorPage", sponsorPage); }, [sponsorPage]);
+  useEffect(() => { lsSet("ac:sponsorSort", sponsorSort); }, [sponsorSort]);
+  useEffect(() => { lsSet("ac:appPage", appPage); }, [appPage]);
+  useEffect(() => { lsSet("ac:appSort", appSort); }, [appSort]);
 
   // Bulk assign
   const [bulkOwner, setBulkOwner] = useState<string>(OWNERS[0]);
+
+  // Assigned-to filter (Approvals)
+  const [assignedFilter, setAssignedFilter] = useState<string>(() => lsGet("ac:assignedFilter", "all"));
+  useEffect(() => { lsSet("ac:assignedFilter", assignedFilter); }, [assignedFilter]);
 
   const load = async () => {
     setLoading(true);
@@ -351,7 +369,19 @@ const AICommandCentre = () => {
     });
   };
 
-  const filteredDrafts = drafts.filter((d) => filter === "all" ? true : d.status === filter);
+  const assignedOptions = useMemo(() => {
+    const set = new Set<string>();
+    drafts.forEach((d) => { const a = d.payload?._assigned_to; if (a) set.add(String(a)); });
+    return ["all", "unassigned", ...Array.from(set).sort()];
+  }, [drafts]);
+
+  const filteredDrafts = drafts.filter((d) => {
+    if (filter !== "all" && d.status !== filter) return false;
+    const a = d.payload?._assigned_to;
+    if (assignedFilter === "unassigned" && a) return false;
+    if (assignedFilter !== "all" && assignedFilter !== "unassigned" && a !== assignedFilter) return false;
+    return true;
+  });
   const pendingDrafts = filteredDrafts.filter((d) => d.status === "pending");
   const allSelected = pendingDrafts.length > 0 && pendingDrafts.every((d) => selected.has(d.id));
 
@@ -779,6 +809,19 @@ const AICommandCentre = () => {
                 {f}
               </button>
             ))}
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Assigned</span>
+              <select
+                value={assignedFilter}
+                onChange={(e) => { setAssignedFilter(e.target.value); setSelected(new Set()); }}
+                className="h-8 px-2 text-xs border border-input bg-background rounded-md"
+                aria-label="Filter by assigned owner"
+              >
+                {assignedOptions.map((o) => (
+                  <option key={o} value={o}>{o === "all" ? "All owners" : o === "unassigned" ? "Unassigned" : o}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Bulk action bar */}
@@ -1312,9 +1355,17 @@ const AICommandCentre = () => {
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm">Booking Enquiries ({filteredBookings.length}/{bookings.length})</CardTitle>
-            <Button size="sm" variant="outline" disabled={!filteredBookings.length} onClick={() => downloadCsv(`bookings-${Date.now()}.csv`, filteredBookings)} className="gap-1 text-xs">
-              <FileText size={12} /> Export CSV
-            </Button>
+            <CsvExporter
+              tableKey="bookings"
+              filtered={sortedBookings}
+              pageRows={pagedBookings}
+              allCols={[
+                { key: "name", label: "Name" }, { key: "email", label: "Email" },
+                { key: "event_type", label: "Event Type" }, { key: "event_date", label: "Event Date" },
+                { key: "status", label: "Status" }, { key: "created_at", label: "Created At" },
+                { key: "id", label: "ID" },
+              ]}
+            />
           </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
@@ -1353,9 +1404,17 @@ const AICommandCentre = () => {
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm">Sponsor Leads ({filteredSponsors.length}/{sponsors.length})</CardTitle>
-            <Button size="sm" variant="outline" disabled={!filteredSponsors.length} onClick={() => downloadCsv(`sponsors-${Date.now()}.csv`, filteredSponsors)} className="gap-1 text-xs">
-              <FileText size={12} /> Export CSV
-            </Button>
+            <CsvExporter
+              tableKey="sponsors"
+              filtered={sortedSponsors}
+              pageRows={pagedSponsors}
+              allCols={[
+                { key: "company", label: "Company" }, { key: "contact_name", label: "Contact Name" },
+                { key: "email", label: "Email" }, { key: "industry", label: "Industry" },
+                { key: "budget_range", label: "Budget Range" }, { key: "status", label: "Status" },
+                { key: "created_at", label: "Created At" }, { key: "id", label: "ID" },
+              ]}
+            />
           </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
@@ -1394,9 +1453,16 @@ const AICommandCentre = () => {
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm">Artist Applications ({filteredApps.length}/{applications.length})</CardTitle>
-            <Button size="sm" variant="outline" disabled={!filteredApps.length} onClick={() => downloadCsv(`artist-applications-${Date.now()}.csv`, filteredApps)} className="gap-1 text-xs">
-              <FileText size={12} /> Export CSV
-            </Button>
+            <CsvExporter
+              tableKey="artist-applications"
+              filtered={sortedApps}
+              pageRows={pagedApps}
+              allCols={[
+                { key: "name", label: "Name" }, { key: "genre", label: "Genre" },
+                { key: "status", label: "Status" }, { key: "created_at", label: "Created At" },
+                { key: "id", label: "ID" },
+              ]}
+            />
           </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
@@ -1549,6 +1615,83 @@ const DraftPreview = ({ type, payload }: { type: string; payload: any }) => {
           {payload.due_date && <span className="ml-3">due {payload.due_date}</span>}
         </div>
       )}
+    </div>
+  );
+};
+
+
+type CsvCol = { key: string; label: string };
+type CsvColCfg = { key: string; header: string; enabled: boolean };
+
+const CsvExporter = ({
+  tableKey, filtered, pageRows, allCols,
+}: {
+  tableKey: string;
+  filtered: any[];
+  pageRows: any[];
+  allCols: CsvCol[];
+}) => {
+  const storageKey = `ac:csvCols:${tableKey}`;
+  const defaultCfg = (): CsvColCfg[] => allCols.map((c) => ({ key: c.key, header: c.label, enabled: true }));
+  const [cfg, setCfg] = useState<CsvColCfg[]>(() => {
+    const saved = lsGet<CsvColCfg[]>(storageKey, []);
+    if (!saved || !saved.length) return defaultCfg();
+    return allCols.map((c) => {
+      const s = saved.find((x) => x.key === c.key);
+      return s ? { key: c.key, header: s.header || c.label, enabled: s.enabled !== false } : { key: c.key, header: c.label, enabled: true };
+    });
+  });
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => { lsSet(storageKey, cfg); }, [cfg, storageKey]);
+
+  const exportRows = (rows: any[], scope: "filtered" | "page") => {
+    const active = cfg.filter((c) => c.enabled);
+    if (!active.length || !rows.length) return;
+    const mapped = rows.map((r) => {
+      const out: Record<string, any> = {};
+      for (const c of active) out[c.header] = r[c.key];
+      return out;
+    });
+    downloadCsv(`${tableKey}-${scope}-${Date.now()}.csv`, mapped);
+  };
+
+  return (
+    <div className="flex gap-1 items-center flex-wrap">
+      <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => exportRows(filtered, "filtered")} className="gap-1 text-xs">
+        <FileText size={12} /> Filtered ({filtered.length})
+      </Button>
+      <Button size="sm" variant="outline" disabled={!pageRows.length} onClick={() => exportRows(pageRows, "page")} className="gap-1 text-xs">
+        <FileText size={12} /> Page ({pageRows.length})
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} className="text-xs h-8">Columns</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Customize CSV columns</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Toggle which fields to include and rename headers for cleaner team reports. Saved automatically per table.</p>
+          <div className="space-y-2 max-h-[55vh] overflow-auto">
+            {cfg.map((c, i) => (
+              <div key={c.key} className="flex items-center gap-2">
+                <Checkbox
+                  checked={c.enabled}
+                  onCheckedChange={(v) => setCfg((prev) => prev.map((x, j) => (j === i ? { ...x, enabled: !!v } : x)))}
+                />
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-28 truncate" title={c.key}>{c.key}</span>
+                <Input
+                  value={c.header}
+                  onChange={(e) => setCfg((prev) => prev.map((x, j) => (j === i ? { ...x, header: e.target.value } : x)))}
+                  className="h-8 text-xs flex-1"
+                  placeholder="CSV header"
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setCfg(defaultCfg())} className="text-xs">Reset</Button>
+            <Button size="sm" onClick={() => setOpen(false)} className="text-xs">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
