@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Check, X, FileText, Calendar, Megaphone, Receipt, Sparkles, Clock, ShieldCheck,
   Loader2, ListChecks, Rocket, Music, CalendarCheck, Inbox, Building2, UserPlus, Plus, Zap,
-  Pencil, Save, Search, History, Repeat, Trash2, Power,
+  Pencil, Save, Search, History, Repeat, Trash2, Power, Copy,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1224,6 +1224,22 @@ const AICommandCentre = () => {
                               </Button>
                               <Button size="sm" variant="outline" onClick={() => toggleSchedule(s)} className="h-7 px-2 text-xs gap-1">
                                 <Power size={10} /> {s.is_active ? "Pause" : "Resume"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setScheduleForm({
+                                    command: s.command,
+                                    frequency: s.frequency,
+                                    hour_of_day: s.hour_of_day ?? 9,
+                                    day_of_week: s.day_of_week ?? 1,
+                                  });
+                                  setConfirmSchedule(true);
+                                }}
+                                className="h-7 px-2 text-xs gap-1"
+                              >
+                                <Copy size={10} /> Duplicate
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => deleteSchedule(s.id)} className="h-7 px-2 text-xs"><Trash2 size={10} /></Button>
                             </div>
