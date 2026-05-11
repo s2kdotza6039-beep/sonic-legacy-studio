@@ -1453,9 +1453,16 @@ const AICommandCentre = () => {
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm">Artist Applications ({filteredApps.length}/{applications.length})</CardTitle>
-            <Button size="sm" variant="outline" disabled={!filteredApps.length} onClick={() => downloadCsv(`artist-applications-${Date.now()}.csv`, filteredApps)} className="gap-1 text-xs">
-              <FileText size={12} /> Export CSV
-            </Button>
+            <CsvExporter
+              tableKey="artist-applications"
+              filtered={sortedApps}
+              pageRows={pagedApps}
+              allCols={[
+                { key: "name", label: "Name" }, { key: "genre", label: "Genre" },
+                { key: "status", label: "Status" }, { key: "created_at", label: "Created At" },
+                { key: "id", label: "ID" },
+              ]}
+            />
           </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
