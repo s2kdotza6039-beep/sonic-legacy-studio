@@ -369,7 +369,19 @@ const AICommandCentre = () => {
     });
   };
 
-  const filteredDrafts = drafts.filter((d) => filter === "all" ? true : d.status === filter);
+  const assignedOptions = useMemo(() => {
+    const set = new Set<string>();
+    drafts.forEach((d) => { const a = d.payload?._assigned_to; if (a) set.add(String(a)); });
+    return ["all", "unassigned", ...Array.from(set).sort()];
+  }, [drafts]);
+
+  const filteredDrafts = drafts.filter((d) => {
+    if (filter !== "all" && d.status !== filter) return false;
+    const a = d.payload?._assigned_to;
+    if (assignedFilter === "unassigned" && a) return false;
+    if (assignedFilter !== "all" && assignedFilter !== "unassigned" && a !== assignedFilter) return false;
+    return true;
+  });
   const pendingDrafts = filteredDrafts.filter((d) => d.status === "pending");
   const allSelected = pendingDrafts.length > 0 && pendingDrafts.every((d) => selected.has(d.id));
 
