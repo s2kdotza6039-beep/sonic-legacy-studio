@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Check, X, FileText, Calendar, Megaphone, Receipt, Sparkles, Clock, ShieldCheck,
   Loader2, ListChecks, Rocket, Music, CalendarCheck, Inbox, Building2, UserPlus, Plus, Zap,
-  Pencil, Save, Search, History, Repeat, Trash2, Power,
+  Pencil, Save, Search, History, Repeat, Trash2, Power, Copy,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
