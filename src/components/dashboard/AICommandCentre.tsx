@@ -1308,6 +1308,17 @@ const AICommandCentre = () => {
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px]">{r.triggered_by}</Badge>
                         <Badge variant={r.status === "completed" ? "default" : r.status === "failed" ? "destructive" : "outline"} className="text-[10px]">{r.status}</Badge>
+                        {r.status === "failed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={runningCmd === r.command || !!runningCmd}
+                            onClick={() => runCommand(r.command)}
+                            className="h-7 px-2 text-xs gap-1"
+                          >
+                            {runningCmd === r.command ? <Loader2 size={10} className="animate-spin" /> : <Repeat size={10} />} Retry
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
