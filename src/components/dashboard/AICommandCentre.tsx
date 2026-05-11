@@ -809,6 +809,19 @@ const AICommandCentre = () => {
                 {f}
               </button>
             ))}
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Assigned</span>
+              <select
+                value={assignedFilter}
+                onChange={(e) => { setAssignedFilter(e.target.value); setSelected(new Set()); }}
+                className="h-8 px-2 text-xs border border-input bg-background rounded-md"
+                aria-label="Filter by assigned owner"
+              >
+                {assignedOptions.map((o) => (
+                  <option key={o} value={o}>{o === "all" ? "All owners" : o === "unassigned" ? "Unassigned" : o}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Bulk action bar */}
