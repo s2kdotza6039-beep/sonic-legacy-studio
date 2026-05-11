@@ -1619,4 +1619,81 @@ const DraftPreview = ({ type, payload }: { type: string; payload: any }) => {
   );
 };
 
+
+type CsvCol = { key: string; label: string };
+type CsvColCfg = { key: string; header: string; enabled: boolean };
+
+const CsvExporter = ({
+  tableKey, filtered, pageRows, allCols,
+}: {
+  tableKey: string;
+  filtered: any[];
+  pageRows: any[];
+  allCols: CsvCol[];
+}) => {
+  const storageKey = `ac:csvCols:${tableKey}`;
+  const defaultCfg = (): CsvColCfg[] => allCols.map((c) => ({ key: c.key, header: c.label, enabled: true }));
+  const [cfg, setCfg] = useState<CsvColCfg[]>(() => {
+    const saved = lsGet<CsvColCfg[]>(storageKey, []);
+    if (!saved || !saved.length) return defaultCfg();
+    return allCols.map((c) => {
+      const s = saved.find((x) => x.key === c.key);
+      return s ? { key: c.key, header: s.header || c.label, enabled: s.enabled !== false } : { key: c.key, header: c.label, enabled: true };
+    });
+  });
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => { lsSet(storageKey, cfg); }, [cfg, storageKey]);
+
+  const exportRows = (rows: any[], scope: "filtered" | "page") => {
+    const active = cfg.filter((c) => c.enabled);
+    if (!active.length || !rows.length) return;
+    const mapped = rows.map((r) => {
+      const out: Record<string, any> = {};
+      for (const c of active) out[c.header] = r[c.key];
+      return out;
+    });
+    downloadCsv(`${tableKey}-${scope}-${Date.now()}.csv`, mapped);
+  };
+
+  return (
+    <div className="flex gap-1 items-center flex-wrap">
+      <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => exportRows(filtered, "filtered")} className="gap-1 text-xs">
+        <FileText size={12} /> Filtered ({filtered.length})
+      </Button>
+      <Button size="sm" variant="outline" disabled={!pageRows.length} onClick={() => exportRows(pageRows, "page")} className="gap-1 text-xs">
+        <FileText size={12} /> Page ({pageRows.length})
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} className="text-xs h-8">Columns</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Customize CSV columns</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Toggle which fields to include and rename headers for cleaner team reports. Saved automatically per table.</p>
+          <div className="space-y-2 max-h-[55vh] overflow-auto">
+            {cfg.map((c, i) => (
+              <div key={c.key} className="flex items-center gap-2">
+                <Checkbox
+                  checked={c.enabled}
+                  onCheckedChange={(v) => setCfg((prev) => prev.map((x, j) => (j === i ? { ...x, enabled: !!v } : x)))}
+                />
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-28 truncate" title={c.key}>{c.key}</span>
+                <Input
+                  value={c.header}
+                  onChange={(e) => setCfg((prev) => prev.map((x, j) => (j === i ? { ...x, header: e.target.value } : x)))}
+                  className="h-8 text-xs flex-1"
+                  placeholder="CSV header"
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setCfg(defaultCfg())} className="text-xs">Reset</Button>
+            <Button size="sm" onClick={() => setOpen(false)} className="text-xs">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 export default AICommandCentre;
