@@ -572,23 +572,45 @@ const AICommandCentre = () => {
 
   const runSelectedSchedules = async () => {
     if (selectedSched.size === 0) return;
-    setRunSchedBulkBusy(true);
-    let ok = 0, fail = 0, totalDrafts = 0;
-    for (const id of selectedSched) {
+    const ids = Array.from(selectedSched);
+    const initial: BulkResult[] = ids.map((id) => {
       const s = schedules.find((x) => x.id === id);
-      if (!s) { fail++; continue; }
+      return { scheduleId: id, command: s?.command ?? "(unknown)", status: "pending", drafts: 0 };
+    });
+    setBulkProgress({ open: true, total: ids.length, done: 0, results: initial });
+    setRunSchedBulkBusy(true);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const s = schedules.find((x) => x.id === id);
+      setBulkProgress((p) => ({
+        ...p, results: p.results.map((r, idx) => idx === i ? { ...r, status: "running" } : r),
+      }));
+      if (!s) {
+        setBulkProgress((p) => ({
+          ...p, done: p.done + 1,
+          results: p.results.map((r, idx) => idx === i ? { ...r, status: "failed", error: "Schedule not found" } : r),
+        }));
+        continue;
+      }
       try {
         const before = new Date().toISOString();
         await runCommand(s.command);
         await (supabase as any).from("command_schedules").update({ last_run_at: new Date().toISOString() }).eq("id", s.id);
         const { data } = await supabase.from("ai_drafts").select("id").eq("command", s.command).gte("created_at", before);
-        totalDrafts += (data ?? []).length;
-        ok++;
-      } catch { fail++; }
+        const count = (data ?? []).length;
+        setBulkProgress((p) => ({
+          ...p, done: p.done + 1,
+          results: p.results.map((r, idx) => idx === i ? { ...r, status: "ok", drafts: count } : r),
+        }));
+      } catch (e: any) {
+        setBulkProgress((p) => ({
+          ...p, done: p.done + 1,
+          results: p.results.map((r, idx) => idx === i ? { ...r, status: "failed", error: e?.message ?? String(e) } : r),
+        }));
+      }
     }
     setRunSchedBulkBusy(false);
     setSelectedSched(new Set());
-    toast({ title: `Ran ${ok} schedule(s)`, description: `${totalDrafts} draft(s) queued for approval${fail ? ` · ${fail} failed` : ""}.` });
     load();
   };
 
