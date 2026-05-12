@@ -1206,36 +1206,116 @@ const AICommandCentre = () => {
             </AlertDialogContent>
           </AlertDialog>
 
+          {(() => {
+            const uniqueCmds = Array.from(new Set(schedules.map((s) => s.command)));
+            const now = Date.now();
+            const filteredSchedules = schedules.filter((s) => {
+              if (schedFilterCmd !== "all" && s.command !== schedFilterCmd) return false;
+              if (schedFilterFreq !== "all" && s.frequency !== schedFilterFreq) return false;
+              if (schedFilterStatus === "active" && !s.is_active) return false;
+              if (schedFilterStatus === "paused" && s.is_active) return false;
+              if (schedFilterNext !== "all") {
+                if (!s.next_run_at) return false;
+                const diffMs = new Date(s.next_run_at).getTime() - now;
+                if (schedFilterNext === "1h" && !(diffMs >= 0 && diffMs <= 3600000)) return false;
+                if (schedFilterNext === "today" && !(diffMs >= 0 && diffMs <= 24 * 3600000)) return false;
+                if (schedFilterNext === "week" && !(diffMs >= 0 && diffMs <= 7 * 24 * 3600000)) return false;
+                if (schedFilterNext === "overdue" && !(diffMs < 0)) return false;
+              }
+              return true;
+            });
+            const filtersActive = schedFilterCmd !== "all" || schedFilterFreq !== "all" || schedFilterStatus !== "all" || schedFilterNext !== "all";
+            return (
           <Card>
-            <CardHeader className="pb-2 flex-row items-center justify-between gap-2 flex-wrap">
-              <CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle>
+            <CardHeader className="pb-2 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-sm">Active Schedules ({filteredSchedules.length}{filtersActive ? ` / ${schedules.length}` : ""})</CardTitle>
+                {schedules.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Checkbox
+                      checked={selectedSched.size > 0 && filteredSchedules.every((s) => selectedSched.has(s.id))}
+                      onCheckedChange={() => {
+                        const allSelected = filteredSchedules.every((s) => selectedSched.has(s.id));
+                        if (allSelected) {
+                          setSelectedSched((prev) => {
+                            const next = new Set(prev);
+                            filteredSchedules.forEach((s) => next.delete(s.id));
+                            return next;
+                          });
+                        } else {
+                          setSelectedSched((prev) => {
+                            const next = new Set(prev);
+                            filteredSchedules.forEach((s) => next.add(s.id));
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {selectedSched.size > 0 ? `${selectedSched.size} selected` : `Select visible`}
+                    </span>
+                    {selectedSched.size > 0 && (
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedSched(new Set())} className="h-7 px-2 text-xs gap-1">
+                        <X size={10} /> Clear selection
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      disabled={selectedSched.size === 0 || runSchedBulkBusy || !!runningCmd}
+                      onClick={() => setConfirmRunSched(true)}
+                      className="gap-1 text-xs"
+                    >
+                      {runSchedBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                      Run selected now
+                    </Button>
+                  </div>
+                )}
+              </div>
               {schedules.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Checkbox
-                    checked={selectedSched.size > 0 && selectedSched.size === schedules.length}
-                    onCheckedChange={toggleSchedSelectAll}
-                  />
-                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {selectedSched.size > 0 ? `${selectedSched.size} selected` : `Select all`}
-                  </span>
-                  <Button
-                    size="sm"
-                    disabled={selectedSched.size === 0 || runSchedBulkBusy || !!runningCmd}
-                    onClick={() => setConfirmRunSched(true)}
-                    className="gap-1 text-xs"
-                  >
-                    {runSchedBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                    Run selected now
-                  </Button>
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <select value={schedFilterCmd} onChange={(e) => setSchedFilterCmd(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">All commands</option>
+                    {uniqueCmds.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={schedFilterFreq} onChange={(e) => setSchedFilterFreq(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">Any frequency</option>
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                  <select value={schedFilterStatus} onChange={(e) => setSchedFilterStatus(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">Any status</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                  <select value={schedFilterNext} onChange={(e) => setSchedFilterNext(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">Any next run</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="1h">Within 1 hour</option>
+                    <option value="today">Within 24 hours</option>
+                    <option value="week">Within 7 days</option>
+                  </select>
+                  {filtersActive && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1"
+                      onClick={() => { setSchedFilterCmd("all"); setSchedFilterFreq("all"); setSchedFilterStatus("all"); setSchedFilterNext("all"); }}>
+                      <X size={10} /> Reset filters
+                    </Button>
+                  )}
                 </div>
               )}
             </CardHeader>
             <CardContent>
               {schedules.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No schedules yet.</p>
+              ) : filteredSchedules.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No schedules match the current filters.</p>
               ) : (
                 <ul className="space-y-3">
-                  {schedules.map((s) => {
+                  {filteredSchedules.map((s) => {
                     const isEditing = editingSchedId === s.id;
                     return (
                       <li key={s.id} className="border-b border-border/40 pb-3 last:border-0">
