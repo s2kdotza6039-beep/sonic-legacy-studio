@@ -1417,7 +1417,8 @@ const AICommandCentre = () => {
             )}
           </CardContent>
         </Card>
-      )}
+        );
+      })()}
 
       {/* INVOICES */}
       {!loading && section === "invoices" && (
