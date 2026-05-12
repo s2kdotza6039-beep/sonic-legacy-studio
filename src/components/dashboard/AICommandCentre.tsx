@@ -252,6 +252,14 @@ const AICommandCentre = () => {
     open: false, total: 0, done: 0, results: [],
   });
 
+  // Command history filters + pagination
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatus, setHistoryStatus] = useState<string>("all");
+  const [historyCmd, setHistoryCmd] = useState<string>("all");
+  const [historyTrigger, setHistoryTrigger] = useState<string>("all");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(20);
+
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
