@@ -1404,6 +1404,8 @@ const AICommandCentre = () => {
               )}
             </CardContent>
           </Card>
+            );
+          })()}
 
           <AlertDialog open={confirmRunSched} onOpenChange={setConfirmRunSched}>
             <AlertDialogContent>
