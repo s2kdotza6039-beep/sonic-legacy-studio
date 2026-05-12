@@ -252,6 +252,14 @@ const AICommandCentre = () => {
     open: false, total: 0, done: 0, results: [],
   });
 
+  // Command history filters + pagination
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatus, setHistoryStatus] = useState<string>("all");
+  const [historyCmd, setHistoryCmd] = useState<string>("all");
+  const [historyTrigger, setHistoryTrigger] = useState<string>("all");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(20);
+
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -1559,31 +1567,119 @@ const AICommandCentre = () => {
           downloadFile(name, lines.join("\n"), "text/csv");
         };
         const ts = format(new Date(), "yyyyMMdd-HHmm");
+        const uniqueCommands = Array.from(new Set(runs.map((r) => r.command)));
+        const uniqueTriggers = Array.from(new Set(runs.map((r) => r.triggered_by)));
+        const q = historySearch.trim().toLowerCase();
+        const filteredRuns = runs.filter((r) => {
+          if (historyStatus !== "all" && r.status !== historyStatus) return false;
+          if (historyCmd !== "all" && r.command !== historyCmd) return false;
+          if (historyTrigger !== "all" && r.triggered_by !== historyTrigger) return false;
+          if (q && !(r.command.toLowerCase().includes(q) || (r.error_message ?? "").toLowerCase().includes(q))) return false;
+          return true;
+        });
+        const totalPages = Math.max(1, Math.ceil(filteredRuns.length / historyPageSize));
+        const safePage = Math.min(historyPage, totalPages);
+        const pageStart = (safePage - 1) * historyPageSize;
+        const pageRuns = filteredRuns.slice(pageStart, pageStart + historyPageSize);
+        const filtersActive = !!q || historyStatus !== "all" || historyCmd !== "all" || historyTrigger !== "all";
         return (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <CardTitle className="text-sm flex items-center gap-2"><History size={14} /> Command History ({runs.length})</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <History size={14} /> Command History ({filteredRuns.length}{filtersActive ? ` / ${runs.length}` : ""})
+              </CardTitle>
               {runs.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Export</span>
                   <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
-                    onClick={() => exportJson(runs, `command-runs-${ts}.json`)}>
-                    <Download size={10} /> JSON
+                    onClick={() => exportJson(pageRuns, `command-runs-page-${ts}.json`)}
+                    disabled={pageRuns.length === 0}
+                    title="Export current page (JSON)">
+                    <Download size={10} /> Page JSON
                   </Button>
                   <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
-                    onClick={() => exportCsv(runs, `command-runs-${ts}.csv`)}>
-                    <Download size={10} /> CSV
+                    onClick={() => exportCsv(pageRuns, `command-runs-page-${ts}.csv`)}
+                    disabled={pageRuns.length === 0}
+                    title="Export current page (CSV)">
+                    <Download size={10} /> Page CSV
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                    onClick={() => exportJson(filteredRuns, `command-runs-filtered-${ts}.json`)}
+                    disabled={filteredRuns.length === 0}
+                    title="Export filtered results (JSON)">
+                    <Download size={10} /> Filtered JSON
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                    onClick={() => exportCsv(filteredRuns, `command-runs-filtered-${ts}.csv`)}
+                    disabled={filteredRuns.length === 0}
+                    title="Export filtered results (CSV)">
+                    <Download size={10} /> Filtered CSV
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1"
+                    onClick={() => exportJson(runs, `command-runs-all-${ts}.json`)}
+                    title="Export all runs (JSON)">
+                    <Download size={10} /> All JSON
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1"
+                    onClick={() => exportCsv(runs, `command-runs-all-${ts}.csv`)}
+                    title="Export all runs (CSV)">
+                    <Download size={10} /> All CSV
                   </Button>
                 </div>
               )}
             </div>
+            {runs.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                <Input
+                  placeholder="Search command or error…"
+                  value={historySearch}
+                  onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }}
+                  className="h-8 text-xs w-48"
+                />
+                <select value={historyStatus}
+                  onChange={(e) => { setHistoryStatus(e.target.value); setHistoryPage(1); }}
+                  className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                  <option value="all">Any status</option>
+                  <option value="completed">Completed</option>
+                  <option value="failed">Failed</option>
+                  <option value="running">Running</option>
+                </select>
+                <select value={historyCmd}
+                  onChange={(e) => { setHistoryCmd(e.target.value); setHistoryPage(1); }}
+                  className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                  <option value="all">All commands</option>
+                  {uniqueCommands.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={historyTrigger}
+                  onChange={(e) => { setHistoryTrigger(e.target.value); setHistoryPage(1); }}
+                  className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                  <option value="all">Any trigger</option>
+                  {uniqueTriggers.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select value={historyPageSize}
+                  onChange={(e) => { setHistoryPageSize(Number(e.target.value)); setHistoryPage(1); }}
+                  className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                  {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n}/page</option>)}
+                </select>
+                {filtersActive && (
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1"
+                    onClick={() => { setHistorySearch(""); setHistoryStatus("all"); setHistoryCmd("all"); setHistoryTrigger("all"); setHistoryPage(1); }}>
+                    <X size={10} /> Reset
+                  </Button>
+                )}
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {runs.length === 0 ? (
               <p className="text-sm text-muted-foreground">No commands have run yet.</p>
+            ) : filteredRuns.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No runs match the current filters.</p>
             ) : (
+              <>
               <ul className="space-y-3">
-                {runs.map((r) => (
+                {pageRuns.map((r) => (
                   <li key={r.id} className="border-b border-border/40 pb-3 last:border-0">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <p className="text-sm font-medium">{r.command}</p>
@@ -1625,6 +1721,20 @@ const AICommandCentre = () => {
                   </li>
                 ))}
               </ul>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-border">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    Page {safePage} of {totalPages} · {pageStart + 1}-{Math.min(pageStart + historyPageSize, filteredRuns.length)} of {filteredRuns.length}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={safePage <= 1}
+                      onClick={() => setHistoryPage(safePage - 1)}>Previous</Button>
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={safePage >= totalPages}
+                      onClick={() => setHistoryPage(safePage + 1)}>Next</Button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </CardContent>
         </Card>
