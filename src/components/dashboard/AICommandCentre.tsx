@@ -1156,8 +1156,10 @@ const AICommandCentre = () => {
                     {(() => {
                       const meta = COMMAND_BY_NAME(scheduleForm.command);
                       if (!meta) return null;
+                      const upcoming = computeUpcomingRuns(scheduleForm.frequency, scheduleForm.hour_of_day, scheduleForm.day_of_week, 7, 24);
+                      const queued = upcoming.flatMap((d) => meta.previews.map((p) => ({ when: d, section: p.section, title: p.title })));
                       return (
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                           <p>{meta.description}</p>
                           <div className="flex flex-wrap gap-1 items-center">
                             <span className="text-xs">Each run generates:</span>
@@ -1166,6 +1168,28 @@ const AICommandCentre = () => {
                           <p className="text-xs"><strong>Estimated per run:</strong> {meta.estimated}</p>
                           <p className="text-xs"><strong>Expected fields:</strong> <span className="text-muted-foreground">{meta.fields.join(", ")}</span></p>
                           {meta.previews.length > 0 && <PreviewPanel items={meta.previews} />}
+                          {upcoming.length > 0 && (
+                            <div className="border border-border bg-secondary/30 p-2 space-y-1">
+                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                                Queued drafts in next 7 days · {upcoming.length} run(s) · {queued.length} draft(s)
+                              </p>
+                              <ul className="space-y-1 max-h-56 overflow-auto">
+                                {upcoming.map((d, ri) => (
+                                  <li key={ri} className="text-[11px]">
+                                    <p className="font-medium">{format(d, "EEE d MMM · HH:mm")}</p>
+                                    <ul className="pl-3 space-y-0.5">
+                                      {meta.previews.map((p, pi) => (
+                                        <li key={pi} className="flex gap-2 text-muted-foreground">
+                                          <Badge variant="outline" className="text-[9px] shrink-0">{p.section}</Badge>
+                                          <span className="truncate">{p.title}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
