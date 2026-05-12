@@ -240,6 +240,18 @@ const AICommandCentre = () => {
     command: "", frequency: "daily", hour_of_day: 9, day_of_week: 1,
   });
 
+  // Schedule filters
+  const [schedFilterCmd, setSchedFilterCmd] = useState<string>("all");
+  const [schedFilterFreq, setSchedFilterFreq] = useState<string>("all");
+  const [schedFilterStatus, setSchedFilterStatus] = useState<string>("all");
+  const [schedFilterNext, setSchedFilterNext] = useState<string>("all");
+
+  // Bulk run progress + summary
+  type BulkResult = { scheduleId: string; command: string; status: "pending" | "running" | "ok" | "failed"; drafts: number; error?: string };
+  const [bulkProgress, setBulkProgress] = useState<{ open: boolean; total: number; done: number; results: BulkResult[] }>({
+    open: false, total: 0, done: 0, results: [],
+  });
+
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -482,7 +494,21 @@ const AICommandCentre = () => {
       next.setDate(next.getDate() + (diff === 0 && next <= now ? 7 : diff));
       return next;
     }
-    next.setDate(next.getDate() + 1); return next;
+  };
+
+  const computeUpcomingRuns = (frequency: string, hour: number, dow: number, windowDays = 7, cap = 24): Date[] => {
+    const runs: Date[] = [];
+    const start = computeNextRunClient(frequency, hour, dow);
+    const end = new Date(Date.now() + windowDays * 24 * 3600 * 1000);
+    const cur = new Date(start);
+    while (cur <= end && runs.length < cap) {
+      runs.push(new Date(cur));
+      if (frequency === "hourly") cur.setHours(cur.getHours() + 1);
+      else if (frequency === "daily") cur.setDate(cur.getDate() + 1);
+      else if (frequency === "weekly") cur.setDate(cur.getDate() + 7);
+      else break;
+    }
+    return runs;
   };
 
   const createSchedule = async () => {
@@ -560,23 +586,45 @@ const AICommandCentre = () => {
 
   const runSelectedSchedules = async () => {
     if (selectedSched.size === 0) return;
-    setRunSchedBulkBusy(true);
-    let ok = 0, fail = 0, totalDrafts = 0;
-    for (const id of selectedSched) {
+    const ids = Array.from(selectedSched);
+    const initial: BulkResult[] = ids.map((id) => {
       const s = schedules.find((x) => x.id === id);
-      if (!s) { fail++; continue; }
+      return { scheduleId: id, command: s?.command ?? "(unknown)", status: "pending", drafts: 0 };
+    });
+    setBulkProgress({ open: true, total: ids.length, done: 0, results: initial });
+    setRunSchedBulkBusy(true);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const s = schedules.find((x) => x.id === id);
+      setBulkProgress((p) => ({
+        ...p, results: p.results.map((r, idx) => idx === i ? { ...r, status: "running" } : r),
+      }));
+      if (!s) {
+        setBulkProgress((p) => ({
+          ...p, done: p.done + 1,
+          results: p.results.map((r, idx) => idx === i ? { ...r, status: "failed", error: "Schedule not found" } : r),
+        }));
+        continue;
+      }
       try {
         const before = new Date().toISOString();
         await runCommand(s.command);
         await (supabase as any).from("command_schedules").update({ last_run_at: new Date().toISOString() }).eq("id", s.id);
         const { data } = await supabase.from("ai_drafts").select("id").eq("command", s.command).gte("created_at", before);
-        totalDrafts += (data ?? []).length;
-        ok++;
-      } catch { fail++; }
+        const count = (data ?? []).length;
+        setBulkProgress((p) => ({
+          ...p, done: p.done + 1,
+          results: p.results.map((r, idx) => idx === i ? { ...r, status: "ok", drafts: count } : r),
+        }));
+      } catch (e: any) {
+        setBulkProgress((p) => ({
+          ...p, done: p.done + 1,
+          results: p.results.map((r, idx) => idx === i ? { ...r, status: "failed", error: e?.message ?? String(e) } : r),
+        }));
+      }
     }
     setRunSchedBulkBusy(false);
     setSelectedSched(new Set());
-    toast({ title: `Ran ${ok} schedule(s)`, description: `${totalDrafts} draft(s) queued for approval${fail ? ` · ${fail} failed` : ""}.` });
     load();
   };
 
@@ -1108,8 +1156,10 @@ const AICommandCentre = () => {
                     {(() => {
                       const meta = COMMAND_BY_NAME(scheduleForm.command);
                       if (!meta) return null;
+                      const upcoming = computeUpcomingRuns(scheduleForm.frequency, scheduleForm.hour_of_day, scheduleForm.day_of_week, 7, 24);
+                      const queued = upcoming.flatMap((d) => meta.previews.map((p) => ({ when: d, section: p.section, title: p.title })));
                       return (
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                           <p>{meta.description}</p>
                           <div className="flex flex-wrap gap-1 items-center">
                             <span className="text-xs">Each run generates:</span>
@@ -1118,6 +1168,28 @@ const AICommandCentre = () => {
                           <p className="text-xs"><strong>Estimated per run:</strong> {meta.estimated}</p>
                           <p className="text-xs"><strong>Expected fields:</strong> <span className="text-muted-foreground">{meta.fields.join(", ")}</span></p>
                           {meta.previews.length > 0 && <PreviewPanel items={meta.previews} />}
+                          {upcoming.length > 0 && (
+                            <div className="border border-border bg-secondary/30 p-2 space-y-1">
+                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                                Queued drafts in next 7 days · {upcoming.length} run(s) · {queued.length} draft(s)
+                              </p>
+                              <ul className="space-y-1 max-h-56 overflow-auto">
+                                {upcoming.map((d, ri) => (
+                                  <li key={ri} className="text-[11px]">
+                                    <p className="font-medium">{format(d, "EEE d MMM · HH:mm")}</p>
+                                    <ul className="pl-3 space-y-0.5">
+                                      {meta.previews.map((p, pi) => (
+                                        <li key={pi} className="flex gap-2 text-muted-foreground">
+                                          <Badge variant="outline" className="text-[9px] shrink-0">{p.section}</Badge>
+                                          <span className="truncate">{p.title}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1134,36 +1206,116 @@ const AICommandCentre = () => {
             </AlertDialogContent>
           </AlertDialog>
 
+          {(() => {
+            const uniqueCmds = Array.from(new Set(schedules.map((s) => s.command)));
+            const now = Date.now();
+            const filteredSchedules = schedules.filter((s) => {
+              if (schedFilterCmd !== "all" && s.command !== schedFilterCmd) return false;
+              if (schedFilterFreq !== "all" && s.frequency !== schedFilterFreq) return false;
+              if (schedFilterStatus === "active" && !s.is_active) return false;
+              if (schedFilterStatus === "paused" && s.is_active) return false;
+              if (schedFilterNext !== "all") {
+                if (!s.next_run_at) return false;
+                const diffMs = new Date(s.next_run_at).getTime() - now;
+                if (schedFilterNext === "1h" && !(diffMs >= 0 && diffMs <= 3600000)) return false;
+                if (schedFilterNext === "today" && !(diffMs >= 0 && diffMs <= 24 * 3600000)) return false;
+                if (schedFilterNext === "week" && !(diffMs >= 0 && diffMs <= 7 * 24 * 3600000)) return false;
+                if (schedFilterNext === "overdue" && !(diffMs < 0)) return false;
+              }
+              return true;
+            });
+            const filtersActive = schedFilterCmd !== "all" || schedFilterFreq !== "all" || schedFilterStatus !== "all" || schedFilterNext !== "all";
+            return (
           <Card>
-            <CardHeader className="pb-2 flex-row items-center justify-between gap-2 flex-wrap">
-              <CardTitle className="text-sm">Active Schedules ({schedules.length})</CardTitle>
+            <CardHeader className="pb-2 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="text-sm">Active Schedules ({filteredSchedules.length}{filtersActive ? ` / ${schedules.length}` : ""})</CardTitle>
+                {schedules.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Checkbox
+                      checked={selectedSched.size > 0 && filteredSchedules.every((s) => selectedSched.has(s.id))}
+                      onCheckedChange={() => {
+                        const allSelected = filteredSchedules.every((s) => selectedSched.has(s.id));
+                        if (allSelected) {
+                          setSelectedSched((prev) => {
+                            const next = new Set(prev);
+                            filteredSchedules.forEach((s) => next.delete(s.id));
+                            return next;
+                          });
+                        } else {
+                          setSelectedSched((prev) => {
+                            const next = new Set(prev);
+                            filteredSchedules.forEach((s) => next.add(s.id));
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {selectedSched.size > 0 ? `${selectedSched.size} selected` : `Select visible`}
+                    </span>
+                    {selectedSched.size > 0 && (
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedSched(new Set())} className="h-7 px-2 text-xs gap-1">
+                        <X size={10} /> Clear selection
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      disabled={selectedSched.size === 0 || runSchedBulkBusy || !!runningCmd}
+                      onClick={() => setConfirmRunSched(true)}
+                      className="gap-1 text-xs"
+                    >
+                      {runSchedBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                      Run selected now
+                    </Button>
+                  </div>
+                )}
+              </div>
               {schedules.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Checkbox
-                    checked={selectedSched.size > 0 && selectedSched.size === schedules.length}
-                    onCheckedChange={toggleSchedSelectAll}
-                  />
-                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {selectedSched.size > 0 ? `${selectedSched.size} selected` : `Select all`}
-                  </span>
-                  <Button
-                    size="sm"
-                    disabled={selectedSched.size === 0 || runSchedBulkBusy || !!runningCmd}
-                    onClick={() => setConfirmRunSched(true)}
-                    className="gap-1 text-xs"
-                  >
-                    {runSchedBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-                    Run selected now
-                  </Button>
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <select value={schedFilterCmd} onChange={(e) => setSchedFilterCmd(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">All commands</option>
+                    {uniqueCmds.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={schedFilterFreq} onChange={(e) => setSchedFilterFreq(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">Any frequency</option>
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                  <select value={schedFilterStatus} onChange={(e) => setSchedFilterStatus(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">Any status</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                  <select value={schedFilterNext} onChange={(e) => setSchedFilterNext(e.target.value)}
+                    className="h-8 px-2 text-xs border border-input bg-background rounded-md">
+                    <option value="all">Any next run</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="1h">Within 1 hour</option>
+                    <option value="today">Within 24 hours</option>
+                    <option value="week">Within 7 days</option>
+                  </select>
+                  {filtersActive && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1"
+                      onClick={() => { setSchedFilterCmd("all"); setSchedFilterFreq("all"); setSchedFilterStatus("all"); setSchedFilterNext("all"); }}>
+                      <X size={10} /> Reset filters
+                    </Button>
+                  )}
                 </div>
               )}
             </CardHeader>
             <CardContent>
               {schedules.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No schedules yet.</p>
+              ) : filteredSchedules.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No schedules match the current filters.</p>
               ) : (
                 <ul className="space-y-3">
-                  {schedules.map((s) => {
+                  {filteredSchedules.map((s) => {
                     const isEditing = editingSchedId === s.id;
                     return (
                       <li key={s.id} className="border-b border-border/40 pb-3 last:border-0">
@@ -1252,6 +1404,8 @@ const AICommandCentre = () => {
               )}
             </CardContent>
           </Card>
+            );
+          })()}
 
           <AlertDialog open={confirmRunSched} onOpenChange={setConfirmRunSched}>
             <AlertDialogContent>
@@ -1289,6 +1443,63 @@ const AICommandCentre = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          <Dialog open={bulkProgress.open} onOpenChange={(o) => setBulkProgress((p) => ({ ...p, open: o }))}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {runSchedBulkBusy
+                    ? `Running schedules… ${bulkProgress.done}/${bulkProgress.total}`
+                    : `Bulk run summary — ${bulkProgress.done}/${bulkProgress.total} complete`}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <div className="w-full h-2 bg-secondary rounded overflow-hidden">
+                  <div className="h-full bg-primary transition-all"
+                    style={{ width: `${bulkProgress.total ? (bulkProgress.done / bulkProgress.total) * 100 : 0}%` }} />
+                </div>
+                {!runSchedBulkBusy && (() => {
+                  const okCount = bulkProgress.results.filter((r) => r.status === "ok").length;
+                  const failCount = bulkProgress.results.filter((r) => r.status === "failed").length;
+                  const totalDrafts = bulkProgress.results.reduce((sum, r) => sum + r.drafts, 0);
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      {okCount} succeeded · {failCount} failed · {totalDrafts} draft(s) queued for approval.
+                    </p>
+                  );
+                })()}
+                <ul className="space-y-1.5 max-h-72 overflow-auto border border-border bg-secondary/30 p-2">
+                  {bulkProgress.results.map((r) => (
+                    <li key={r.scheduleId} className="text-xs flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{r.command}</p>
+                        {r.error && <p className="text-[10px] text-destructive">{r.error}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {r.status === "ok" && <span className="text-[10px] text-muted-foreground">{r.drafts} draft(s)</span>}
+                        <Badge
+                          variant={r.status === "ok" ? "default" : r.status === "failed" ? "destructive" : "outline"}
+                          className="text-[10px]"
+                        >
+                          {r.status === "running" ? "Running…" : r.status === "pending" ? "Queued" : r.status === "ok" ? "OK" : "Failed"}
+                        </Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <DialogFooter>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={runSchedBulkBusy}
+                  onClick={() => setBulkProgress((p) => ({ ...p, open: false }))}
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
