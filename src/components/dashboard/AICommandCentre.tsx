@@ -1293,9 +1293,80 @@ const AICommandCentre = () => {
       )}
 
       {/* COMMAND HISTORY */}
-      {!loading && section === "history" && (
+      {!loading && section === "history" && (() => {
+        const buildRunDetails = (rows: CommandRun[]) => rows.map((r) => {
+          const qc = COMMAND_BY_NAME(r.command);
+          const draftDetails = (r.draft_ids || []).map((id) => {
+            const d = drafts.find((x) => x.id === id);
+            return d ? { id, draft_type: d.draft_type, title: d.title, status: d.status } : { id };
+          });
+          return {
+            run_id: r.id,
+            command: r.command,
+            status: r.status,
+            triggered_by: r.triggered_by,
+            schedule_id: r.schedule_id,
+            started_at: r.started_at,
+            completed_at: r.completed_at,
+            error_message: r.error_message,
+            draft_count: r.draft_count,
+            draft_ids: r.draft_ids || [],
+            drafts: draftDetails,
+            expected_fields: qc?.fields ?? [],
+            expected_outputs: qc?.outputs ?? [],
+          };
+        });
+        const downloadFile = (name: string, content: string, mime: string) => {
+          const blob = new Blob([content], { type: mime });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = name; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        };
+        const exportJson = (rows: CommandRun[], name: string) => {
+          downloadFile(name, JSON.stringify(buildRunDetails(rows), null, 2), "application/json");
+        };
+        const exportCsv = (rows: CommandRun[], name: string) => {
+          const details = buildRunDetails(rows);
+          const headers = ["run_id","command","status","triggered_by","schedule_id","started_at","completed_at","draft_count","draft_ids","draft_titles","expected_fields","expected_outputs","error_message"];
+          const esc = (v: any) => {
+            const s = v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+            return `"${s.replace(/"/g, '""')}"`;
+          };
+          const lines = [headers.join(",")];
+          for (const d of details) {
+            lines.push([
+              d.run_id, d.command, d.status, d.triggered_by, d.schedule_id ?? "",
+              d.started_at, d.completed_at ?? "", d.draft_count,
+              (d.draft_ids || []).join("|"),
+              (d.drafts || []).map((x: any) => x.title || "").filter(Boolean).join(" | "),
+              (d.expected_fields || []).join("|"),
+              (d.expected_outputs || []).join("|"),
+              d.error_message ?? "",
+            ].map(esc).join(","));
+          }
+          downloadFile(name, lines.join("\n"), "text/csv");
+        };
+        const ts = format(new Date(), "yyyyMMdd-HHmm");
+        return (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><History size={14} /> Command History ({runs.length})</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-sm flex items-center gap-2"><History size={14} /> Command History ({runs.length})</CardTitle>
+              {runs.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                    onClick={() => exportJson(runs, `command-runs-${ts}.json`)}>
+                    <Download size={10} /> JSON
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                    onClick={() => exportCsv(runs, `command-runs-${ts}.csv`)}>
+                    <Download size={10} /> CSV
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardHeader>
           <CardContent>
             {runs.length === 0 ? (
               <p className="text-sm text-muted-foreground">No commands have run yet.</p>
