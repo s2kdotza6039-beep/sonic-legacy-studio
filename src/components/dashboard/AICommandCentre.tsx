@@ -240,6 +240,18 @@ const AICommandCentre = () => {
     command: "", frequency: "daily", hour_of_day: 9, day_of_week: 1,
   });
 
+  // Schedule filters
+  const [schedFilterCmd, setSchedFilterCmd] = useState<string>("all");
+  const [schedFilterFreq, setSchedFilterFreq] = useState<string>("all");
+  const [schedFilterStatus, setSchedFilterStatus] = useState<string>("all");
+  const [schedFilterNext, setSchedFilterNext] = useState<string>("all");
+
+  // Bulk run progress + summary
+  type BulkResult = { scheduleId: string; command: string; status: "pending" | "running" | "ok" | "failed"; drafts: number; error?: string };
+  const [bulkProgress, setBulkProgress] = useState<{ open: boolean; total: number; done: number; results: BulkResult[] }>({
+    open: false, total: 0, done: 0, results: [],
+  });
+
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
