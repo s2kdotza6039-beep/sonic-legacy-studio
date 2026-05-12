@@ -1443,6 +1443,63 @@ const AICommandCentre = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          <Dialog open={bulkProgress.open} onOpenChange={(o) => setBulkProgress((p) => ({ ...p, open: o }))}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {runSchedBulkBusy
+                    ? `Running schedules… ${bulkProgress.done}/${bulkProgress.total}`
+                    : `Bulk run summary — ${bulkProgress.done}/${bulkProgress.total} complete`}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <div className="w-full h-2 bg-secondary rounded overflow-hidden">
+                  <div className="h-full bg-primary transition-all"
+                    style={{ width: `${bulkProgress.total ? (bulkProgress.done / bulkProgress.total) * 100 : 0}%` }} />
+                </div>
+                {!runSchedBulkBusy && (() => {
+                  const okCount = bulkProgress.results.filter((r) => r.status === "ok").length;
+                  const failCount = bulkProgress.results.filter((r) => r.status === "failed").length;
+                  const totalDrafts = bulkProgress.results.reduce((sum, r) => sum + r.drafts, 0);
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      {okCount} succeeded · {failCount} failed · {totalDrafts} draft(s) queued for approval.
+                    </p>
+                  );
+                })()}
+                <ul className="space-y-1.5 max-h-72 overflow-auto border border-border bg-secondary/30 p-2">
+                  {bulkProgress.results.map((r) => (
+                    <li key={r.scheduleId} className="text-xs flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{r.command}</p>
+                        {r.error && <p className="text-[10px] text-destructive">{r.error}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {r.status === "ok" && <span className="text-[10px] text-muted-foreground">{r.drafts} draft(s)</span>}
+                        <Badge
+                          variant={r.status === "ok" ? "default" : r.status === "failed" ? "destructive" : "outline"}
+                          className="text-[10px]"
+                        >
+                          {r.status === "running" ? "Running…" : r.status === "pending" ? "Queued" : r.status === "ok" ? "OK" : "Failed"}
+                        </Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <DialogFooter>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={runSchedBulkBusy}
+                  onClick={() => setBulkProgress((p) => ({ ...p, open: false }))}
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
