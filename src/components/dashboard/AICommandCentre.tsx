@@ -494,7 +494,21 @@ const AICommandCentre = () => {
       next.setDate(next.getDate() + (diff === 0 && next <= now ? 7 : diff));
       return next;
     }
-    next.setDate(next.getDate() + 1); return next;
+  };
+
+  const computeUpcomingRuns = (frequency: string, hour: number, dow: number, windowDays = 7, cap = 24): Date[] => {
+    const runs: Date[] = [];
+    const start = computeNextRunClient(frequency, hour, dow);
+    const end = new Date(Date.now() + windowDays * 24 * 3600 * 1000);
+    const cur = new Date(start);
+    while (cur <= end && runs.length < cap) {
+      runs.push(new Date(cur));
+      if (frequency === "hourly") cur.setHours(cur.getHours() + 1);
+      else if (frequency === "daily") cur.setDate(cur.getDate() + 1);
+      else if (frequency === "weekly") cur.setDate(cur.getDate() + 7);
+      else break;
+    }
+    return runs;
   };
 
   const createSchedule = async () => {
