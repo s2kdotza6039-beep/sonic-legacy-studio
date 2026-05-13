@@ -135,7 +135,21 @@ const Listen = () => {
           {loading ? (
             <p className="text-muted-foreground text-sm">Loading releases…</p>
           ) : releases.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No new singles available yet.</p>
+            <div className="border border-border bg-card/50 px-8 py-16 md:py-20 text-center">
+              <div className="max-w-md mx-auto">
+                <Cloud className="mx-auto mb-6 text-primary/60" size={36} />
+                <p className="text-xs uppercase tracking-[0.25em] text-primary mb-3">
+                  No featured singles
+                </p>
+                <h3 className="text-2xl md:text-3xl font-display font-bold mb-4">
+                  New music coming soon
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  There are no featured singles available right now. Check back shortly for the
+                  next official release from the s2kDOTza Entertainment roster.
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
               {releases.map((r) => (
