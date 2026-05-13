@@ -28,6 +28,7 @@ const TABS = [
   { key: "scorecard", label: "Scorecard", icon: Star },
   { key: "ideas", label: "Ideas", icon: Lightbulb },
   { key: "content", label: "Content", icon: Film },
+  { key: "releases", label: "Releases", icon: Disc3 },
   { key: "revenue", label: "Revenue", icon: DollarSign },
   { key: "contracts", label: "Contracts", icon: FileText },
   { key: "betting", label: "AI Betting", icon: Target },
