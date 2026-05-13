@@ -98,9 +98,10 @@ const Listen = () => {
     (async () => {
       const { data, error } = await supabase
         .from("releases")
-        .select("id, artist_id, artist_name, title, cover_url, cloudflare_url")
+        .select("id, artist_id, artist_name, title, cover_url, cloudflare_url, is_featured, sort_order")
         .eq("release_type", "Single")
         .eq("status", "New Single")
+        .order("is_featured", { ascending: false })
         .order("sort_order", { ascending: true });
 
       if (!error && data) setReleases(data as Release[]);
