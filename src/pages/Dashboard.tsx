@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
 import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
+import ReleasesManager from "@/components/dashboard/ReleasesManager";
 import { Target } from "lucide-react";
 
 const TABS = [
@@ -27,6 +28,7 @@ const TABS = [
   { key: "scorecard", label: "Scorecard", icon: Star },
   { key: "ideas", label: "Ideas", icon: Lightbulb },
   { key: "content", label: "Content", icon: Film },
+  { key: "releases", label: "Releases", icon: Disc3 },
   { key: "revenue", label: "Revenue", icon: DollarSign },
   { key: "contracts", label: "Contracts", icon: FileText },
   { key: "betting", label: "AI Betting", icon: Target },
@@ -109,6 +111,7 @@ const Dashboard = () => {
             {tab === "scorecard" && <ArtistScorecard />}
             {tab === "ideas" && <IdeasBoard />}
             {tab === "content" && <ContentEngine />}
+            {tab === "releases" && <ReleasesManager />}
             {tab === "revenue" && <RevenuePipeline />}
             {tab === "contracts" && <ContractVault />}
             {tab === "betting" && <BettingSystem />}
