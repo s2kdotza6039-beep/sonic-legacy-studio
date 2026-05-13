@@ -14,10 +14,25 @@ interface Release {
   cloudflare_url: string | null;
 }
 
+const CLOUDFLARE_BASE = "https://newsingle.s2kdotza.com";
+
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const buildCloudflareUrl = (release: Release) =>
+  release.cloudflare_url?.trim()
+    ? release.cloudflare_url
+    : `${CLOUDFLARE_BASE}/${slugify(release.artist_id || release.artist_name)}/${slugify(release.title)}`;
+
 const SingleCard = ({ release }: { release: Release }) => {
   const fallback = artists.find((a) => a.id === release.artist_id)?.image;
   const cover = release.cover_url || fallback;
-  const href = release.cloudflare_url || "#";
+  const href = buildCloudflareUrl(release);
 
   return (
     <article className="group bg-card border border-border hover:border-primary/60 transition-all duration-500 flex flex-col">
