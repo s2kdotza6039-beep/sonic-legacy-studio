@@ -16,6 +16,7 @@ import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
 import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
+import ReleasesManager from "@/components/dashboard/ReleasesManager";
 import { Target } from "lucide-react";
 
 const TABS = [
