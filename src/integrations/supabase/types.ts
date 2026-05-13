@@ -1253,6 +1253,54 @@ export type Database = {
         }
         Relationships: []
       }
+      releases: {
+        Row: {
+          artist_id: string
+          artist_name: string
+          cloudflare_url: string | null
+          cover_url: string | null
+          created_at: string
+          id: string
+          is_featured: boolean
+          release_type: string
+          released_at: string | null
+          sort_order: number
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          artist_name: string
+          cloudflare_url?: string | null
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          is_featured?: boolean
+          release_type?: string
+          released_at?: string | null
+          sort_order?: number
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          artist_name?: string
+          cloudflare_url?: string | null
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          is_featured?: boolean
+          release_type?: string
+          released_at?: string | null
+          sort_order?: number
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reminders: {
         Row: {
           created_at: string
