@@ -352,9 +352,9 @@ const Listen = () => {
               controls
               preload="none"
               className="flex-1 min-w-[200px] max-w-md"
-              onLoadStart={() => setStatus("loading")}
-              onCanPlay={() => setStatus((s) => (s === "loading" ? "paused" : s))}
-              onWaiting={() => setStatus("loading")}
+              onLoadStart={() => setStatus((s) => (s === "error" || s === "slow" ? s : "loading"))}
+              onCanPlay={() => setStatus((s) => (s === "loading" || s === "slow" ? "paused" : s))}
+              onWaiting={() => setStatus((s) => (s === "playing" ? "loading" : s))}
               onPlaying={() => setStatus("playing")}
               onPause={() => setStatus((s) => (s === "playing" ? "paused" : s))}
               onError={() => setStatus("error")}
