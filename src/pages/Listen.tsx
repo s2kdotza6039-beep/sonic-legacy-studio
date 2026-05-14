@@ -98,7 +98,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
         </p>
 
         <button
-          onClick={isPlaying ? onPause : isError ? onRetry : onPlay}
+          onClick={isPlaying ? onPause : (isError || isSlow) ? onRetry : onPlay}
           disabled={isLoading}
           className="w-full border border-border hover:border-primary text-foreground px-4 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2 mb-6 disabled:opacity-60"
         >
@@ -110,6 +110,10 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
             <>
               <Pause size={14} /> Pause Preview
             </>
+          ) : isSlow ? (
+            <>
+              <AlertCircle size={14} className="text-primary" /> Retry Stream
+            </>
           ) : isError ? (
             <>
               <AlertCircle size={14} className="text-destructive" /> Retry Stream
@@ -120,6 +124,18 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
             </>
           )}
         </button>
+
+        {isSlow && (
+          <div className="border border-primary/40 bg-primary/5 px-4 py-3 mb-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-primary mb-1 inline-flex items-center gap-2">
+              <Loader2 size={12} className="animate-spin" /> Stream is taking too long
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The Cloudflare preview is slow to load. You can keep waiting, retry, or
+              download the full track below.
+            </p>
+          </div>
+        )}
 
         {isError && (
           <p className="text-xs text-destructive mb-4 leading-relaxed">
