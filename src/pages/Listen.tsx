@@ -63,9 +63,18 @@ const SingleCard = ({ release }: { release: Release }) => {
           {release.title}
         </h3>
 
-        <p className="text-xs text-muted-foreground italic mb-6">
+        <p className="text-xs text-muted-foreground italic mb-4">
           Available exclusively via Cloudflare Cloud
         </p>
+
+        <audio
+          controls
+          preload="none"
+          src={href}
+          className="w-full mb-6"
+        >
+          Your browser does not support the audio element.
+        </audio>
 
         <div className="mt-auto space-y-3">
           <a
