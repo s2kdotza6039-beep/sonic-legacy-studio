@@ -328,10 +328,22 @@ const Listen = () => {
               {status === "loading" && (
                 <Loader2 size={14} className="animate-spin text-primary flex-shrink-0" />
               )}
+              {status === "slow" && (
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center gap-1 text-xs text-primary flex-shrink-0 border border-primary/40 px-2 py-1 hover:bg-primary/10 transition-colors"
+                  title="Stream is slow — retry"
+                >
+                  <AlertCircle size={12} /> Slow — Retry
+                </button>
+              )}
               {status === "error" && (
-                <span className="inline-flex items-center gap-1 text-xs text-destructive flex-shrink-0">
-                  <AlertCircle size={12} /> Stream failed
-                </span>
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center gap-1 text-xs text-destructive flex-shrink-0 border border-destructive/40 px-2 py-1 hover:bg-destructive/10 transition-colors"
+                >
+                  <AlertCircle size={12} /> Stream failed — Retry
+                </button>
               )}
             </div>
 
