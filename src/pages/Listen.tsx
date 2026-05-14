@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Layout from "@/components/Layout";
 import { Link } from "react-router-dom";
 import { Cloud, ArrowRight, Play, Pause, Loader2, AlertCircle, SkipForward } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { artists } from "@/data/artists";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,6 +18,7 @@ interface Release {
 type PlayerStatus = "idle" | "loading" | "slow" | "playing" | "paused" | "error";
 
 const SLOW_THRESHOLD_MS = 8000;
+const STORAGE_KEY = "listen:currentId";
 
 const CLOUDFLARE_BASE = "https://newsingle.s2kdotza.com";
 
@@ -32,6 +34,13 @@ const buildCloudflareUrl = (release: Release) =>
   release.cloudflare_url?.trim()
     ? release.cloudflare_url
     : `${CLOUDFLARE_BASE}/${slugify(release.artist_id || release.artist_name)}/${slugify(release.title)}`;
+
+const formatTime = (seconds: number) => {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
 
 interface CardProps {
   release: Release;
@@ -170,8 +179,15 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
 const Listen = () => {
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [currentId, setCurrentId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(STORAGE_KEY);
+  });
+  const [autoplayOnLoad, setAutoplayOnLoad] = useState(false);
   const [status, setStatus] = useState<PlayerStatus>("idle");
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [seeking, setSeeking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -184,10 +200,26 @@ const Listen = () => {
         .order("is_featured", { ascending: false })
         .order("sort_order", { ascending: true });
 
-      if (!error && data) setReleases(data as Release[]);
+      if (!error && data) {
+        const list = data as Release[];
+        setReleases(list);
+        // Clear persisted id if no longer present
+        if (currentId && !list.some((r) => r.id === currentId)) {
+          setCurrentId(null);
+          window.localStorage.removeItem(STORAGE_KEY);
+        }
+      }
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist currentId
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (currentId) window.localStorage.setItem(STORAGE_KEY, currentId);
+    else window.localStorage.removeItem(STORAGE_KEY);
+  }, [currentId]);
 
   const currentIndex = currentId ? releases.findIndex((r) => r.id === currentId) : -1;
   const currentRelease = currentIndex >= 0 ? releases[currentIndex] : null;
@@ -197,18 +229,30 @@ const Listen = () => {
       audioRef.current.play().catch(() => setStatus("error"));
       return;
     }
+    setAutoplayOnLoad(true);
     setCurrentId(release.id);
     setStatus("loading");
+    setCurrentTime(0);
+    setDuration(0);
   };
 
-  // When currentId changes, load and play the new track
+  // When currentId changes, load (and optionally play) the new track
   useEffect(() => {
     if (!currentRelease || !audioRef.current) return;
     const audio = audioRef.current;
     audio.src = buildCloudflareUrl(currentRelease);
     audio.load();
-    audio.play().catch(() => setStatus("error"));
-  }, [currentId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (autoplayOnLoad) {
+      audio.play().catch(() => setStatus("error"));
+    } else {
+      setStatus("paused");
+    }
+  }, [currentId, currentRelease?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePlay = () => {
+    if (!audioRef.current) return;
+    audioRef.current.play().catch(() => setStatus("error"));
+  };
 
   const handlePause = () => {
     audioRef.current?.pause();
@@ -221,7 +265,14 @@ const Listen = () => {
     audioRef.current.play().catch(() => setStatus("error"));
   };
 
-  // Slow-stream timeout: if loading persists, surface a "taking too long" UI
+  const handleSeek = (value: number[]) => {
+    if (!audioRef.current) return;
+    const t = value[0];
+    setCurrentTime(t);
+    audioRef.current.currentTime = t;
+  };
+
+  // Slow-stream timeout
   useEffect(() => {
     if (status !== "loading") return;
     const t = window.setTimeout(() => {
@@ -238,6 +289,9 @@ const Listen = () => {
     }
     playRelease(releases[currentIndex + 1]);
   };
+
+  const isPlayingNow = status === "playing";
+  const seekMax = duration > 0 ? duration : 0;
 
   return (
     <Layout>
@@ -308,51 +362,102 @@ const Listen = () => {
       {/* Persistent player bar */}
       {currentRelease && (
         <div className="sticky bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              {currentRelease.cover_url && (
-                <img
-                  src={currentRelease.cover_url}
-                  alt=""
-                  className="w-12 h-12 object-cover border border-border flex-shrink-0"
-                />
-              )}
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground truncate">
-                  {currentRelease.artist_name}
-                </p>
-                <p className="font-display font-semibold text-sm truncate">
-                  {currentRelease.title}
-                </p>
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
+            <div className="flex items-center gap-3 md:gap-4 flex-wrap md:flex-nowrap">
+              {/* Track info */}
+              <div className="flex items-center gap-3 min-w-0 md:w-64 flex-shrink-0">
+                {currentRelease.cover_url && (
+                  <img
+                    src={currentRelease.cover_url}
+                    alt=""
+                    className="w-12 h-12 object-cover border border-border flex-shrink-0"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground truncate">
+                    {currentRelease.artist_name}
+                  </p>
+                  <p className="font-display font-semibold text-sm truncate">
+                    {currentRelease.title}
+                  </p>
+                </div>
               </div>
-              {status === "loading" && (
-                <Loader2 size={14} className="animate-spin text-primary flex-shrink-0" />
-              )}
-              {status === "slow" && (
+
+              {/* Transport + progress */}
+              <div className="flex items-center gap-3 flex-1 min-w-0 w-full">
                 <button
-                  onClick={handleRetry}
-                  className="inline-flex items-center gap-1 text-xs text-primary flex-shrink-0 border border-primary/40 px-2 py-1 hover:bg-primary/10 transition-colors"
-                  title="Stream is slow — retry"
+                  onClick={isPlayingNow ? handlePause : (status === "error" || status === "slow") ? handleRetry : handlePlay}
+                  disabled={status === "loading"}
+                  className="w-10 h-10 rounded-full bg-gold-gradient text-primary-foreground inline-flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-60 flex-shrink-0"
+                  title={isPlayingNow ? "Pause" : "Play"}
                 >
-                  <AlertCircle size={12} /> Slow — Retry
+                  {status === "loading" ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : isPlayingNow ? (
+                    <Pause size={16} />
+                  ) : (status === "error" || status === "slow") ? (
+                    <AlertCircle size={16} />
+                  ) : (
+                    <Play size={16} className="ml-0.5" />
+                  )}
                 </button>
-              )}
-              {status === "error" && (
+
                 <button
-                  onClick={handleRetry}
-                  className="inline-flex items-center gap-1 text-xs text-destructive flex-shrink-0 border border-destructive/40 px-2 py-1 hover:bg-destructive/10 transition-colors"
+                  onClick={playNext}
+                  disabled={currentIndex < 0 || currentIndex >= releases.length - 1}
+                  className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+                  title="Play next single"
                 >
-                  <AlertCircle size={12} /> Stream failed — Retry
+                  <SkipForward size={18} />
                 </button>
-              )}
+
+                <span className="text-[11px] tabular-nums text-muted-foreground w-10 text-right flex-shrink-0">
+                  {formatTime(currentTime)}
+                </span>
+
+                <Slider
+                  value={[Math.min(currentTime, seekMax)]}
+                  max={seekMax || 1}
+                  step={0.1}
+                  disabled={!duration}
+                  onValueChange={(v) => {
+                    setSeeking(true);
+                    setCurrentTime(v[0]);
+                  }}
+                  onValueCommit={(v) => {
+                    handleSeek(v);
+                    setSeeking(false);
+                  }}
+                  className="flex-1"
+                />
+
+                <span className="text-[11px] tabular-nums text-muted-foreground w-10 flex-shrink-0">
+                  {formatTime(duration)}
+                </span>
+
+                {status === "slow" && (
+                  <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-primary border border-primary/40 px-2 py-1 flex-shrink-0">
+                    <AlertCircle size={12} /> Slow
+                  </span>
+                )}
+                {status === "error" && (
+                  <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-destructive border border-destructive/40 px-2 py-1 flex-shrink-0">
+                    <AlertCircle size={12} /> Error
+                  </span>
+                )}
+              </div>
             </div>
 
             <audio
               ref={audioRef}
-              controls
-              preload="none"
-              className="flex-1 min-w-[200px] max-w-md"
+              preload="metadata"
+              className="hidden"
               onLoadStart={() => setStatus((s) => (s === "error" || s === "slow" ? s : "loading"))}
+              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+              onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
+              onTimeUpdate={(e) => {
+                if (!seeking) setCurrentTime(e.currentTarget.currentTime);
+              }}
               onCanPlay={() => setStatus((s) => (s === "loading" || s === "slow" ? "paused" : s))}
               onWaiting={() => setStatus((s) => (s === "playing" ? "loading" : s))}
               onPlaying={() => setStatus("playing")}
@@ -362,15 +467,6 @@ const Listen = () => {
             >
               Your browser does not support the audio element.
             </audio>
-
-            <button
-              onClick={playNext}
-              disabled={currentIndex < 0 || currentIndex >= releases.length - 1}
-              className="border border-border hover:border-primary text-foreground px-3 py-2 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Play next single"
-            >
-              <SkipForward size={14} /> Next
-            </button>
           </div>
         </div>
       )}
