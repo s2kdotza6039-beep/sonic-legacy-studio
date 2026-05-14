@@ -50,6 +50,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
   const isLoading = isActive && status === "loading";
   const isPlaying = isActive && status === "playing";
   const isError = isActive && status === "error";
+  const isSlow = isActive && status === "slow";
 
   return (
     <article
