@@ -221,6 +221,15 @@ const Listen = () => {
     audioRef.current.play().catch(() => setStatus("error"));
   };
 
+  // Slow-stream timeout: if loading persists, surface a "taking too long" UI
+  useEffect(() => {
+    if (status !== "loading") return;
+    const t = window.setTimeout(() => {
+      setStatus((s) => (s === "loading" ? "slow" : s));
+    }, SLOW_THRESHOLD_MS);
+    return () => window.clearTimeout(t);
+  }, [status, currentId]);
+
   const playNext = () => {
     if (currentIndex < 0 || currentIndex >= releases.length - 1) {
       setStatus("idle");
