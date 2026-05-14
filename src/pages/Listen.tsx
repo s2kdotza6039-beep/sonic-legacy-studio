@@ -14,7 +14,9 @@ interface Release {
   cloudflare_url: string | null;
 }
 
-type PlayerStatus = "idle" | "loading" | "playing" | "paused" | "error";
+type PlayerStatus = "idle" | "loading" | "slow" | "playing" | "paused" | "error";
+
+const SLOW_THRESHOLD_MS = 8000;
 
 const CLOUDFLARE_BASE = "https://newsingle.s2kdotza.com";
 
@@ -48,6 +50,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
   const isLoading = isActive && status === "loading";
   const isPlaying = isActive && status === "playing";
   const isError = isActive && status === "error";
+  const isSlow = isActive && status === "slow";
 
   return (
     <article
@@ -76,7 +79,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
           <div className="absolute top-4 right-4">
             <span className="bg-background/80 backdrop-blur-sm border border-primary text-primary text-[10px] uppercase tracking-[0.2em] font-semibold px-3 py-1.5 inline-flex items-center gap-1.5">
               {isPlaying && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
-              {isPlaying ? "Now Playing" : isLoading ? "Loading" : isError ? "Error" : "Selected"}
+              {isPlaying ? "Now Playing" : isLoading ? "Loading" : isSlow ? "Slow" : isError ? "Error" : "Selected"}
             </span>
           </div>
         )}
@@ -95,7 +98,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
         </p>
 
         <button
-          onClick={isPlaying ? onPause : isError ? onRetry : onPlay}
+          onClick={isPlaying ? onPause : (isError || isSlow) ? onRetry : onPlay}
           disabled={isLoading}
           className="w-full border border-border hover:border-primary text-foreground px-4 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2 mb-6 disabled:opacity-60"
         >
@@ -107,6 +110,10 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
             <>
               <Pause size={14} /> Pause Preview
             </>
+          ) : isSlow ? (
+            <>
+              <AlertCircle size={14} className="text-primary" /> Retry Stream
+            </>
           ) : isError ? (
             <>
               <AlertCircle size={14} className="text-destructive" /> Retry Stream
@@ -117,6 +124,18 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
             </>
           )}
         </button>
+
+        {isSlow && (
+          <div className="border border-primary/40 bg-primary/5 px-4 py-3 mb-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-primary mb-1 inline-flex items-center gap-2">
+              <Loader2 size={12} className="animate-spin" /> Stream is taking too long
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The Cloudflare preview is slow to load. You can keep waiting, retry, or
+              download the full track below.
+            </p>
+          </div>
+        )}
 
         {isError && (
           <p className="text-xs text-destructive mb-4 leading-relaxed">
@@ -201,6 +220,15 @@ const Listen = () => {
     audioRef.current.load();
     audioRef.current.play().catch(() => setStatus("error"));
   };
+
+  // Slow-stream timeout: if loading persists, surface a "taking too long" UI
+  useEffect(() => {
+    if (status !== "loading") return;
+    const t = window.setTimeout(() => {
+      setStatus((s) => (s === "loading" ? "slow" : s));
+    }, SLOW_THRESHOLD_MS);
+    return () => window.clearTimeout(t);
+  }, [status, currentId]);
 
   const playNext = () => {
     if (currentIndex < 0 || currentIndex >= releases.length - 1) {
@@ -300,10 +328,22 @@ const Listen = () => {
               {status === "loading" && (
                 <Loader2 size={14} className="animate-spin text-primary flex-shrink-0" />
               )}
+              {status === "slow" && (
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center gap-1 text-xs text-primary flex-shrink-0 border border-primary/40 px-2 py-1 hover:bg-primary/10 transition-colors"
+                  title="Stream is slow — retry"
+                >
+                  <AlertCircle size={12} /> Slow — Retry
+                </button>
+              )}
               {status === "error" && (
-                <span className="inline-flex items-center gap-1 text-xs text-destructive flex-shrink-0">
-                  <AlertCircle size={12} /> Stream failed
-                </span>
+                <button
+                  onClick={handleRetry}
+                  className="inline-flex items-center gap-1 text-xs text-destructive flex-shrink-0 border border-destructive/40 px-2 py-1 hover:bg-destructive/10 transition-colors"
+                >
+                  <AlertCircle size={12} /> Stream failed — Retry
+                </button>
               )}
             </div>
 
@@ -312,9 +352,9 @@ const Listen = () => {
               controls
               preload="none"
               className="flex-1 min-w-[200px] max-w-md"
-              onLoadStart={() => setStatus("loading")}
-              onCanPlay={() => setStatus((s) => (s === "loading" ? "paused" : s))}
-              onWaiting={() => setStatus("loading")}
+              onLoadStart={() => setStatus((s) => (s === "error" || s === "slow" ? s : "loading"))}
+              onCanPlay={() => setStatus((s) => (s === "loading" || s === "slow" ? "paused" : s))}
+              onWaiting={() => setStatus((s) => (s === "playing" ? "loading" : s))}
               onPlaying={() => setStatus("playing")}
               onPause={() => setStatus((s) => (s === "playing" ? "paused" : s))}
               onError={() => setStatus("error")}
