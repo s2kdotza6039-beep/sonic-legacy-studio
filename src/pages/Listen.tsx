@@ -14,7 +14,9 @@ interface Release {
   cloudflare_url: string | null;
 }
 
-type PlayerStatus = "idle" | "loading" | "playing" | "paused" | "error";
+type PlayerStatus = "idle" | "loading" | "slow" | "playing" | "paused" | "error";
+
+const SLOW_THRESHOLD_MS = 8000;
 
 const CLOUDFLARE_BASE = "https://newsingle.s2kdotza.com";
 
