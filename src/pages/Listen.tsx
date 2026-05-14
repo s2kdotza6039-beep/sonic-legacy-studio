@@ -79,7 +79,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
           <div className="absolute top-4 right-4">
             <span className="bg-background/80 backdrop-blur-sm border border-primary text-primary text-[10px] uppercase tracking-[0.2em] font-semibold px-3 py-1.5 inline-flex items-center gap-1.5">
               {isPlaying && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
-              {isPlaying ? "Now Playing" : isLoading ? "Loading" : isError ? "Error" : "Selected"}
+              {isPlaying ? "Now Playing" : isLoading ? "Loading" : isSlow ? "Slow" : isError ? "Error" : "Selected"}
             </span>
           </div>
         )}
