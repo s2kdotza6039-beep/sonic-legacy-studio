@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { artists } from "@/data/artists";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { buildCloudflareUrl } from "@/lib/releaseUrl";
 
 interface Release {
   id: string;
