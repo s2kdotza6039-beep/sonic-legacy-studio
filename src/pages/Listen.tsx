@@ -6,7 +6,13 @@ import { Slider } from "@/components/ui/slider";
 import { artists } from "@/data/artists";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { buildCloudflareUrl } from "@/lib/releaseUrl";
+import { resolveCloudflareUrl, type CloudflareUrlReason } from "@/lib/releaseUrl";
+
+const FALLBACK_MESSAGES: Record<Exclude<CloudflareUrlReason, "explicit" | "derived">, string> = {
+  "missing-title": "Track title missing — destination unavailable.",
+  "missing-artist": "Artist info missing — destination unavailable.",
+  "invalid-url": "Stored Cloudflare link is invalid — please update in CMS.",
+};
 
 interface Release {
   id: string;
@@ -52,7 +58,8 @@ interface CardProps {
 const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: CardProps) => {
   const fallback = artists.find((a) => a.id === release.artist_id)?.image;
   const cover = release.cover_url || fallback;
-  const href = buildCloudflareUrl(release);
+  const { url: href, reason: hrefReason } = resolveCloudflareUrl(release);
+  const hrefFallback = href ? null : FALLBACK_MESSAGES[hrefReason as keyof typeof FALLBACK_MESSAGES];
 
   const isLoading = isActive && status === "loading";
   const isPlaying = isActive && status === "playing";
@@ -106,7 +113,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
 
         <button
           onClick={isPlaying ? onPause : (isError || isSlow) ? onRetry : onPlay}
-          disabled={isLoading}
+          disabled={isLoading || !href}
           className="w-full border border-border hover:border-primary text-foreground px-4 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2 mb-6 disabled:opacity-60"
         >
           {isLoading ? (
@@ -152,22 +159,34 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
         )}
 
         <div className="mt-auto space-y-3">
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-gold-gradient text-primary-foreground px-6 py-4 text-xs uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-3"
-          >
-            <Cloud size={16} />
-            Get "{release.title}" on Cloudflare Cloud
-          </a>
-          <Link
-            to={`/artists/${release.artist_id}`}
-            className="w-full border border-border hover:border-primary text-foreground px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2"
-          >
-            View Artist Profile
-            <ArrowRight size={14} />
-          </Link>
+          {href ? (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-gold-gradient text-primary-foreground px-6 py-4 text-xs uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-3"
+            >
+              <Cloud size={16} />
+              Get "{release.title || "this single"}" on Cloudflare Cloud
+            </a>
+          ) : (
+            <div
+              role="alert"
+              className="w-full border border-destructive/40 bg-destructive/5 px-6 py-4 text-xs uppercase tracking-widest font-semibold text-destructive inline-flex items-center justify-center gap-3 text-center"
+            >
+              <AlertCircle size={16} />
+              {hrefFallback ?? "Cloudflare destination unavailable"}
+            </div>
+          )}
+          {release.artist_id ? (
+            <Link
+              to={`/artists/${release.artist_id}`}
+              className="w-full border border-border hover:border-primary text-foreground px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2"
+            >
+              View Artist Profile
+              <ArrowRight size={14} />
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>
@@ -292,7 +311,13 @@ const Listen = () => {
   useEffect(() => {
     if (!currentRelease || !audioRef.current) return;
     const audio = audioRef.current;
-    audio.src = buildCloudflareUrl(currentRelease);
+    const resolved = resolveCloudflareUrl(currentRelease);
+    if (!resolved.url) {
+      setStatus("error");
+      logDiag("track:unavailable", `${currentRelease.title} — ${resolved.reason}`);
+      return;
+    }
+    audio.src = resolved.url;
     audio.load();
     if (autoplayOnLoad) {
       audio.play().catch(() => setStatus("error"));
