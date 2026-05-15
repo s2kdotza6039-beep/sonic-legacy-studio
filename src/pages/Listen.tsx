@@ -6,7 +6,13 @@ import { Slider } from "@/components/ui/slider";
 import { artists } from "@/data/artists";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { buildCloudflareUrl } from "@/lib/releaseUrl";
+import { resolveCloudflareUrl, type CloudflareUrlReason } from "@/lib/releaseUrl";
+
+const FALLBACK_MESSAGES: Record<Exclude<CloudflareUrlReason, "explicit" | "derived">, string> = {
+  "missing-title": "Track title missing — destination unavailable.",
+  "missing-artist": "Artist info missing — destination unavailable.",
+  "invalid-url": "Stored Cloudflare link is invalid — please update in CMS.",
+};
 
 interface Release {
   id: string;
