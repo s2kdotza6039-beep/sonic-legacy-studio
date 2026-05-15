@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import Layout from "@/components/Layout";
 import { Link } from "react-router-dom";
-import { Cloud, ArrowRight, Play, Pause, Loader2, AlertCircle, SkipForward } from "lucide-react";
+import { Cloud, ArrowRight, Play, Pause, Loader2, AlertCircle, SkipForward, Terminal, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { artists } from "@/data/artists";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Release {
   id: string;
@@ -19,6 +20,9 @@ type PlayerStatus = "idle" | "loading" | "slow" | "playing" | "paused" | "error"
 
 const SLOW_THRESHOLD_MS = 8000;
 const STORAGE_KEY = "listen:currentId";
+const STATUS_STORAGE_KEY = "listen:lastStatus";
+const BACKOFF_BASE_MS = 1500;
+const BACKOFF_MAX_MS = 30000;
 
 const CLOUDFLARE_BASE = "https://newsingle.s2kdotza.com";
 
@@ -41,6 +45,14 @@ const formatTime = (seconds: number) => {
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
+
+interface DiagEntry {
+  ts: number;
+  trackId: string;
+  trackTitle: string;
+  event: string;
+  detail?: string;
+}
 
 interface CardProps {
   release: Release;
@@ -184,11 +196,50 @@ const Listen = () => {
     return window.localStorage.getItem(STORAGE_KEY);
   });
   const [autoplayOnLoad, setAutoplayOnLoad] = useState(false);
-  const [status, setStatus] = useState<PlayerStatus>("idle");
+  const [status, setStatus] = useState<PlayerStatus>(() => {
+    if (typeof window === "undefined") return "idle";
+    const persisted = window.localStorage.getItem(STATUS_STORAGE_KEY);
+    return persisted === "error" || persisted === "slow" ? (persisted as PlayerStatus) : "idle";
+  });
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [seeking, setSeeking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Backoff + diagnostics
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryCooldownUntil, setRetryCooldownUntil] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<DiagEntry[]>([]);
+  const loadStartRef = useRef<number | null>(null);
+  const lastToastStatusRef = useRef<PlayerStatus | null>(null);
+
+  const logDiag = (event: string, detail?: string) => {
+    const release = currentReleaseRef.current;
+    setDiagnostics((d) =>
+      [
+        ...d,
+        {
+          ts: Date.now(),
+          trackId: release?.id ?? "—",
+          trackTitle: release?.title ?? "—",
+          event,
+          detail,
+        },
+      ].slice(-100),
+    );
+  };
+
+  // Persist last error/slow status only
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (status === "error" || status === "slow") {
+      window.localStorage.setItem(STATUS_STORAGE_KEY, status);
+    } else {
+      window.localStorage.removeItem(STATUS_STORAGE_KEY);
+    }
+  }, [status]);
 
   useEffect(() => {
     (async () => {
@@ -203,10 +254,10 @@ const Listen = () => {
       if (!error && data) {
         const list = data as Release[];
         setReleases(list);
-        // Clear persisted id if no longer present
         if (currentId && !list.some((r) => r.id === currentId)) {
           setCurrentId(null);
           window.localStorage.removeItem(STORAGE_KEY);
+          window.localStorage.removeItem(STATUS_STORAGE_KEY);
         }
       }
       setLoading(false);
@@ -214,7 +265,6 @@ const Listen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist currentId
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (currentId) window.localStorage.setItem(STORAGE_KEY, currentId);
@@ -223,20 +273,36 @@ const Listen = () => {
 
   const currentIndex = currentId ? releases.findIndex((r) => r.id === currentId) : -1;
   const currentRelease = currentIndex >= 0 ? releases[currentIndex] : null;
+  const currentReleaseRef = useRef<Release | null>(null);
+  useEffect(() => {
+    currentReleaseRef.current = currentRelease;
+  }, [currentRelease]);
+
+  // Tick for cooldown countdown
+  useEffect(() => {
+    if (retryCooldownUntil <= Date.now()) return;
+    const i = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(i);
+  }, [retryCooldownUntil]);
+
+  const cooldownRemaining = Math.max(0, retryCooldownUntil - now);
+  const canRetry = cooldownRemaining === 0;
 
   const playRelease = (release: Release) => {
     if (currentId === release.id && audioRef.current) {
       audioRef.current.play().catch(() => setStatus("error"));
       return;
     }
+    setRetryCount(0);
+    setRetryCooldownUntil(0);
     setAutoplayOnLoad(true);
     setCurrentId(release.id);
     setStatus("loading");
     setCurrentTime(0);
     setDuration(0);
+    logDiag("track:select", release.title);
   };
 
-  // When currentId changes, load (and optionally play) the new track
   useEffect(() => {
     if (!currentRelease || !audioRef.current) return;
     const audio = audioRef.current;
@@ -245,7 +311,7 @@ const Listen = () => {
     if (autoplayOnLoad) {
       audio.play().catch(() => setStatus("error"));
     } else {
-      setStatus("paused");
+      setStatus((s) => (s === "error" || s === "slow" ? s : "paused"));
     }
   }, [currentId, currentRelease?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -260,9 +326,18 @@ const Listen = () => {
 
   const handleRetry = () => {
     if (!currentRelease || !audioRef.current) return;
+    if (!canRetry) {
+      toast.info(`Please wait ${Math.ceil(cooldownRemaining / 1000)}s before retrying`);
+      return;
+    }
+    const nextCount = retryCount + 1;
+    const delay = Math.min(BACKOFF_BASE_MS * Math.pow(2, retryCount), BACKOFF_MAX_MS);
+    setRetryCount(nextCount);
+    setRetryCooldownUntil(Date.now() + delay);
     setStatus("loading");
     audioRef.current.load();
     audioRef.current.play().catch(() => setStatus("error"));
+    logDiag("retry", `attempt ${nextCount}, next cooldown ${delay}ms`);
   };
 
   const handleSeek = (value: number[]) => {
@@ -275,11 +350,42 @@ const Listen = () => {
   // Slow-stream timeout
   useEffect(() => {
     if (status !== "loading") return;
+    const startedAt = Date.now();
     const t = window.setTimeout(() => {
-      setStatus((s) => (s === "loading" ? "slow" : s));
+      setStatus((s) => {
+        if (s === "loading") {
+          const elapsed = Date.now() - startedAt;
+          logDiag("status:slow", `after ${elapsed}ms (threshold ${SLOW_THRESHOLD_MS}ms)`);
+          return "slow";
+        }
+        return s;
+      });
     }, SLOW_THRESHOLD_MS);
     return () => window.clearTimeout(t);
   }, [status, currentId]);
+
+  // Toast on slow / error transitions
+  useEffect(() => {
+    if (status !== "slow" && status !== "error") {
+      lastToastStatusRef.current = null;
+      return;
+    }
+    if (lastToastStatusRef.current === status) return;
+    lastToastStatusRef.current = status;
+    const title = currentRelease?.title ?? "Stream";
+    if (status === "slow") {
+      toast.warning(`Stream is slow — "${title}"`, {
+        description: "Cloudflare is taking a while to respond.",
+        action: { label: "Retry", onClick: () => handleRetry() },
+      });
+    } else {
+      toast.error(`Stream failed — "${title}"`, {
+        description: "Unable to load the Cloudflare audio.",
+        action: { label: "Retry", onClick: () => handleRetry() },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, currentRelease?.id]);
 
   const playNext = () => {
     if (currentIndex < 0 || currentIndex >= releases.length - 1) {
@@ -359,6 +465,72 @@ const Listen = () => {
         </div>
       </section>
 
+      {/* Diagnostics console panel */}
+      <div className="fixed bottom-24 right-4 z-50">
+        {diagOpen ? (
+          <div className="w-[min(92vw,420px)] max-h-[50vh] flex flex-col bg-background border border-border shadow-2xl">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-primary inline-flex items-center gap-2">
+                <Terminal size={12} /> Playback Diagnostics
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setDiagnostics([])}
+                  className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => setDiagOpen(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Close diagnostics"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="px-3 py-2 border-b border-border text-[11px] text-muted-foreground space-y-1">
+              <div>Status: <span className="text-foreground">{status}</span></div>
+              <div>Slow threshold: {SLOW_THRESHOLD_MS}ms</div>
+              <div>
+                Retries: <span className="text-foreground">{retryCount}</span>
+                {cooldownRemaining > 0 && (
+                  <> · Cooldown: <span className="text-foreground">{Math.ceil(cooldownRemaining / 1000)}s</span></>
+                )}
+              </div>
+              <div>Duration: {formatTime(duration)} · Time: {formatTime(currentTime)}</div>
+            </div>
+            <div className="overflow-y-auto flex-1 font-mono text-[11px] p-2 space-y-1">
+              {diagnostics.length === 0 ? (
+                <p className="text-muted-foreground italic px-1">No events yet.</p>
+              ) : (
+                [...diagnostics].reverse().map((d, i) => (
+                  <div key={i} className="border-b border-border/50 pb-1">
+                    <span className="text-muted-foreground">
+                      {new Date(d.ts).toLocaleTimeString()}
+                    </span>{" "}
+                    <span className="text-primary">{d.event}</span>
+                    {d.detail && <span className="text-foreground"> — {d.detail}</span>}
+                    <div className="text-muted-foreground/70 truncate">{d.trackTitle}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setDiagOpen(true)}
+            className="bg-card border border-border hover:border-primary px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-2 shadow-lg"
+            title="Open playback diagnostics"
+          >
+            <Terminal size={12} /> Diagnostics
+            {diagnostics.length > 0 && (
+              <span className="text-primary">({diagnostics.length})</span>
+            )}
+          </button>
+        )}
+      </div>
+
       {/* Persistent player bar */}
       {currentRelease && (
         <div className="sticky bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-md">
@@ -387,9 +559,9 @@ const Listen = () => {
               <div className="flex items-center gap-3 flex-1 min-w-0 w-full">
                 <button
                   onClick={isPlayingNow ? handlePause : (status === "error" || status === "slow") ? handleRetry : handlePlay}
-                  disabled={status === "loading"}
+                  disabled={status === "loading" || ((status === "error" || status === "slow") && !canRetry)}
                   className="w-10 h-10 rounded-full bg-gold-gradient text-primary-foreground inline-flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-60 flex-shrink-0"
-                  title={isPlayingNow ? "Pause" : "Play"}
+                  title={isPlayingNow ? "Pause" : (status === "error" || status === "slow") && !canRetry ? `Retry in ${Math.ceil(cooldownRemaining / 1000)}s` : "Play"}
                 >
                   {status === "loading" ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -437,12 +609,12 @@ const Listen = () => {
 
                 {status === "slow" && (
                   <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-primary border border-primary/40 px-2 py-1 flex-shrink-0">
-                    <AlertCircle size={12} /> Slow
+                    <AlertCircle size={12} /> Slow{cooldownRemaining > 0 && ` ${Math.ceil(cooldownRemaining / 1000)}s`}
                   </span>
                 )}
                 {status === "error" && (
                   <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-destructive border border-destructive/40 px-2 py-1 flex-shrink-0">
-                    <AlertCircle size={12} /> Error
+                    <AlertCircle size={12} /> Error{cooldownRemaining > 0 && ` ${Math.ceil(cooldownRemaining / 1000)}s`}
                   </span>
                 )}
               </div>
@@ -452,18 +624,55 @@ const Listen = () => {
               ref={audioRef}
               preload="metadata"
               className="hidden"
-              onLoadStart={() => setStatus((s) => (s === "error" || s === "slow" ? s : "loading"))}
-              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+              onLoadStart={() => {
+                loadStartRef.current = Date.now();
+                logDiag("audio:loadstart");
+                setStatus((s) => (s === "error" || s === "slow" ? s : "loading"));
+              }}
+              onLoadedMetadata={(e) => {
+                const d = e.currentTarget.duration || 0;
+                setDuration(d);
+                logDiag("audio:loadedmetadata", `duration ${formatTime(d)}`);
+              }}
               onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
               onTimeUpdate={(e) => {
                 if (!seeking) setCurrentTime(e.currentTarget.currentTime);
               }}
-              onCanPlay={() => setStatus((s) => (s === "loading" || s === "slow" ? "paused" : s))}
-              onWaiting={() => setStatus((s) => (s === "playing" ? "loading" : s))}
-              onPlaying={() => setStatus("playing")}
-              onPause={() => setStatus((s) => (s === "playing" ? "paused" : s))}
-              onError={() => setStatus("error")}
-              onEnded={playNext}
+              onCanPlay={() => {
+                const took = loadStartRef.current ? Date.now() - loadStartRef.current : null;
+                logDiag("audio:canplay", took !== null ? `loaded in ${took}ms` : undefined);
+                setStatus((s) => (s === "loading" || s === "slow" ? "paused" : s));
+              }}
+              onWaiting={() => {
+                logDiag("audio:waiting", "buffer underrun");
+                setStatus((s) => (s === "playing" ? "loading" : s));
+              }}
+              onPlaying={() => {
+                logDiag("audio:playing");
+                setStatus("playing");
+                setRetryCount(0);
+                setRetryCooldownUntil(0);
+              }}
+              onPause={() => {
+                logDiag("audio:pause");
+                setStatus((s) => (s === "playing" ? "paused" : s));
+              }}
+              onError={(e) => {
+                const err = (e.currentTarget as HTMLAudioElement).error;
+                const codeMap: Record<number, string> = {
+                  1: "MEDIA_ERR_ABORTED",
+                  2: "MEDIA_ERR_NETWORK",
+                  3: "MEDIA_ERR_DECODE",
+                  4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
+                };
+                const detail = err ? `${codeMap[err.code] ?? `code ${err.code}`}${err.message ? ` — ${err.message}` : ""}` : "unknown";
+                logDiag("audio:error", detail);
+                setStatus("error");
+              }}
+              onEnded={() => {
+                logDiag("audio:ended");
+                playNext();
+              }}
             >
               Your browser does not support the audio element.
             </audio>
