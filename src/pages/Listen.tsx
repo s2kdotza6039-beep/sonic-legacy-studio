@@ -58,7 +58,8 @@ interface CardProps {
 const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: CardProps) => {
   const fallback = artists.find((a) => a.id === release.artist_id)?.image;
   const cover = release.cover_url || fallback;
-  const href = buildCloudflareUrl(release);
+  const { url: href, reason: hrefReason } = resolveCloudflareUrl(release);
+  const hrefFallback = href ? null : FALLBACK_MESSAGES[hrefReason as keyof typeof FALLBACK_MESSAGES];
 
   const isLoading = isActive && status === "loading";
   const isPlaying = isActive && status === "playing";
@@ -298,7 +299,13 @@ const Listen = () => {
   useEffect(() => {
     if (!currentRelease || !audioRef.current) return;
     const audio = audioRef.current;
-    audio.src = buildCloudflareUrl(currentRelease);
+    const resolved = resolveCloudflareUrl(currentRelease);
+    if (!resolved.url) {
+      setStatus("error");
+      logDiag("track:unavailable", `${currentRelease.title} — ${resolved.reason}`);
+      return;
+    }
+    audio.src = resolved.url;
     audio.load();
     if (autoplayOnLoad) {
       audio.play().catch(() => setStatus("error"));
