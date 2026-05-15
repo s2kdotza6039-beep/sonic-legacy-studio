@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { artists } from "@/data/artists";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { buildCloudflareUrl } from "@/lib/releaseUrl";
 
 interface Release {
   id: string;
@@ -23,21 +24,6 @@ const STORAGE_KEY = "listen:currentId";
 const STATUS_STORAGE_KEY = "listen:lastStatus";
 const BACKOFF_BASE_MS = 1500;
 const BACKOFF_MAX_MS = 30000;
-
-const CLOUDFLARE_BASE = "https://newsingle.s2kdotza.com";
-
-const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-const buildCloudflareUrl = (release: Release) =>
-  release.cloudflare_url?.trim()
-    ? release.cloudflare_url
-    : `${CLOUDFLARE_BASE}/${slugify(release.artist_id || release.artist_name)}/${slugify(release.title)}`;
 
 const formatTime = (seconds: number) => {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
