@@ -113,7 +113,7 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
 
         <button
           onClick={isPlaying ? onPause : (isError || isSlow) ? onRetry : onPlay}
-          disabled={isLoading}
+          disabled={isLoading || !href}
           className="w-full border border-border hover:border-primary text-foreground px-4 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2 mb-6 disabled:opacity-60"
         >
           {isLoading ? (
