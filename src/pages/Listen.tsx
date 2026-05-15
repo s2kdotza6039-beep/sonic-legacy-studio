@@ -159,22 +159,34 @@ const SingleCard = ({ release, isActive, status, onPlay, onPause, onRetry }: Car
         )}
 
         <div className="mt-auto space-y-3">
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-gold-gradient text-primary-foreground px-6 py-4 text-xs uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-3"
-          >
-            <Cloud size={16} />
-            Get "{release.title}" on Cloudflare Cloud
-          </a>
-          <Link
-            to={`/artists/${release.artist_id}`}
-            className="w-full border border-border hover:border-primary text-foreground px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2"
-          >
-            View Artist Profile
-            <ArrowRight size={14} />
-          </Link>
+          {href ? (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-gold-gradient text-primary-foreground px-6 py-4 text-xs uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-3"
+            >
+              <Cloud size={16} />
+              Get "{release.title || "this single"}" on Cloudflare Cloud
+            </a>
+          ) : (
+            <div
+              role="alert"
+              className="w-full border border-destructive/40 bg-destructive/5 px-6 py-4 text-xs uppercase tracking-widest font-semibold text-destructive inline-flex items-center justify-center gap-3 text-center"
+            >
+              <AlertCircle size={16} />
+              {hrefFallback ?? "Cloudflare destination unavailable"}
+            </div>
+          )}
+          {release.artist_id ? (
+            <Link
+              to={`/artists/${release.artist_id}`}
+              className="w-full border border-border hover:border-primary text-foreground px-6 py-3 text-xs uppercase tracking-widest font-medium transition-colors inline-flex items-center justify-center gap-2"
+            >
+              View Artist Profile
+              <ArrowRight size={14} />
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>
