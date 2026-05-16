@@ -841,6 +841,51 @@ export type Database = {
         }
         Relationships: []
       }
+      download_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          payment_id: string
+          token: string
+          track_id: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          payment_id: string
+          token: string
+          track_id: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payment_id?: string
+          token?: string
+          track_id?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "download_tokens_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "download_tokens_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_drafts: {
         Row: {
           body: string
@@ -1225,6 +1270,68 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      payments: {
+        Row: {
+          amount_cents: number
+          buyer_email: string | null
+          created_at: string
+          currency: string
+          id: string
+          itn_payload: Json | null
+          kind: string
+          m_payment_id: string
+          paid_at: string | null
+          pf_payment_id: string | null
+          signature_verified: boolean
+          status: string
+          track_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          buyer_email?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          itn_payload?: Json | null
+          kind: string
+          m_payment_id: string
+          paid_at?: string | null
+          pf_payment_id?: string | null
+          signature_verified?: boolean
+          status?: string
+          track_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          buyer_email?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          itn_payload?: Json | null
+          kind?: string
+          m_payment_id?: string
+          paid_at?: string | null
+          pf_payment_id?: string | null
+          signature_verified?: boolean
+          status?: string
+          track_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1700,6 +1807,69 @@ export type Database = {
           status?: string
           updated_at?: string
           venue?: string | null
+        }
+        Relationships: []
+      }
+      tracks: {
+        Row: {
+          artist_name: string
+          artist_slug: string | null
+          cover_url: string | null
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          is_active: boolean
+          pct_free: number
+          pct_gold: number
+          pct_standard: number
+          price_download_cents: number
+          price_gold_cents: number
+          price_standard_cents: number
+          r2_object_key: string
+          slug: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          artist_name: string
+          artist_slug?: string | null
+          cover_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          pct_free?: number
+          pct_gold?: number
+          pct_standard?: number
+          price_download_cents?: number
+          price_gold_cents?: number
+          price_standard_cents?: number
+          r2_object_key: string
+          slug: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          artist_name?: string
+          artist_slug?: string | null
+          cover_url?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          is_active?: boolean
+          pct_free?: number
+          pct_gold?: number
+          pct_standard?: number
+          price_download_cents?: number
+          price_gold_cents?: number
+          price_standard_cents?: number
+          r2_object_key?: string
+          slug?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
