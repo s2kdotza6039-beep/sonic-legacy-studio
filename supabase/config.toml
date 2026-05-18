@@ -14,3 +14,15 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
+
+[functions.payfast-notify]
+verify_jwt = false
+
+[functions.payfast-create]
+verify_jwt = false
+
+[functions.payment-status]
+verify_jwt = false
+
+[functions.download-track]
+verify_jwt = false
