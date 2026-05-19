@@ -119,6 +119,8 @@ const Dashboard = () => {
             {tab === "revenue" && <RevenuePipeline />}
             {tab === "contracts" && <ContractVault />}
             {tab === "betting" && <BettingSystem />}
+            {tab === "music" && <MusicAdmin />}
+            {tab === "payfast" && <PayFastAuditLog />}
           </div>
           <div>
             <RemindersPanel />
