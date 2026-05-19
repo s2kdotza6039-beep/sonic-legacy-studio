@@ -70,6 +70,11 @@ const App = () => (
               </FounderRoute>
             } />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/sandbox/payments" element={
+              <FounderRoute>
+                <SandboxPayments />
+              </FounderRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <FloatingAssistant />
