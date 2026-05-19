@@ -26,6 +26,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Assistant from "./pages/Assistant";
 import FloatingAssistant from "./components/FloatingAssistant";
 import Unsubscribe from "./pages/Unsubscribe";
+import SandboxPayments from "./pages/SandboxPayments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
