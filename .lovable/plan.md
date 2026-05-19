@@ -1,113 +1,125 @@
-## AI Music Tier Access System
+## Music Tier System — Server Enforcement, Admin & Diagnostics
 
-A tier-gated playback + paid download system for the Listen page, powered by PayFast and Cloudflare R2 signed URLs. No cart — one-tap tier selection, automatic unlock after payment.
-
----
-
-### 1. Tier model
-
-Four tiers, applied per-track per-session:
-
-| Tier | Price | Playback | Auth |
-|------|-------|----------|------|
-| Free | R0 | 25% of duration | none |
-| Standard | R3.50 | 55% | PayFast |
-| Gold | R5.00 | 100% | PayFast |
-| Cristal | R0 | 100% | Founder role only |
-
-Download Now: **R10** per track via PayFast → time-limited signed R2 URL → auto-download.
+Five coordinated additions building on the existing PayFast + tier system.
 
 ---
 
-### 2. UX flow (Listen page)
+### 1. Server-side playback enforcement (`stream-track` edge function + Worker)
 
-```
-[ Track card ]
-   LISTEN NOW  →  shows 4 tier chips (Free / Standard / Gold / Cristal)
-                  ├─ Free      → plays instantly, auto-pause at 25%, upgrade popup
-                  ├─ Standard  → PayFast checkout → unlock 55%
-                  ├─ Gold      → PayFast checkout → unlock 100%
-                  └─ Cristal   → only visible if founder, unlocks 100%
-   DOWNLOAD NOW — R10  →  PayFast → signed download link auto-starts
-```
+**New edge function** `supabase/functions/stream-track/index.ts` (public, `verify_jwt = false`):
+- Input: `?track_id=<uuid>&tier=<free|standard|gold|cristal>` plus optional `Authorization: Bearer <jwt>` (for Cristal/founder) or `?ref=<m_payment_id>` (to prove paid Standard/Gold).
+- Resolves the highest tier the caller is entitled to:
+  - `free` → always allowed (25%).
+  - `standard`/`gold` → verified against `payments` table (status=`paid`, matching `track_id`, matching `kind`).
+  - `cristal` → JWT must belong to a user with `founder` role.
+- Computes `pct` from the track row.
+- Builds a short-lived HMAC token: `base64url(payload).base64url(sig)` where
+  `payload = {track_id, exp, pct, max_bytes?}`, signed with `R2_SIGNING_SECRET`.
+- Returns `302` redirect to `https://newsingle.s2kdotza.com/<r2_object_key>?t=<token>` (or JSON `{url}` when `?json=1`).
+- TTL = 5 minutes, single track scope.
 
-- Tier chips: rounded, gradient-accented, hover lift, mobile-first.
-- Playback enforcement client-side via `timeupdate` listener + auto-pause at `duration * tierPct`.
-- Upgrade modal on limit reached, offering Standard / Gold.
-- Unlocked tiers persisted per track in `localStorage` AND verified server-side against `payments` table.
+**Cloudflare Worker update** (`docs/payments-setup.md`): replace template with a worker that:
+- Reads `?t=` token from request.
+- Splits payload/sig, verifies HMAC with `R2_SIGNING_SECRET` (Workers secret).
+- Checks `exp`, checks `track_id` matches the requested object key prefix/mapping.
+- If `pct < 1`, uses HTTP `Range` semantics: it fetches the R2 object, reads `Content-Length`, computes `allowedBytes = floor(length * pct)`, rewrites/limits the response Range to `0-(allowedBytes-1)`. Rejects requests for bytes beyond `allowedBytes` with `416`.
+- On failure: `401` or `403`.
 
----
+**New secret needed:** `R2_SIGNING_SECRET` (also configured as a Worker secret).
 
-### 3. Backend (Lovable Cloud)
-
-**New tables**
-- `payments` — id, user_id (nullable for guest), email, track_id, kind (`tier_standard` | `tier_gold` | `download`), amount, status (`pending|paid|failed`), pf_payment_id, m_payment_id (our ref), signature_verified, created_at, paid_at.
-- `download_tokens` — id, payment_id, token (random), track_id, expires_at, used_at.
-- `track_access` — derived view / table linking email+track → highest tier paid (for cross-device unlock by email).
-
-RLS: founders manage all; users read their own by email match; service role writes from edge functions.
-
-**Edge functions**
-- `payfast-create` — builds signed PayFast checkout payload (merchant_id, merchant_key, amount, item_name, m_payment_id, return/cancel/notify URLs, MD5 signature with passphrase). Inserts `pending` payment row. Returns redirect URL.
-- `payfast-notify` (ITN webhook, no JWT) — validates: signature, source IP against PayFast IP ranges, server-to-server postback to `https://www.payfast.co.za/eng/query/validate`, amount match. Marks payment `paid`. For downloads, mints a `download_tokens` row.
-- `payfast-return` — thin redirect back into app with `?m_payment_id=…`.
-- `payfast-cancel` — redirect with cancel state.
-- `stream-track` — returns short-lived signed R2 URL for the audio (HMAC-signed query param verified by a Cloudflare Worker on `newsingle.s2kdotza.com`, OR Supabase-signed redirect). Validates the requesting session's tier entitlement.
-- `download-track` — exchanges a one-time token for a signed R2 URL, marks token used.
-
-**Secrets to add** (will request via add_secret after approval):
-- `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_MODE` (`sandbox|live`)
-- `R2_SIGNING_SECRET` (HMAC key shared with the Cloudflare Worker that fronts R2)
+**Frontend (`src/lib/musicTier.ts`)**:
+- Replace `trackStreamUrl(track)` with `async signedStreamUrl(track, tier, ref?)` that calls the `stream-track` function with `?json=1` and returns the signed URL. Audio `src` is the signed URL.
 
 ---
 
-### 4. Audio security
+### 2. Sandbox PayFast test page (`/sandbox/payments`)
 
-- Audio `<audio src>` is set to `stream-track` edge function output, which 302-redirects to a signed R2 URL valid ~2 minutes.
-- Worker on `newsingle.s2kdotza.com` rejects unsigned requests, blocks directory listing, and enforces token expiry.
-- Downloads use a single-use token, expires in 10 minutes.
-- No permanent public URLs exposed in the client bundle.
-
-> Note: the Cloudflare Worker + R2 bucket policy itself must be configured by you in Cloudflare — I'll provide the Worker script and exact env vars. Lovable can't deploy to your Cloudflare account.
-
----
-
-### 5. Admin (Founder dashboard)
-
-New dashboard module `MusicAdmin`:
-- Upload track metadata (title, artist, R2 object key, cover).
-- Override per-track pricing and playback percentages.
-- Sales table (payments, filter by status / kind / date).
-- Download log.
-- Toggle Cristal access for specific founder accounts.
-
-Founder-only via existing `FounderRoute` + `has_role`.
+New page `src/pages/SandboxPayments.tsx` (route registered in `App.tsx`, founder-only via `FounderRoute`):
+- Track picker (loads from `tracks`).
+- Buttons: "Buy Standard", "Buy Gold", "Buy Download" (uses sandbox `PAYFAST_MODE`).
+- Step list rendered live:
+  1. `payfast-create` request + response (`m_payment_id`).
+  2. PayFast redirect (submit form in new tab).
+  3. Polling `payment-status` — shows each tick + status transitions.
+  4. On `paid`: shows minted token, attempts `stream-track` request, displays tier unlock from `localStorage`.
+- Reset / clear-access controls.
+- Visible only when `import.meta.env.DEV` OR user is founder.
 
 ---
 
-### 6. Future-ready structure
+### 3. Hardened Listen page (`src/pages/Listen.tsx`)
 
-- `payments.kind` enum extensible to `subscription_monthly`, etc.
-- Separate `entitlements` resolver hook so subscriptions, artist accounts, and AI recommendations can plug in.
-- All playback events emitted to a `playback_events` table later for analytics + royalty tracking.
-
----
-
-### 7. Build order
-
-1. DB migration: `payments`, `download_tokens`, `track_access`, RLS, indexes.
-2. Add secrets (PayFast + R2 signing).
-3. Edge functions: `payfast-create`, `payfast-notify`, `payfast-return`, `payfast-cancel`, `stream-track`, `download-track`.
-4. Listen page rebuild: tier chip UI, playback enforcement, upgrade modal, download button, payment-return handler.
-5. Founder dashboard `MusicAdmin` module.
-6. Provide Cloudflare Worker script + setup instructions for R2 signing.
-7. Sandbox end-to-end test with PayFast sandbox credentials.
+- Add a `seeking` guard: in the `timeupdate` and new `seeking`/`seeked` listeners, clamp `currentTime` to `allowedSec - 0.25` if user scrubs past it (free/standard tiers).
+- Disable seek beyond `allowedSec` on the progress UI (custom click handler instead of HTML default).
+- Use signed URLs (`signedStreamUrl`) — set `audio.src` only after fetch resolves; show inline loader.
+- Upgrade prompt: clearer copy showing exactly how much more they'd unlock (e.g. "+45% with Standard, full song with Gold").
+- After successful upgrade (when `PaymentReturnHandler` grants access), auto-resume from the last `progress` value of the matching track (store `lastProgress[trackId]` in `sessionStorage`).
+- Toast on tier unlock now offers a "Resume" action.
 
 ---
 
-### Open questions before I start
+### 4. Music admin (`src/components/dashboard/MusicAdmin.tsx`)
 
-1. **PayFast account**: do you have a PayFast merchant account ready (sandbox + live), and the passphrase set in the PayFast dashboard? If not, I'll wire it for sandbox first.
-2. **Cloudflare Worker**: are you OK deploying a small Worker on `newsingle.s2kdotza.com` that I provide? Without it, R2 objects either stay fully public (insecure) or have to be proxied through an edge function (slower, costs Supabase egress).
-3. **Guest checkout**: should non-logged-in visitors be able to pay (email captured at checkout), or do you want to require sign-up before Standard/Gold/Download?
-4. **Cristal**: lock to existing `founder` role, or add a new `cristal` role in `user_roles`?
+Added as a new Dashboard tab (founder-only — existing `Dashboard` already restricts).
+Table of `tracks` with editable cells:
+- Title, artist, R2 object key.
+- Prices (Standard / Gold / Download) in ZAR.
+- Percentages (Free / Standard / Gold) as 0–100 sliders.
+- `is_active` switch.
+- `sort_order` number.
+- "Publish as New Single" quick action: sets `is_active = true`, bumps `sort_order` to top, optionally creates a matching `releases` row (`status='New Single'`, `is_featured=true`).
+All edits via `supabase.from('tracks').update(...)`. Optimistic UI + toast.
+
+No new table — uses existing `tracks` + `releases`.
+
+---
+
+### 5. PayFast notify audit log
+
+**New table** `payfast_notify_log`:
+- `id`, `created_at`,
+- `m_payment_id` (text, nullable),
+- `payment_id` (uuid, nullable, refs `payments.id` logically),
+- `signature_ok` (bool),
+- `amount_ok` (bool),
+- `was_idempotent_skip` (bool) — true when payment was already `paid`,
+- `pf_payment_status` (text),
+- `expected_amount_cents` (int, nullable),
+- `received_amount` (text, nullable),
+- `verify_reason` (text, nullable),
+- `outcome` (text: `paid` | `failed` | `ignored` | `unknown_payment` | `invalid`),
+- `source_ip` (text, nullable),
+- `raw_payload` (jsonb),
+- `raw_body_hash` (text) — sha256 of raw body, lets you dedupe replays without storing duplicates.
+
+RLS: founders SELECT; service_role full ALL. No update/delete for users.
+
+**`payfast-notify` edge function** writes one row per inbound POST (after parsing, regardless of outcome), and sets `was_idempotent_skip = true` when the early `pmt.status === 'paid'` short-circuit fires.
+
+**Admin UI** `src/components/dashboard/PayFastAuditLog.tsx` (Dashboard tab, founder-only):
+- Reverse-chronological table, filters by `outcome` and date range.
+- Row expander shows `raw_payload` JSON.
+- Badge colors: green `paid`, red `invalid`/`failed`, gray `ignored`/`unknown_payment`.
+- "Resend test ITN" button (sandbox only) that calls `payfast-notify` with a stored payload for replay troubleshooting.
+
+---
+
+### Build order
+
+1. Migration: create `payfast_notify_log` (RLS + indexes).
+2. Add secret `R2_SIGNING_SECRET`.
+3. Edge functions: new `stream-track`; update `payfast-notify` to log; (no change needed to `payfast-create`/`payment-status`).
+4. Update `src/lib/musicTier.ts` → signed-URL helper.
+5. Rewrite Listen card playback (seek clamping, resume).
+6. Sandbox payments page + route.
+7. `MusicAdmin` + `PayFastAuditLog` dashboard tabs.
+8. Update `docs/payments-setup.md` with new Worker code + signing key instructions.
+
+---
+
+### Open questions
+
+1. **`R2_SIGNING_SECRET`** — OK to add a new runtime + Worker secret? (Required for any real enforcement.)
+2. **Worker deployment** — can you deploy the updated Worker to `newsingle.s2kdotza.com`? Without it, the signed-URL function still works but R2 will accept unsigned requests too (best-effort only).
+3. **Cristal via JWT** — confirm that any logged-in user with the existing `founder` role should get Cristal (no new role needed).
+4. **Sandbox page route** — `/sandbox/payments` founder-only is fine, or do you want it gated behind `PAYFAST_MODE === 'sandbox'` as well so it disappears in production?
