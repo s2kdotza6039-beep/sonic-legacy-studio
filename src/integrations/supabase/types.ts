@@ -1271,6 +1271,60 @@ export type Database = {
         }
         Relationships: []
       }
+      payfast_notify_log: {
+        Row: {
+          amount_ok: boolean
+          created_at: string
+          expected_amount_cents: number | null
+          id: string
+          m_payment_id: string | null
+          outcome: string
+          payment_id: string | null
+          pf_payment_status: string | null
+          raw_body_hash: string | null
+          raw_payload: Json | null
+          received_amount: string | null
+          signature_ok: boolean
+          source_ip: string | null
+          verify_reason: string | null
+          was_idempotent_skip: boolean
+        }
+        Insert: {
+          amount_ok?: boolean
+          created_at?: string
+          expected_amount_cents?: number | null
+          id?: string
+          m_payment_id?: string | null
+          outcome: string
+          payment_id?: string | null
+          pf_payment_status?: string | null
+          raw_body_hash?: string | null
+          raw_payload?: Json | null
+          received_amount?: string | null
+          signature_ok?: boolean
+          source_ip?: string | null
+          verify_reason?: string | null
+          was_idempotent_skip?: boolean
+        }
+        Update: {
+          amount_ok?: boolean
+          created_at?: string
+          expected_amount_cents?: number | null
+          id?: string
+          m_payment_id?: string | null
+          outcome?: string
+          payment_id?: string | null
+          pf_payment_status?: string | null
+          raw_body_hash?: string | null
+          raw_payload?: Json | null
+          received_amount?: string | null
+          signature_ok?: boolean
+          source_ip?: string | null
+          verify_reason?: string | null
+          was_idempotent_skip?: boolean
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount_cents: number
