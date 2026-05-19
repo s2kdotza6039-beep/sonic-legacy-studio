@@ -21,35 +21,63 @@ export interface Track {
   sort_order: number;
 }
 
-const R2_BASE =
-  (import.meta.env.VITE_R2_PUBLIC_BASE as string | undefined)?.replace(/\/$/, "") ??
-  "https://newsingle.s2kdotza.com";
-
-export const trackStreamUrl = (t: Track) => `${R2_BASE}/${t.r2_object_key}`;
-
 export const tierPercentage = (track: Track, tier: Tier) => {
   if (tier === "cristal") return 1;
-  if (tier === "gold") return track.pct_gold;
-  if (tier === "standard") return track.pct_standard;
-  return track.pct_free;
+  if (tier === "gold") return Number(track.pct_gold);
+  if (tier === "standard") return Number(track.pct_standard);
+  return Number(track.pct_free);
 };
 
 export const tierRank: Record<Tier, number> = { free: 0, standard: 1, gold: 2, cristal: 3 };
 
 const ACCESS_KEY = "s2k.tierAccess.v1";
-type AccessMap = Record<string, Tier>; // track_id -> highest tier
+const REF_KEY = "s2k.tierRefs.v1";
+type AccessMap = Record<string, Tier>;
+type RefMap = Record<string, string>;
 
 export const loadAccess = (): AccessMap => {
   try { return JSON.parse(localStorage.getItem(ACCESS_KEY) ?? "{}"); } catch { return {}; }
 };
+export const loadRefs = (): RefMap => {
+  try { return JSON.parse(localStorage.getItem(REF_KEY) ?? "{}"); } catch { return {}; }
+};
 
-export const grantAccess = (trackId: string, tier: Tier) => {
+export const grantAccess = (trackId: string, tier: Tier, ref?: string | null) => {
   const cur = loadAccess();
   if (!cur[trackId] || tierRank[tier] > tierRank[cur[trackId]]) {
     cur[trackId] = tier;
     localStorage.setItem(ACCESS_KEY, JSON.stringify(cur));
   }
+  if (ref) {
+    const refs = loadRefs();
+    refs[trackId] = ref;
+    localStorage.setItem(REF_KEY, JSON.stringify(refs));
+  }
 };
+
+export const clearAccess = () => {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REF_KEY);
+};
+
+/** Ask the backend for a signed Cloudflare URL for the given tier. */
+export async function signedStreamUrl(
+  track: Track, tier: Tier, opts?: { ref?: string | null; jwt?: string | null },
+): Promise<{ url: string; granted: Tier; pct: number }> {
+  const base = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-track`;
+  const qs = new URLSearchParams({ track_id: track.id, tier, json: "1" });
+  if (opts?.ref) qs.set("ref", opts.ref);
+  const headers: Record<string, string> = {
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+  };
+  if (opts?.jwt) headers.Authorization = `Bearer ${opts.jwt}`;
+  const res = await fetch(`${base}?${qs}`, { headers });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`stream-track ${res.status}: ${txt}`);
+  }
+  return res.json();
+}
 
 export async function startPayFast(args: {
   track_id: string;
@@ -61,11 +89,15 @@ export async function startPayFast(args: {
   return data;
 }
 
-/** Submit a hidden form to PayFast with the signed fields. */
-export function submitPayFast(checkoutUrl: string, fields: Record<string, string>) {
+export function submitPayFast(
+  checkoutUrl: string,
+  fields: Record<string, string>,
+  opts?: { target?: string },
+) {
   const form = document.createElement("form");
   form.method = "POST";
   form.action = checkoutUrl;
+  if (opts?.target) form.target = opts.target;
   form.style.display = "none";
   for (const [k, v] of Object.entries(fields)) {
     const i = document.createElement("input");

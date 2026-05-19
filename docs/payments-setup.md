@@ -1,66 +1,134 @@
-# PayFast + R2 Music Tier — Setup Guide
+# Payments + Stream Setup
 
-## 1. PayFast configuration
+## Required secrets
 
-In your PayFast dashboard (Settings → Integration):
+| Secret | Purpose |
+|---|---|
+| `PAYFAST_MERCHANT_ID` | PayFast dashboard → Settings → Integration |
+| `PAYFAST_MERCHANT_KEY` | PayFast dashboard → Settings → Integration |
+| `PAYFAST_PASSPHRASE` | PayFast dashboard → Settings → Integration (recommended) |
+| `PAYFAST_MODE` | `sandbox` or `live` |
+| `APP_PUBLIC_URL` | e.g. `https://s2kdotza.com` (used for return/cancel URLs) |
+| `R2_PUBLIC_BASE` | e.g. `https://newsingle.s2kdotza.com` |
+| `R2_SIGNING_SECRET` | Long random string shared with the Cloudflare Worker |
 
-- **Notify URL**: `https://dvmftknddmssmpyhnjob.supabase.co/functions/v1/payfast-notify`
-- **Return URL**: `https://s2kdotza.com/listen?pf=return`
-- **Cancel URL**: `https://s2kdotza.com/listen?pf=cancel`
-- Set a passphrase and copy it into the `PAYFAST_PASSPHRASE` secret.
-- `PAYFAST_MODE` = `sandbox` while testing, `live` when ready.
+## PayFast dashboard
 
-The Notify URL is the only one PayFast actually calls server-to-server; the
-return/cancel URLs are filled in dynamically per-checkout anyway.
+1. Set the **Notify URL** to:
+   `https://<your-project>.functions.supabase.co/payfast-notify`
+   (this function is public — `verify_jwt = false`).
+2. Whitelist this URL in the PayFast ITN settings.
+3. Use a passphrase in both the PayFast settings and the `PAYFAST_PASSPHRASE` secret.
 
-## 2. Cloudflare R2 hardening (recommended)
+## Audit trail
 
-Right now `https://newsingle.s2kdotza.com/*.mp3` is publicly downloadable, which
-means the tier system is enforced **client-side only**. To enforce server-side:
+Every inbound PayFast notify call is written to `payfast_notify_log` (signature OK, amount OK, idempotency skip, raw payload, source IP). View it under **Dashboard → PayFast Log** (founder only).
 
-1. Make the R2 bucket private (remove the public custom-domain binding, or set
-   the binding behind a Worker route).
-2. Deploy a Worker at `newsingle.s2kdotza.com/*` that:
-   - Requires a signed `?token=` query param.
-   - Verifies the HMAC against an `R2_SIGNING_SECRET` shared with the
-     `stream-track` / `download-track` Supabase edge functions.
-   - Streams the R2 object through `env.BUCKET.get(key)`.
+## Sandbox test page
 
-Worker skeleton:
+Founders can exercise the full PayFast → notify → unlock loop end-to-end at `/sandbox/payments`.
 
-```js
-export default {
-  async fetch(req, env) {
-    const url = new URL(req.url);
-    const token = url.searchParams.get("token");
-    const exp = Number(url.searchParams.get("exp") ?? 0);
-    const key = decodeURIComponent(url.pathname.slice(1));
-    if (!token || !exp || Date.now() / 1000 > exp) return new Response("expired", { status: 410 });
-    const expected = await hmacHex(env.R2_SIGNING_SECRET, `${key}|${exp}`);
-    if (expected !== token) return new Response("bad token", { status: 403 });
-    const obj = await env.BUCKET.get(key);
-    if (!obj) return new Response("not found", { status: 404 });
-    return new Response(obj.body, {
-      headers: {
-        "Content-Type": obj.httpMetadata.contentType ?? "audio/mpeg",
-        "Cache-Control": "private, max-age=60",
-      },
-    });
-  },
-};
-async function hmacHex(secret, msg) {
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(msg));
-  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+## Cloudflare Worker — sign-token + range gating
+
+Deploy this Worker on `newsingle.s2kdotza.com` (the route that fronts your R2 bucket). It:
+
+- Requires a `?t=<payload>.<sig>` query parameter on every request.
+- Verifies HMAC-SHA256 against `R2_SIGNING_SECRET`.
+- Enforces expiry (`e`) and the URL path (`p`) the token was minted for.
+- Limits how many bytes the client can receive to `floor(content_length * pct)`.
+
+### `wrangler.toml`
+
+```toml
+name = "s2k-stream-gate"
+main = "src/worker.ts"
+compatibility_date = "2024-09-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "newsingle-s2kdotza"
 ```
 
-Then add an `R2_SIGNING_SECRET` Supabase secret and update `download-track`
-(and a new `stream-track`) to mint signed URLs instead of redirecting to the
-raw public URL.
+Then `wrangler secret put R2_SIGNING_SECRET` (use the exact same value as the Supabase secret).
 
-## 3. Local testing
+### `src/worker.ts`
 
-Use a PayFast sandbox account and run a `R5` test purchase. PayFast's sandbox
-will hit your Notify URL exactly like production.
+```ts
+interface Env { BUCKET: R2Bucket; R2_SIGNING_SECRET: string; }
+
+const b64urlDecode = (s: string) => {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+};
+
+const verify = async (payloadB64: string, sigB64: string, secret: string) => {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
+  );
+  return crypto.subtle.verify("HMAC", key, b64urlDecode(sigB64), new TextEncoder().encode(payloadB64));
+};
+
+export default {
+  async fetch(req: Request, env: Env): Promise<Response> {
+    const url = new URL(req.url);
+    const key = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+    const t = url.searchParams.get("t");
+    if (!key || !t) return new Response("missing token", { status: 401 });
+
+    const [payloadB64, sigB64] = t.split(".");
+    if (!payloadB64 || !sigB64) return new Response("bad token", { status: 401 });
+
+    const ok = await verify(payloadB64, sigB64, env.R2_SIGNING_SECRET);
+    if (!ok) return new Response("bad signature", { status: 401 });
+
+    let p: { p: string; e: number; pct: number };
+    try { p = JSON.parse(new TextDecoder().decode(b64urlDecode(payloadB64))); }
+    catch { return new Response("bad payload", { status: 401 }); }
+
+    if (p.e < Date.now()) return new Response("expired", { status: 401 });
+    if (p.p !== key) return new Response("path mismatch", { status: 403 });
+
+    // Read object so we can compute the allowed byte cap.
+    const head = await env.BUCKET.head(key);
+    if (!head) return new Response("not found", { status: 404 });
+    const total = head.size;
+    const maxBytes = Math.max(1, Math.floor(total * Math.min(1, Math.max(0, p.pct))));
+
+    // Parse incoming Range, clamp to maxBytes.
+    const rangeHeader = req.headers.get("Range");
+    let start = 0, end = maxBytes - 1;
+    if (rangeHeader) {
+      const m = /bytes=(\d+)-(\d+)?/.exec(rangeHeader);
+      if (m) {
+        start = parseInt(m[1], 10);
+        end = m[2] ? Math.min(parseInt(m[2], 10), maxBytes - 1) : maxBytes - 1;
+      }
+    }
+    if (start >= maxBytes) return new Response("forbidden range", { status: 416 });
+
+    const obj = await env.BUCKET.get(key, {
+      range: { offset: start, length: end - start + 1 },
+    });
+    if (!obj) return new Response("not found", { status: 404 });
+
+    const headers = new Headers();
+    obj.writeHttpMetadata(headers);
+    headers.set("Content-Length", String(end - start + 1));
+    headers.set("Content-Range", `bytes ${start}-${end}/${total}`);
+    headers.set("Accept-Ranges", "bytes");
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("Access-Control-Allow-Origin", "*");
+
+    return new Response(obj.body, { status: rangeHeader ? 206 : 200, headers });
+  },
+};
+```
+
+## How the pieces fit together
+
+1. Frontend calls `stream-track` edge function with `track_id`, `tier`, and either a paid-`m_payment_id` (`?ref=`) or a logged-in JWT.
+2. Edge function checks entitlement against `payments` / `user_roles`, then mints a short HMAC token bound to the R2 object key and the allowed percentage.
+3. The signed URL is returned to the client; the `<audio>` element fetches it from `newsingle.s2kdotza.com`.
+4. The Worker validates the token and caps the response bytes to the tier's percentage — even if the user scrubs ahead.

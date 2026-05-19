@@ -26,6 +26,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Assistant from "./pages/Assistant";
 import FloatingAssistant from "./components/FloatingAssistant";
 import Unsubscribe from "./pages/Unsubscribe";
+import SandboxPayments from "./pages/SandboxPayments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,11 @@ const App = () => (
               </FounderRoute>
             } />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/sandbox/payments" element={
+              <FounderRoute>
+                <SandboxPayments />
+              </FounderRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <FloatingAssistant />
