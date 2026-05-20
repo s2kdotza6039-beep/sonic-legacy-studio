@@ -179,14 +179,19 @@ function TrackCard({
     a.addEventListener("timeupdate", enforce);
     a.addEventListener("seeking", enforce);
     a.addEventListener("seeked", enforce);
+    a.addEventListener("ratechange", enforce);
     a.addEventListener("loadedmetadata", onMeta);
     a.addEventListener("ended", onEnd);
+    // Continuous watchdog catches any source that bypasses 'seeking' (mobile scrub edge cases)
+    const watchdog = window.setInterval(enforce, 250);
     return () => {
       a.removeEventListener("timeupdate", enforce);
       a.removeEventListener("seeking", enforce);
       a.removeEventListener("seeked", enforce);
+      a.removeEventListener("ratechange", enforce);
       a.removeEventListener("loadedmetadata", onMeta);
       a.removeEventListener("ended", onEnd);
+      window.clearInterval(watchdog);
     };
   }, [allowedSec, capped, track.id]);
 
@@ -245,7 +250,7 @@ function TrackCard({
               <Pause /> Pause
             </Button>
           ) : (
-            <Button onClick={() => setShowTiers(true)} size="lg" className="rounded-full px-6 bg-primary hover:bg-primary/90" disabled={loadingUrl}>
+            <Button data-track-play={track.id} onClick={() => setShowTiers(true)} size="lg" className="rounded-full px-6 bg-primary hover:bg-primary/90" disabled={loadingUrl}>
               {loadingUrl ? <Loader2 className="animate-spin" /> : <Play />} Listen Now
             </Button>
           )}
