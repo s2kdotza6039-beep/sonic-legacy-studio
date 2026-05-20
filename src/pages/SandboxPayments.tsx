@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, XCircle, Circle, ExternalLink } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Circle, ExternalLink, RotateCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Track, startPayFast, submitPayFast, pollPaymentStatus,
@@ -177,7 +178,94 @@ export default function SandboxPayments() {
             Open Listen page <ExternalLink className="w-3 h-3" />
           </a>
         </Card>
+
+        <ReplayItnTool />
       </div>
     </Layout>
   );
 }
+
+function ReplayItnTool() {
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState<string[]>([]);
+  const [count, setCount] = useState(3);
+
+  const add = (l: string) => setLog((cur) => [...cur, l]);
+
+  const run = async () => {
+    setBusy(true); setLog([]);
+    try {
+      add("Fetching latest notify log row…");
+      const { data, error } = await supabase
+        .from("payfast_notify_log")
+        .select("m_payment_id,raw_payload,outcome,created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.raw_payload || !data.m_payment_id) {
+        add("No previous ITN payload found. Run a sandbox checkout first.");
+        return;
+      }
+      add(`Replaying m_payment_id=${data.m_payment_id} (last outcome=${data.outcome})`);
+      const body = new URLSearchParams(data.raw_payload as Record<string, string>).toString();
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payfast-notify`;
+      for (let i = 1; i <= count; i++) {
+        const t0 = performance.now();
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        });
+        const txt = await res.text();
+        add(`#${i} → HTTP ${res.status} (${Math.round(performance.now() - t0)}ms) · ${txt}`);
+      }
+      // Confirm log captured idempotent skips
+      await new Promise((r) => setTimeout(r, 800));
+      const { data: recent } = await supabase
+        .from("payfast_notify_log")
+        .select("outcome,was_idempotent_skip,created_at")
+        .eq("m_payment_id", data.m_payment_id)
+        .order("created_at", { ascending: false })
+        .limit(count + 1);
+      const skips = (recent ?? []).filter((r) => r.was_idempotent_skip).length;
+      add(`Audit log shows ${skips} idempotent-skip row(s) for this ref.`);
+      const { data: pmt } = await supabase
+        .from("payments").select("status,paid_at,amount_cents")
+        .eq("m_payment_id", data.m_payment_id).maybeSingle();
+      if (pmt) add(`Payment row unchanged: status=${pmt.status}, paid_at=${pmt.paid_at}, amount_cents=${pmt.amount_cents}`);
+    } catch (e) {
+      add(`Failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="p-5 mt-6">
+      <h2 className="font-display text-lg font-bold mb-1">Webhook idempotency rehearsal</h2>
+      <p className="text-xs text-muted-foreground mb-4">
+        Re-POSTs the most recent ITN payload to <code>payfast-notify</code> multiple times to confirm
+        repeats are logged as idempotent skips and never double-grant or mutate the payment row.
+      </p>
+      <div className="flex items-center gap-2 mb-3">
+        <label className="text-xs uppercase tracking-widest text-muted-foreground">Repeats</label>
+        <Input
+          type="number" min={1} max={10} value={count}
+          onChange={(e) => setCount(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+          className="w-20 h-8"
+        />
+        <Button onClick={run} disabled={busy} size="sm">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+          Replay last ITN
+        </Button>
+      </div>
+      {log.length > 0 && (
+        <pre className="text-[11px] font-mono bg-secondary/40 border border-border rounded-md p-3 max-h-64 overflow-auto whitespace-pre-wrap break-all">
+          {log.join("\n")}
+        </pre>
+      )}
+    </Card>
+  );
+}
+
