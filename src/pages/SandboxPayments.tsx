@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, XCircle, Circle, ExternalLink, RotateCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -267,7 +268,4 @@ function ReplayItnTool() {
     </Card>
   );
 }
-      </div>
-    </Layout>
-  );
-}
+
