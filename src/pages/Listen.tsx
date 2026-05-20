@@ -371,6 +371,10 @@ function PaymentReturnHandler({ onAccessChange }: { onAccessChange: () => void }
   const ref = params.get("ref");
   const pf = params.get("pf");
   const [busy, setBusy] = useState(false);
+  const [download, setDownload] = useState<{
+    token: string; expiresAt: string; trackId: string;
+    amountCents: number; paidAt: string | null; pfId: string | null; ref: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!ref || !pf) return;
@@ -384,17 +388,28 @@ function PaymentReturnHandler({ onAccessChange }: { onAccessChange: () => void }
       try {
         const res = await pollPaymentStatus(ref);
         if (res.status === "paid") {
-          if (res.kind === "download" && res.download_token) {
-            window.location.href = downloadUrl(res.download_token);
-            toast.success("Download starting…");
+          if (res.kind === "download" && res.download_token && res.download_expires_at) {
+            setDownload({
+              token: res.download_token,
+              expiresAt: res.download_expires_at,
+              trackId: res.track_id,
+              amountCents: res.amount_cents,
+              paidAt: res.paid_at,
+              pfId: res.pf_payment_id,
+              ref,
+            });
+            toast.success("Download ready");
           } else {
             const t = kindToTier(res.kind);
             if (t && res.track_id) {
               grantAccess(res.track_id, t, ref);
               onAccessChange();
+              const trackId = res.track_id;
               toast.success(`${t === "gold" ? "Gold" : "Standard"} unlocked`, {
                 action: { label: "Resume", onClick: () => {
-                  document.querySelector<HTMLButtonElement>(`[data-track-play="${res.track_id}"]`)?.click();
+                  const btn = document.querySelector<HTMLButtonElement>(`[data-track-play="${trackId}"]`);
+                  btn?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  btn?.click();
                 }},
               });
             }
@@ -422,11 +437,90 @@ function PaymentReturnHandler({ onAccessChange }: { onAccessChange: () => void }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref, pf]);
 
-  if (!busy) return null;
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-card border border-border rounded-xl px-4 py-3 shadow-2xl flex items-center gap-3">
-      <Loader2 className="animate-spin text-primary" />
-      <div className="text-sm">Verifying payment…</div>
+    <>
+      {busy && (
+        <div className="fixed bottom-6 right-6 z-50 bg-card border border-border rounded-xl px-4 py-3 shadow-2xl flex items-center gap-3">
+          <Loader2 className="animate-spin text-primary" />
+          <div className="text-sm">Verifying payment…</div>
+        </div>
+      )}
+      {download && (
+        <DownloadConfirmation
+          info={download}
+          onClose={() => setDownload(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function DownloadConfirmation({
+  info, onClose,
+}: {
+  info: { token: string; expiresAt: string; trackId: string; amountCents: number; paidAt: string | null; pfId: string | null; ref: string };
+  onClose: () => void;
+}) {
+  const [now, setNow] = useState(Date.now());
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const remainingMs = new Date(info.expiresAt).getTime() - now;
+  const expired = remainingMs <= 0;
+  const mins = Math.max(0, Math.floor(remainingMs / 60000));
+  const secs = Math.max(0, Math.floor((remainingMs % 60000) / 1000));
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-emerald-500" /> Download ready
+          </DialogTitle>
+          <DialogDescription>
+            Payment confirmed. Your download link is single-use and expires shortly.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="text-xs space-y-1.5 bg-secondary/40 border border-border rounded-md p-3 font-mono">
+          <Row k="Receipt" v={info.ref} />
+          {info.pfId && <Row k="PayFast ID" v={info.pfId} />}
+          <Row k="Amount" v={formatZAR(info.amountCents)} />
+          {info.paidAt && <Row k="Paid at" v={new Date(info.paidAt).toLocaleString()} />}
+        </div>
+
+        <div className={`rounded-md px-3 py-2 text-sm text-center tabular-nums ${expired ? "bg-destructive/15 text-destructive" : "bg-primary/10 text-primary"}`}>
+          {expired
+            ? "Link expired — contact support to re-issue."
+            : <>Link expires in <strong>{mins}:{secs.toString().padStart(2, "0")}</strong></>}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button
+            disabled={expired}
+            onClick={() => {
+              setStarted(true);
+              window.open(downloadUrl(info.token), "_blank", "noopener");
+            }}
+            className="bg-gradient-to-br from-amber-400 to-yellow-600 text-black"
+          >
+            <Download className="w-4 h-4 mr-1" />
+            {started ? "Download again" : "Start download"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="text-muted-foreground">{k}</span>
+      <span className="break-all text-right">{v}</span>
     </div>
   );
 }
