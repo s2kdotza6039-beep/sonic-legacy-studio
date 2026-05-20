@@ -118,7 +118,11 @@ export async function pollPaymentStatus(ref: string) {
     status: "pending" | "paid" | "failed" | "cancelled";
     kind: "tier_standard" | "tier_gold" | "download";
     track_id: string;
+    amount_cents: number;
+    paid_at: string | null;
+    pf_payment_id: string | null;
     download_token: string | null;
+    download_expires_at: string | null;
   }>;
 }
 
