@@ -5,8 +5,9 @@ import { mintStreamToken } from "../_shared/streamSign.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const R2_BASE =
-  (Deno.env.get("R2_PUBLIC_BASE") ?? "https://newsingle.s2kdotza.com").replace(/\/$/, "");
+const R2_BASE_RAW = (Deno.env.get("R2_PUBLIC_BASE") ?? "https://newsingle.s2kdotza.com").trim().replace(/\/$/, "");
+// Defensive: ensure protocol so the browser <audio src> isn't treated as a relative path.
+const R2_BASE = /^https?:\/\//i.test(R2_BASE_RAW) ? R2_BASE_RAW : `https://${R2_BASE_RAW}`;
 
 type Tier = "free" | "standard" | "gold" | "cristal";
 
