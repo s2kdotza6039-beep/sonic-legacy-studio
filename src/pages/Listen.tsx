@@ -170,13 +170,19 @@ function TrackCard({
     const a = audioRef.current;
     if (!a) return;
     const enforce = () => {
-      if (capped && allowedSec > 0 && a.currentTime > allowedSec) {
-        a.currentTime = Math.max(0, allowedSec - 0.25);
-        if (!a.paused) {
+      const result = enforceCap({
+        currentTime: a.currentTime,
+        allowedSec,
+        capped,
+        wasPlaying: !a.paused,
+      });
+      if (result.clamped) {
+        a.currentTime = result.currentTime;
+        if (result.paused && !a.paused) {
           a.pause();
           setPlaying(false);
-          setUpgradePrompt(true);
         }
+        if (result.promptUpgrade) setUpgradePrompt(true);
       }
       setProgress(a.currentTime);
       saveResume(track.id, a.currentTime);
