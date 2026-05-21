@@ -218,13 +218,14 @@ function TrackCard({
     const a = audioRef.current; if (!a || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const target = ratio * duration;
-    if (capped && target > allowedSec) {
-      a.currentTime = Math.max(0, allowedSec - 0.25);
-      setUpgradePrompt(true);
-    } else {
-      a.currentTime = target;
-    }
+    const result = clampSeekTarget({
+      target: ratio * duration,
+      duration,
+      allowedSec,
+      capped,
+    });
+    a.currentTime = result.currentTime;
+    if (result.promptUpgrade) setUpgradePrompt(true);
   };
 
   const standardGain = Math.round((Number(track.pct_standard) - Number(track.pct_free)) * 100);
