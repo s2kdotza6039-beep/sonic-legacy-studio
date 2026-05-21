@@ -136,3 +136,79 @@ export const kindToTier = (kind: string): Tier | null =>
   kind === "tier_standard" ? "standard"
   : kind === "tier_gold" ? "gold"
   : null;
+
+/* ------------------------------------------------------------------ *
+ * Pure playback-cap helpers (kept here so they're unit-testable
+ * independently of the React audio component).
+ * ------------------------------------------------------------------ */
+
+export interface CapState {
+  /** Where the player should jump to. */
+  currentTime: number;
+  /** Whether playback should be paused. */
+  paused: boolean;
+  /** Whether the upgrade prompt should be raised. */
+  promptUpgrade: boolean;
+  /** Whether the helper modified anything. */
+  clamped: boolean;
+}
+
+/**
+ * Enforce the playback cap on a current-time reading. Used by every
+ * source that can advance the playhead: `timeupdate`, `seeking`,
+ * `seeked`, `ratechange`, and the 250 ms mobile watchdog.
+ */
+export function enforceCap(args: {
+  currentTime: number;
+  allowedSec: number;
+  capped: boolean;
+  wasPlaying: boolean;
+  /** Safety margin so the next tick can't immediately re-trigger. */
+  margin?: number;
+}): CapState {
+  const margin = args.margin ?? 0.25;
+  if (!args.capped || args.allowedSec <= 0 || args.currentTime <= args.allowedSec) {
+    return { currentTime: args.currentTime, paused: !args.wasPlaying, promptUpgrade: false, clamped: false };
+  }
+  return {
+    currentTime: Math.max(0, args.allowedSec - margin),
+    paused: true,
+    promptUpgrade: true,
+    clamped: true,
+  };
+}
+
+/**
+ * Clamp a user-requested seek target (mouse scrub, keyboard arrow,
+ * or programmatic `MediaSession.seekto`) to the tier's allowed range.
+ */
+export function clampSeekTarget(args: {
+  target: number;
+  duration: number;
+  allowedSec: number;
+  capped: boolean;
+  margin?: number;
+}): { currentTime: number; promptUpgrade: boolean } {
+  const margin = args.margin ?? 0.25;
+  const bounded = Math.max(0, Math.min(args.duration, args.target));
+  if (args.capped && bounded > args.allowedSec) {
+    return { currentTime: Math.max(0, args.allowedSec - margin), promptUpgrade: true };
+  }
+  return { currentTime: bounded, promptUpgrade: false };
+}
+
+/**
+ * Decide where to resume from on (re)mount. Used after a tier upgrade
+ * and on initial load. Never resumes past the cap.
+ */
+export function resolveResumePosition(args: {
+  saved: number | undefined;
+  duration: number;
+  allowedSec: number;
+  capped: boolean;
+}): number {
+  if (!args.saved || !isFinite(args.saved) || args.saved <= 0) return 0;
+  if (args.saved >= args.duration) return 0;
+  if (args.capped && args.saved >= args.allowedSec) return Math.max(0, args.allowedSec - 0.25);
+  return args.saved;
+}
