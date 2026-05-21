@@ -14,6 +14,7 @@ import {
   loadAccess, loadRefs, grantAccess,
   signedStreamUrl, startPayFast, submitPayFast,
   pollPaymentStatus, downloadUrl, formatZAR, kindToTier,
+  enforceCap, clampSeekTarget, resolveResumePosition,
 } from "@/lib/musicTier";
 
 const TIER_META: Record<Tier, { label: string; pct: string; icon: typeof Crown; gradient: string }> = {
