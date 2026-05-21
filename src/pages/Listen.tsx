@@ -139,7 +139,7 @@ function TrackCard({
     }
     const a = await ensureAudio(tier);
     if (!a) return;
-    const resume = loadResume()[track.id];
+    
     const resume = resolveResumePosition({
       saved: loadResume()[track.id],
       duration: a.duration,
