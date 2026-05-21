@@ -14,6 +14,7 @@ import {
   loadAccess, loadRefs, grantAccess,
   signedStreamUrl, startPayFast, submitPayFast,
   pollPaymentStatus, downloadUrl, formatZAR, kindToTier,
+  enforceCap, clampSeekTarget, resolveResumePosition,
 } from "@/lib/musicTier";
 
 const TIER_META: Record<Tier, { label: string; pct: string; icon: typeof Crown; gradient: string }> = {
@@ -138,8 +139,14 @@ function TrackCard({
     }
     const a = await ensureAudio(tier);
     if (!a) return;
-    const resume = loadResume()[track.id];
-    if (resume && resume < a.duration * tierPercentage(track, tier)) a.currentTime = resume;
+    
+    const resume = resolveResumePosition({
+      saved: loadResume()[track.id],
+      duration: a.duration,
+      allowedSec: a.duration * tierPercentage(track, tier),
+      capped: tier !== "cristal" && tier !== "gold",
+    });
+    if (resume > 0) a.currentTime = resume;
     a.play().then(() => setPlaying(true)).catch(() => toast.error("Playback failed"));
   };
 
@@ -163,13 +170,19 @@ function TrackCard({
     const a = audioRef.current;
     if (!a) return;
     const enforce = () => {
-      if (capped && allowedSec > 0 && a.currentTime > allowedSec) {
-        a.currentTime = Math.max(0, allowedSec - 0.25);
-        if (!a.paused) {
+      const result = enforceCap({
+        currentTime: a.currentTime,
+        allowedSec,
+        capped,
+        wasPlaying: !a.paused,
+      });
+      if (result.clamped) {
+        a.currentTime = result.currentTime;
+        if (result.paused && !a.paused) {
           a.pause();
           setPlaying(false);
-          setUpgradePrompt(true);
         }
+        if (result.promptUpgrade) setUpgradePrompt(true);
       }
       setProgress(a.currentTime);
       saveResume(track.id, a.currentTime);
@@ -205,13 +218,14 @@ function TrackCard({
     const a = audioRef.current; if (!a || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const target = ratio * duration;
-    if (capped && target > allowedSec) {
-      a.currentTime = Math.max(0, allowedSec - 0.25);
-      setUpgradePrompt(true);
-    } else {
-      a.currentTime = target;
-    }
+    const result = clampSeekTarget({
+      target: ratio * duration,
+      duration,
+      allowedSec,
+      capped,
+    });
+    a.currentTime = result.currentTime;
+    if (result.promptUpgrade) setUpgradePrompt(true);
   };
 
   const standardGain = Math.round((Number(track.pct_standard) - Number(track.pct_free)) * 100);
