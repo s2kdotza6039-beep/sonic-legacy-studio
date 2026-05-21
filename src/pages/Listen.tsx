@@ -140,7 +140,13 @@ function TrackCard({
     const a = await ensureAudio(tier);
     if (!a) return;
     const resume = loadResume()[track.id];
-    if (resume && resume < a.duration * tierPercentage(track, tier)) a.currentTime = resume;
+    const resume = resolveResumePosition({
+      saved: loadResume()[track.id],
+      duration: a.duration,
+      allowedSec: a.duration * tierPercentage(track, tier),
+      capped: tier !== "cristal" && tier !== "gold",
+    });
+    if (resume > 0) a.currentTime = resume;
     a.play().then(() => setPlaying(true)).catch(() => toast.error("Playback failed"));
   };
 
