@@ -128,6 +128,23 @@ function TrackCard({
     }
   };
 
+  const prevTierRef = useRef<Tier>(effectiveTier);
+
+  // Detect entitlement upgrades (e.g. after returning from PayFast) and log them.
+  useEffect(() => {
+    if (tierRank[effectiveTier] > tierRank[prevTierRef.current]) {
+      logPlaybackEvent({
+        trackId: track.id,
+        kind: "upgrade_applied",
+        tier: effectiveTier,
+        durationSeconds: duration,
+        metadata: { from: prevTierRef.current, to: effectiveTier },
+      });
+      setUpgradePrompt(false);
+    }
+    prevTierRef.current = effectiveTier;
+  }, [effectiveTier, track.id, duration]);
+
   const handlePlay = async (tier: Tier) => {
     onActivate();
     setShowTiers(false);
@@ -140,14 +157,21 @@ function TrackCard({
     }
     const a = await ensureAudio(tier);
     if (!a) return;
-    
+
     const resume = resolveResumePosition({
       saved: loadResume()[track.id],
       duration: a.duration,
       allowedSec: a.duration * tierPercentage(track, tier),
       capped: tier !== "cristal" && tier !== "gold",
     });
-    if (resume > 0) a.currentTime = resume;
+    if (resume > 0) {
+      a.currentTime = resume;
+      logPlaybackEvent({
+        trackId: track.id, kind: "resume", tier,
+        currentSeconds: resume, durationSeconds: a.duration,
+        paymentRef: loadRefs()[track.id] ?? null,
+      });
+    }
     a.play().then(() => setPlaying(true)).catch(() => toast.error("Playback failed"));
   };
 
