@@ -251,7 +251,7 @@ export function logPlaybackEvent(args: LogArgs): void {
   void (async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("playback_events").insert({
+      await supabase.from("playback_events").insert([{
         user_id: user?.id ?? null,
         track_id: args.trackId,
         event_kind: args.kind,
@@ -262,7 +262,7 @@ export function logPlaybackEvent(args: LogArgs): void {
         payment_ref: args.paymentRef ?? null,
         metadata: args.metadata ?? {},
         user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 300) : null,
-      });
+      }] as never);
     } catch {
       /* swallow */
     }
