@@ -567,15 +567,86 @@ function DownloadConfirmation({
   onClose: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
+  const [token, setToken] = useState(info.token);
+  const [expiresAt, setExpiresAt] = useState(info.expiresAt);
   const [started, setStarted] = useState(false);
+  const [reUnlocking, setReUnlocking] = useState(false);
+  const [reissueChecked, setReissueChecked] = useState(false);
+
+  // 1-second tick for the countdown display.
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
-  const remainingMs = new Date(info.expiresAt).getTime() - now;
+
+  const remainingMs = new Date(expiresAt).getTime() - now;
   const expired = remainingMs <= 0;
   const mins = Math.max(0, Math.floor(remainingMs / 60000));
   const secs = Math.max(0, Math.floor((remainingMs % 60000) / 1000));
+  const lowTime = !expired && remainingMs < 60_000;
+
+  // Every 30s while the dialog is open, re-poll payment-status. This lets the
+  // backend hand us a freshly re-issued token if the user kept the dialog up
+  // past the original expiry (or if the link was rotated server-side).
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await pollPaymentStatus(info.ref);
+        if (cancelled) return;
+        if (res.status === "paid" && res.download_token && res.download_expires_at) {
+          if (res.download_token !== token) {
+            setToken(res.download_token);
+            setExpiresAt(res.download_expires_at);
+            toast.success("Download link refreshed");
+          } else if (res.download_expires_at !== expiresAt) {
+            setExpiresAt(res.download_expires_at);
+          }
+        }
+      } catch { /* silent */ }
+    };
+    const t = window.setInterval(check, 30_000);
+    return () => { cancelled = true; window.clearInterval(t); };
+  }, [info.ref, token, expiresAt]);
+
+  // When the timer hits zero, do one immediate re-check before showing the
+  // re-unlock CTA — covers the case where the backend already rotated the token.
+  useEffect(() => {
+    if (!expired || reissueChecked) return;
+    setReissueChecked(true);
+    (async () => {
+      try {
+        const res = await pollPaymentStatus(info.ref);
+        if (res.status === "paid" && res.download_token && res.download_expires_at) {
+          const fresh = new Date(res.download_expires_at).getTime();
+          if (fresh > Date.now()) {
+            setToken(res.download_token);
+            setExpiresAt(res.download_expires_at);
+            toast.success("Download link renewed");
+            return;
+          }
+        }
+        logPlaybackEvent({
+          trackId: info.trackId, kind: "re_unlock_prompt",
+          paymentRef: info.ref, metadata: { reason: "token_expired" },
+        });
+      } catch { /* silent */ }
+    })();
+  }, [expired, reissueChecked, info.ref, info.trackId]);
+
+  const handleReUnlock = async () => {
+    setReUnlocking(true);
+    try {
+      const { checkout_url, fields, m_payment_id } = await startPayFast({
+        track_id: info.trackId, kind: "download",
+      });
+      sessionStorage.setItem(`pf.pending.${m_payment_id}`, JSON.stringify({ track_id: info.trackId, kind: "download" }));
+      submitPayFast(checkout_url, fields);
+    } catch {
+      toast.error("Could not restart checkout");
+      setReUnlocking(false);
+    }
+  };
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -596,25 +667,46 @@ function DownloadConfirmation({
           {info.paidAt && <Row k="Paid at" v={new Date(info.paidAt).toLocaleString()} />}
         </div>
 
-        <div className={`rounded-md px-3 py-2 text-sm text-center tabular-nums ${expired ? "bg-destructive/15 text-destructive" : "bg-primary/10 text-primary"}`}>
+        <div className={`rounded-md px-3 py-2 text-sm text-center tabular-nums ${
+          expired ? "bg-destructive/15 text-destructive"
+          : lowTime ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+          : "bg-primary/10 text-primary"
+        }`}>
           {expired
-            ? "Link expired — contact support to re-issue."
+            ? "Download link expired."
             : <>Link expires in <strong>{mins}:{secs.toString().padStart(2, "0")}</strong></>}
         </div>
 
+        {expired && (
+          <div className="text-xs text-muted-foreground text-center">
+            Your payment is still recorded under receipt <span className="font-mono">{info.ref}</span>.
+            Re-unlock to generate a fresh signed link.
+          </div>
+        )}
+
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button
-            disabled={expired}
-            onClick={() => {
-              setStarted(true);
-              window.open(downloadUrl(info.token), "_blank", "noopener");
-            }}
-            className="bg-gradient-to-br from-amber-400 to-yellow-600 text-black"
-          >
-            <Download className="w-4 h-4 mr-1" />
-            {started ? "Download again" : "Start download"}
-          </Button>
+          {expired ? (
+            <Button
+              onClick={handleReUnlock}
+              disabled={reUnlocking}
+              className="bg-gradient-to-br from-amber-400 to-yellow-600 text-black"
+            >
+              {reUnlocking ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+              Re-unlock download
+            </Button>
+          ) : (
+            <Button
+              onClick={() => {
+                setStarted(true);
+                window.open(downloadUrl(token), "_blank", "noopener");
+              }}
+              className="bg-gradient-to-br from-amber-400 to-yellow-600 text-black"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              {started ? "Download again" : "Start download"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
