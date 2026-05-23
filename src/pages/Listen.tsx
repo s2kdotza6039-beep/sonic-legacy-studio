@@ -191,10 +191,32 @@ function TrackCard({
   };
 
   // Playback monitor: enforce cap on time updates AND on seek attempts.
+  // Also handles tab visibility changes + buffering, and prevents the upgrade
+  // prompt from being re-shown in a loop while the user is mid-seek.
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
-    const enforce = () => {
+    let promptArmed = true;          // re-arms after the user moves below the cap
+    let lastClampLog = 0;            // local throttle for verbose log kinds
+
+    const log = (kind: "clamp" | "watchdog_clamp" | "seek_blocked", extra: Record<string, unknown> = {}) => {
+      const now = Date.now();
+      if (now - lastClampLog < 800) return;
+      lastClampLog = now;
+      logPlaybackEvent({
+        trackId: track.id, kind, tier: effectiveTier,
+        currentSeconds: a.currentTime,
+        allowedSeconds: allowedSec,
+        durationSeconds: a.duration || duration,
+        metadata: { readyState: a.readyState, paused: a.paused, ...extra },
+      });
+    };
+
+    const enforce = (source: "timeupdate" | "seeking" | "seeked" | "ratechange" | "watchdog") => () => {
+      // Don't fight the browser while it's still buffering after a seek —
+      // currentTime can be stale and trigger a false clamp loop.
+      if (a.readyState < 2 && source === "watchdog") return;
+
       const result = enforceCap({
         currentTime: a.currentTime,
         allowedSec,
@@ -207,31 +229,68 @@ function TrackCard({
           a.pause();
           setPlaying(false);
         }
-        if (result.promptUpgrade) setUpgradePrompt(true);
+        if (result.promptUpgrade && promptArmed) {
+          setUpgradePrompt(true);
+          promptArmed = false;
+        }
+        log(source === "watchdog" ? "watchdog_clamp" : source === "seeking" || source === "seeked" ? "seek_blocked" : "clamp", { source });
+      } else if (capped && a.currentTime < allowedSec - 1) {
+        // User scrubbed back below the cap — re-arm the upgrade prompt so a
+        // fresh clamp later still surfaces the dialog.
+        promptArmed = true;
       }
       setProgress(a.currentTime);
       saveResume(track.id, a.currentTime);
     };
+
+    const onTimeUpdate = enforce("timeupdate");
+    const onSeeking    = enforce("seeking");
+    const onSeeked     = enforce("seeked");
+    const onRateChange = enforce("ratechange");
+    const onWatchdog   = enforce("watchdog");
+
     const onMeta = () => setDuration(a.duration);
     const onEnd = () => setPlaying(false);
-    a.addEventListener("timeupdate", enforce);
-    a.addEventListener("seeking", enforce);
-    a.addEventListener("seeked", enforce);
-    a.addEventListener("ratechange", enforce);
+
+    // Pause the watchdog while the tab is hidden to avoid spurious clamps
+    // when the browser throttles timers; re-sync entitlements on return.
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        const fresh = loadAccess();
+        const owned = fresh[track.id] ?? "free";
+        if (tierRank[owned] > tierRank[unlockedTier]) {
+          onAccessChange();
+          logPlaybackEvent({
+            trackId: track.id, kind: "tab_resume", tier: owned,
+            metadata: { previous: unlockedTier },
+          });
+        }
+        // Re-run enforce after the tab regains focus so a stale currentTime
+        // gets snapped before playback resumes.
+        onWatchdog();
+      }
+    };
+
+    a.addEventListener("timeupdate", onTimeUpdate);
+    a.addEventListener("seeking", onSeeking);
+    a.addEventListener("seeked", onSeeked);
+    a.addEventListener("ratechange", onRateChange);
     a.addEventListener("loadedmetadata", onMeta);
     a.addEventListener("ended", onEnd);
-    // Continuous watchdog catches any source that bypasses 'seeking' (mobile scrub edge cases)
-    const watchdog = window.setInterval(enforce, 250);
+    document.addEventListener("visibilitychange", onVisibility);
+    const watchdog = window.setInterval(onWatchdog, 250);
+
     return () => {
-      a.removeEventListener("timeupdate", enforce);
-      a.removeEventListener("seeking", enforce);
-      a.removeEventListener("seeked", enforce);
-      a.removeEventListener("ratechange", enforce);
+      a.removeEventListener("timeupdate", onTimeUpdate);
+      a.removeEventListener("seeking", onSeeking);
+      a.removeEventListener("seeked", onSeeked);
+      a.removeEventListener("ratechange", onRateChange);
       a.removeEventListener("loadedmetadata", onMeta);
       a.removeEventListener("ended", onEnd);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(watchdog);
     };
-  }, [allowedSec, capped, track.id]);
+  }, [allowedSec, capped, track.id, effectiveTier, duration, unlockedTier, onAccessChange]);
 
   const togglePause = () => {
     const a = audioRef.current; if (!a) return;
@@ -250,7 +309,14 @@ function TrackCard({
       capped,
     });
     a.currentTime = result.currentTime;
-    if (result.promptUpgrade) setUpgradePrompt(true);
+    if (result.promptUpgrade) {
+      setUpgradePrompt(true);
+      logPlaybackEvent({
+        trackId: track.id, kind: "seek_blocked", tier: effectiveTier,
+        currentSeconds: ratio * duration, allowedSeconds: allowedSec, durationSeconds: duration,
+        metadata: { source: "click_seek", requested: ratio * duration },
+      });
+    }
   };
 
   const standardGain = Math.round((Number(track.pct_standard) - Number(track.pct_free)) * 100);
