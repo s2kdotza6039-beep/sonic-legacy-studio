@@ -1387,6 +1387,59 @@ export type Database = {
           },
         ]
       }
+      playback_events: {
+        Row: {
+          allowed_seconds: number | null
+          created_at: string
+          current_seconds: number | null
+          duration_seconds: number | null
+          event_kind: string
+          id: string
+          metadata: Json
+          payment_ref: string | null
+          tier: string | null
+          track_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          allowed_seconds?: number | null
+          created_at?: string
+          current_seconds?: number | null
+          duration_seconds?: number | null
+          event_kind: string
+          id?: string
+          metadata?: Json
+          payment_ref?: string | null
+          tier?: string | null
+          track_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          allowed_seconds?: number | null
+          created_at?: string
+          current_seconds?: number | null
+          duration_seconds?: number | null
+          event_kind?: string
+          id?: string
+          metadata?: Json
+          payment_ref?: string | null
+          tier?: string | null
+          track_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playback_events_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

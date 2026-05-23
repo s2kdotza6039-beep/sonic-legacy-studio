@@ -15,6 +15,7 @@ import {
   signedStreamUrl, startPayFast, submitPayFast,
   pollPaymentStatus, downloadUrl, formatZAR, kindToTier,
   enforceCap, clampSeekTarget, resolveResumePosition,
+  logPlaybackEvent,
 } from "@/lib/musicTier";
 
 const TIER_META: Record<Tier, { label: string; pct: string; icon: typeof Crown; gradient: string }> = {
@@ -127,6 +128,23 @@ function TrackCard({
     }
   };
 
+  const prevTierRef = useRef<Tier>(effectiveTier);
+
+  // Detect entitlement upgrades (e.g. after returning from PayFast) and log them.
+  useEffect(() => {
+    if (tierRank[effectiveTier] > tierRank[prevTierRef.current]) {
+      logPlaybackEvent({
+        trackId: track.id,
+        kind: "upgrade_applied",
+        tier: effectiveTier,
+        durationSeconds: duration,
+        metadata: { from: prevTierRef.current, to: effectiveTier },
+      });
+      setUpgradePrompt(false);
+    }
+    prevTierRef.current = effectiveTier;
+  }, [effectiveTier, track.id, duration]);
+
   const handlePlay = async (tier: Tier) => {
     onActivate();
     setShowTiers(false);
@@ -139,14 +157,21 @@ function TrackCard({
     }
     const a = await ensureAudio(tier);
     if (!a) return;
-    
+
     const resume = resolveResumePosition({
       saved: loadResume()[track.id],
       duration: a.duration,
       allowedSec: a.duration * tierPercentage(track, tier),
       capped: tier !== "cristal" && tier !== "gold",
     });
-    if (resume > 0) a.currentTime = resume;
+    if (resume > 0) {
+      a.currentTime = resume;
+      logPlaybackEvent({
+        trackId: track.id, kind: "resume", tier,
+        currentSeconds: resume, durationSeconds: a.duration,
+        paymentRef: loadRefs()[track.id] ?? null,
+      });
+    }
     a.play().then(() => setPlaying(true)).catch(() => toast.error("Playback failed"));
   };
 
@@ -166,10 +191,32 @@ function TrackCard({
   };
 
   // Playback monitor: enforce cap on time updates AND on seek attempts.
+  // Also handles tab visibility changes + buffering, and prevents the upgrade
+  // prompt from being re-shown in a loop while the user is mid-seek.
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
-    const enforce = () => {
+    let promptArmed = true;          // re-arms after the user moves below the cap
+    let lastClampLog = 0;            // local throttle for verbose log kinds
+
+    const log = (kind: "clamp" | "watchdog_clamp" | "seek_blocked", extra: Record<string, unknown> = {}) => {
+      const now = Date.now();
+      if (now - lastClampLog < 800) return;
+      lastClampLog = now;
+      logPlaybackEvent({
+        trackId: track.id, kind, tier: effectiveTier,
+        currentSeconds: a.currentTime,
+        allowedSeconds: allowedSec,
+        durationSeconds: a.duration || duration,
+        metadata: { readyState: a.readyState, paused: a.paused, ...extra },
+      });
+    };
+
+    const enforce = (source: "timeupdate" | "seeking" | "seeked" | "ratechange" | "watchdog") => () => {
+      // Don't fight the browser while it's still buffering after a seek —
+      // currentTime can be stale and trigger a false clamp loop.
+      if (a.readyState < 2 && source === "watchdog") return;
+
       const result = enforceCap({
         currentTime: a.currentTime,
         allowedSec,
@@ -182,31 +229,68 @@ function TrackCard({
           a.pause();
           setPlaying(false);
         }
-        if (result.promptUpgrade) setUpgradePrompt(true);
+        if (result.promptUpgrade && promptArmed) {
+          setUpgradePrompt(true);
+          promptArmed = false;
+        }
+        log(source === "watchdog" ? "watchdog_clamp" : source === "seeking" || source === "seeked" ? "seek_blocked" : "clamp", { source });
+      } else if (capped && a.currentTime < allowedSec - 1) {
+        // User scrubbed back below the cap — re-arm the upgrade prompt so a
+        // fresh clamp later still surfaces the dialog.
+        promptArmed = true;
       }
       setProgress(a.currentTime);
       saveResume(track.id, a.currentTime);
     };
+
+    const onTimeUpdate = enforce("timeupdate");
+    const onSeeking    = enforce("seeking");
+    const onSeeked     = enforce("seeked");
+    const onRateChange = enforce("ratechange");
+    const onWatchdog   = enforce("watchdog");
+
     const onMeta = () => setDuration(a.duration);
     const onEnd = () => setPlaying(false);
-    a.addEventListener("timeupdate", enforce);
-    a.addEventListener("seeking", enforce);
-    a.addEventListener("seeked", enforce);
-    a.addEventListener("ratechange", enforce);
+
+    // Pause the watchdog while the tab is hidden to avoid spurious clamps
+    // when the browser throttles timers; re-sync entitlements on return.
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        const fresh = loadAccess();
+        const owned = fresh[track.id] ?? "free";
+        if (tierRank[owned] > tierRank[unlockedTier]) {
+          onAccessChange();
+          logPlaybackEvent({
+            trackId: track.id, kind: "tab_resume", tier: owned,
+            metadata: { previous: unlockedTier },
+          });
+        }
+        // Re-run enforce after the tab regains focus so a stale currentTime
+        // gets snapped before playback resumes.
+        onWatchdog();
+      }
+    };
+
+    a.addEventListener("timeupdate", onTimeUpdate);
+    a.addEventListener("seeking", onSeeking);
+    a.addEventListener("seeked", onSeeked);
+    a.addEventListener("ratechange", onRateChange);
     a.addEventListener("loadedmetadata", onMeta);
     a.addEventListener("ended", onEnd);
-    // Continuous watchdog catches any source that bypasses 'seeking' (mobile scrub edge cases)
-    const watchdog = window.setInterval(enforce, 250);
+    document.addEventListener("visibilitychange", onVisibility);
+    const watchdog = window.setInterval(onWatchdog, 250);
+
     return () => {
-      a.removeEventListener("timeupdate", enforce);
-      a.removeEventListener("seeking", enforce);
-      a.removeEventListener("seeked", enforce);
-      a.removeEventListener("ratechange", enforce);
+      a.removeEventListener("timeupdate", onTimeUpdate);
+      a.removeEventListener("seeking", onSeeking);
+      a.removeEventListener("seeked", onSeeked);
+      a.removeEventListener("ratechange", onRateChange);
       a.removeEventListener("loadedmetadata", onMeta);
       a.removeEventListener("ended", onEnd);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(watchdog);
     };
-  }, [allowedSec, capped, track.id]);
+  }, [allowedSec, capped, track.id, effectiveTier, duration, unlockedTier, onAccessChange]);
 
   const togglePause = () => {
     const a = audioRef.current; if (!a) return;
@@ -225,7 +309,14 @@ function TrackCard({
       capped,
     });
     a.currentTime = result.currentTime;
-    if (result.promptUpgrade) setUpgradePrompt(true);
+    if (result.promptUpgrade) {
+      setUpgradePrompt(true);
+      logPlaybackEvent({
+        trackId: track.id, kind: "seek_blocked", tier: effectiveTier,
+        currentSeconds: ratio * duration, allowedSeconds: allowedSec, durationSeconds: duration,
+        metadata: { source: "click_seek", requested: ratio * duration },
+      });
+    }
   };
 
   const standardGain = Math.round((Number(track.pct_standard) - Number(track.pct_free)) * 100);
@@ -476,15 +567,86 @@ function DownloadConfirmation({
   onClose: () => void;
 }) {
   const [now, setNow] = useState(Date.now());
+  const [token, setToken] = useState(info.token);
+  const [expiresAt, setExpiresAt] = useState(info.expiresAt);
   const [started, setStarted] = useState(false);
+  const [reUnlocking, setReUnlocking] = useState(false);
+  const [reissueChecked, setReissueChecked] = useState(false);
+
+  // 1-second tick for the countdown display.
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
-  const remainingMs = new Date(info.expiresAt).getTime() - now;
+
+  const remainingMs = new Date(expiresAt).getTime() - now;
   const expired = remainingMs <= 0;
   const mins = Math.max(0, Math.floor(remainingMs / 60000));
   const secs = Math.max(0, Math.floor((remainingMs % 60000) / 1000));
+  const lowTime = !expired && remainingMs < 60_000;
+
+  // Every 30s while the dialog is open, re-poll payment-status. This lets the
+  // backend hand us a freshly re-issued token if the user kept the dialog up
+  // past the original expiry (or if the link was rotated server-side).
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await pollPaymentStatus(info.ref);
+        if (cancelled) return;
+        if (res.status === "paid" && res.download_token && res.download_expires_at) {
+          if (res.download_token !== token) {
+            setToken(res.download_token);
+            setExpiresAt(res.download_expires_at);
+            toast.success("Download link refreshed");
+          } else if (res.download_expires_at !== expiresAt) {
+            setExpiresAt(res.download_expires_at);
+          }
+        }
+      } catch { /* silent */ }
+    };
+    const t = window.setInterval(check, 30_000);
+    return () => { cancelled = true; window.clearInterval(t); };
+  }, [info.ref, token, expiresAt]);
+
+  // When the timer hits zero, do one immediate re-check before showing the
+  // re-unlock CTA — covers the case where the backend already rotated the token.
+  useEffect(() => {
+    if (!expired || reissueChecked) return;
+    setReissueChecked(true);
+    (async () => {
+      try {
+        const res = await pollPaymentStatus(info.ref);
+        if (res.status === "paid" && res.download_token && res.download_expires_at) {
+          const fresh = new Date(res.download_expires_at).getTime();
+          if (fresh > Date.now()) {
+            setToken(res.download_token);
+            setExpiresAt(res.download_expires_at);
+            toast.success("Download link renewed");
+            return;
+          }
+        }
+        logPlaybackEvent({
+          trackId: info.trackId, kind: "re_unlock_prompt",
+          paymentRef: info.ref, metadata: { reason: "token_expired" },
+        });
+      } catch { /* silent */ }
+    })();
+  }, [expired, reissueChecked, info.ref, info.trackId]);
+
+  const handleReUnlock = async () => {
+    setReUnlocking(true);
+    try {
+      const { checkout_url, fields, m_payment_id } = await startPayFast({
+        track_id: info.trackId, kind: "download",
+      });
+      sessionStorage.setItem(`pf.pending.${m_payment_id}`, JSON.stringify({ track_id: info.trackId, kind: "download" }));
+      submitPayFast(checkout_url, fields);
+    } catch {
+      toast.error("Could not restart checkout");
+      setReUnlocking(false);
+    }
+  };
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -505,25 +667,46 @@ function DownloadConfirmation({
           {info.paidAt && <Row k="Paid at" v={new Date(info.paidAt).toLocaleString()} />}
         </div>
 
-        <div className={`rounded-md px-3 py-2 text-sm text-center tabular-nums ${expired ? "bg-destructive/15 text-destructive" : "bg-primary/10 text-primary"}`}>
+        <div className={`rounded-md px-3 py-2 text-sm text-center tabular-nums ${
+          expired ? "bg-destructive/15 text-destructive"
+          : lowTime ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+          : "bg-primary/10 text-primary"
+        }`}>
           {expired
-            ? "Link expired — contact support to re-issue."
+            ? "Download link expired."
             : <>Link expires in <strong>{mins}:{secs.toString().padStart(2, "0")}</strong></>}
         </div>
 
+        {expired && (
+          <div className="text-xs text-muted-foreground text-center">
+            Your payment is still recorded under receipt <span className="font-mono">{info.ref}</span>.
+            Re-unlock to generate a fresh signed link.
+          </div>
+        )}
+
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button
-            disabled={expired}
-            onClick={() => {
-              setStarted(true);
-              window.open(downloadUrl(info.token), "_blank", "noopener");
-            }}
-            className="bg-gradient-to-br from-amber-400 to-yellow-600 text-black"
-          >
-            <Download className="w-4 h-4 mr-1" />
-            {started ? "Download again" : "Start download"}
-          </Button>
+          {expired ? (
+            <Button
+              onClick={handleReUnlock}
+              disabled={reUnlocking}
+              className="bg-gradient-to-br from-amber-400 to-yellow-600 text-black"
+            >
+              {reUnlocking ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+              Re-unlock download
+            </Button>
+          ) : (
+            <Button
+              onClick={() => {
+                setStarted(true);
+                window.open(downloadUrl(token), "_blank", "noopener");
+              }}
+              className="bg-gradient-to-br from-amber-400 to-yellow-600 text-black"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              {started ? "Download again" : "Start download"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

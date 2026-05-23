@@ -212,3 +212,59 @@ export function resolveResumePosition(args: {
   if (args.capped && args.saved >= args.allowedSec) return Math.max(0, args.allowedSec - 0.25);
   return args.saved;
 }
+
+/* ------------------------------------------------------------------ *
+ * Playback audit logging — fire-and-forget; never blocks playback.
+ * ------------------------------------------------------------------ */
+
+export type PlaybackEventKind =
+  | "clamp"
+  | "resume"
+  | "upgrade_applied"
+  | "seek_blocked"
+  | "watchdog_clamp"
+  | "tab_resume"
+  | "re_unlock_prompt";
+
+interface LogArgs {
+  trackId: string;
+  kind: PlaybackEventKind;
+  tier?: Tier | null;
+  currentSeconds?: number;
+  allowedSeconds?: number;
+  durationSeconds?: number;
+  paymentRef?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+// Per-event throttling so the 250ms watchdog can't spam the table.
+const lastLogged = new Map<string, number>();
+const THROTTLE_MS = 1500;
+
+export function logPlaybackEvent(args: LogArgs): void {
+  const key = `${args.trackId}:${args.kind}`;
+  const now = Date.now();
+  const last = lastLogged.get(key) ?? 0;
+  if (now - last < THROTTLE_MS) return;
+  lastLogged.set(key, now);
+
+  void (async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("playback_events").insert([{
+        user_id: user?.id ?? null,
+        track_id: args.trackId,
+        event_kind: args.kind,
+        tier: args.tier ?? null,
+        current_seconds: args.currentSeconds ?? null,
+        allowed_seconds: args.allowedSeconds ?? null,
+        duration_seconds: args.durationSeconds ?? null,
+        payment_ref: args.paymentRef ?? null,
+        metadata: args.metadata ?? {},
+        user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 300) : null,
+      }] as never);
+    } catch {
+      /* swallow */
+    }
+  })();
+}

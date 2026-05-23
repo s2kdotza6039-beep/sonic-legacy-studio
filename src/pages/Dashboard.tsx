@@ -1,7 +1,8 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity } from "lucide-react";
 import MusicAdmin from "@/components/dashboard/MusicAdmin";
 import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
+import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +37,7 @@ const TABS = [
   { key: "betting", label: "AI Betting", icon: Target },
   { key: "music", label: "Music Admin", icon: Headphones },
   { key: "payfast", label: "PayFast Log", icon: ReceiptText },
+  { key: "playback", label: "Playback Log", icon: Activity },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -121,6 +123,7 @@ const Dashboard = () => {
             {tab === "betting" && <BettingSystem />}
             {tab === "music" && <MusicAdmin />}
             {tab === "payfast" && <PayFastAuditLog />}
+            {tab === "playback" && <PlaybackAuditLog />}
           </div>
           <div>
             <RemindersPanel />
