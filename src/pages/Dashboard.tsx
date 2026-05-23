@@ -123,6 +123,7 @@ const Dashboard = () => {
             {tab === "betting" && <BettingSystem />}
             {tab === "music" && <MusicAdmin />}
             {tab === "payfast" && <PayFastAuditLog />}
+            {tab === "playback" && <PlaybackAuditLog />}
           </div>
           <div>
             <RemindersPanel />
