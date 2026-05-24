@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, Star, Disc3 } from "lucide-react";
+import CloudflareCloudButton from "@/components/CloudflareCloudButton";
 
 interface Release {
   id: string;
@@ -223,6 +224,13 @@ export default function ReleasesManager() {
                 <span>{r.release_type}</span>
                 <span className="text-primary/80">{r.status}</span>
               </div>
+
+              <CloudflareCloudButton
+                release={r}
+                source="releases-admin"
+                compact
+                label="Cloud"
+              />
 
               <button
                 onClick={() => toggleFeatured(r)}
