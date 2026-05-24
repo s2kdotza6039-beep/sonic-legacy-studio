@@ -1467,6 +1467,45 @@ export type Database = {
         }
         Relationships: []
       }
+      release_clicks: {
+        Row: {
+          artist_name: string | null
+          created_at: string
+          destination_url: string
+          id: string
+          referrer: string | null
+          release_id: string | null
+          release_title: string | null
+          source: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          artist_name?: string | null
+          created_at?: string
+          destination_url: string
+          id?: string
+          referrer?: string | null
+          release_id?: string | null
+          release_title?: string | null
+          source?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          artist_name?: string | null
+          created_at?: string
+          destination_url?: string
+          id?: string
+          referrer?: string | null
+          release_id?: string | null
+          release_title?: string | null
+          source?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       releases: {
         Row: {
           artist_id: string
