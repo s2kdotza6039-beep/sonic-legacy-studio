@@ -10,7 +10,9 @@ export interface TemplateEntry {
 }
 
 import { template as adhocMessage } from './adhoc-message.tsx'
+import { template as securityDailyReport } from './security-daily-report.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'adhoc-message': adhocMessage,
+  'security-daily-report': securityDailyReport,
 }
