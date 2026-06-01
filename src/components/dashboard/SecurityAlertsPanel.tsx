@@ -345,6 +345,83 @@ export default function SecurityAlertsPanel() {
         </CardContent>
       </Card>
 
+      {/* Dry-run test result */}
+      {testResult && (
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FlaskConical className="w-4 h-4" /> Dry-run: {String(testResult._rule ?? "")}
+              </CardTitle>
+              <CardDescription>
+                Simulated evaluation. No email or webhook was sent and no dispatch row was written.
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setTestResult(null)}><X className="w-4 h-4" /></Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${testResult.would_fire ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"}`}>
+                {testResult.would_fire ? "WOULD FIRE" : "below threshold"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                matched={String(testResult.matched ?? 0)} · threshold={String(testResult.threshold ?? 0)} · window={String(testResult.window_minutes ?? 0)}m
+              </span>
+            </div>
+            <pre className="text-[11px] font-mono bg-secondary/30 p-3 rounded overflow-x-auto">{JSON.stringify(testResult, null, 2)}</pre>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Channel defaults */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Settings2 className="w-4 h-4" /> Channel destinations & cooldowns
+          </CardTitle>
+          <CardDescription>
+            Bulk-apply a destination or cooldown to every rule on a channel. Validated server-side
+            (email format / https://). Per-rule overrides remain available in the table above.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2 p-3 border border-border rounded-md bg-secondary/20">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email</div>
+            <div className="flex gap-2">
+              <Input placeholder="alerts@you.com" value={defaultEmailDest} onChange={(e) => setDefaultEmailDest(e.target.value)} />
+              <Button size="sm" variant="outline" disabled={busy || !defaultEmailDest}
+                onClick={() => applyChannelDestination("email", defaultEmailDest)}>Apply</Button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-muted-foreground w-28">Cooldown (min)</span>
+              <Input type="number" min={0} value={emailCooldown} onChange={(e) => setEmailCooldown(Number(e.target.value))} />
+              <Button size="sm" variant="outline" disabled={busy}
+                onClick={() => applyChannelCooldown("email", emailCooldown)}>Apply</Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {rules.filter((r) => r.channel === "email").length} email rule(s) currently configured.
+            </p>
+          </div>
+          <div className="space-y-2 p-3 border border-border rounded-md bg-secondary/20">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Webhook</div>
+            <div className="flex gap-2">
+              <Input placeholder="https://hooks.example.com/..." value={defaultWebhookDest} onChange={(e) => setDefaultWebhookDest(e.target.value)} />
+              <Button size="sm" variant="outline" disabled={busy || !defaultWebhookDest}
+                onClick={() => applyChannelDestination("webhook", defaultWebhookDest)}>Apply</Button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-muted-foreground w-28">Cooldown (min)</span>
+              <Input type="number" min={0} value={webhookCooldown} onChange={(e) => setWebhookCooldown(Number(e.target.value))} />
+              <Button size="sm" variant="outline" disabled={busy}
+                onClick={() => applyChannelCooldown("webhook", webhookCooldown)}>Apply</Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {rules.filter((r) => r.channel === "webhook").length} webhook rule(s) currently configured.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Dead-letter queue */}
       <Card>
         <CardHeader>
