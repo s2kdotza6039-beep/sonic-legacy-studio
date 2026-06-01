@@ -60,6 +60,15 @@ const validateDestination = (channel: Rule["channel"], dest: string) => {
   return dest.startsWith("https://");
 };
 
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="p-2 rounded border border-border bg-secondary/20">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="font-mono text-sm">{value}</div>
+    </div>
+  );
+}
+
 export default function SecurityAlertsPanel() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [dlq, setDlq] = useState<DlqRow[]>([]);
