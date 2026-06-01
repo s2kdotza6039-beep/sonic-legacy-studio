@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight, Download, X } from "lucide-react";
 
 type Preview = { subject: string; html: string; templateData: Record<string, unknown> };
 
@@ -22,12 +22,27 @@ type HistoryRow = {
 const PAGE_SIZE = 25;
 
 type SortKey = "date_desc" | "date_asc" | "status" | "top_rule";
+type StatusKey = "ok" | "partial" | "failed" | "unknown";
 
 const topRuleFor = (row: HistoryRow): string => {
   const td = row.metadata?.template_data as { top_meta_rules?: Array<{ rule_name?: string; name?: string }> } | undefined;
   const list = td?.top_meta_rules ?? [];
   const first = list[0];
   return (first?.rule_name ?? first?.name ?? "").toString();
+};
+
+const summarizeRow = (row: HistoryRow) => {
+  const sent = row.metadata?.sent_results ?? [];
+  const recipients = row.metadata?.recipients ?? [];
+  const okCount = sent.filter((s) => s.ok).length;
+  const total = sent.length || recipients.length;
+  const status: StatusKey = total === 0 ? "unknown" : okCount === total ? "ok" : okCount === 0 ? "failed" : "partial";
+  return { okCount, total, status };
+};
+
+const csvCell = (v: unknown) => {
+  const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
 export default function SecurityDailyDigestRunner() {
@@ -43,6 +58,9 @@ export default function SecurityDailyDigestRunner() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date_desc");
+  const [statusFilters, setStatusFilters] = useState<Set<StatusKey>>(new Set());
+  const [topRuleFilter, setTopRuleFilter] = useState<string>("");
+  const [exporting, setExporting] = useState(false);
 
   const loadHistory = async (resetPage = false) => {
     setHistoryLoading(true);
@@ -58,8 +76,6 @@ export default function SecurityDailyDigestRunner() {
       end.setHours(23, 59, 59, 999);
       q = q.lte("created_at", end.toISOString());
     }
-    // Date sort is server-side; other sorts fetch by date desc and reorder
-    // the visible page client-side.
     const ascending = sortKey === "date_asc";
     const { data, count } = await q
       .order("created_at", { ascending })
@@ -72,7 +88,18 @@ export default function SecurityDailyDigestRunner() {
   useEffect(() => { loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page, sortKey]);
 
   const applyFilters = () => loadHistory(true);
-  const clearFilters = () => { setDateFrom(""); setDateTo(""); setPage(0); setTimeout(() => loadHistory(true), 0); };
+  const clearFilters = () => {
+    setDateFrom(""); setDateTo(""); setStatusFilters(new Set()); setTopRuleFilter(""); setPage(0);
+    setTimeout(() => loadHistory(true), 0);
+  };
+
+  const toggleStatus = (s: StatusKey) => {
+    setStatusFilters((prev) => {
+      const next = new Set(prev);
+      next.has(s) ? next.delete(s) : next.add(s);
+      return next;
+    });
+  };
 
   const loadPreview = async () => {
     setPreviewing(true);
@@ -129,20 +156,90 @@ export default function SecurityDailyDigestRunner() {
     }
   };
 
-  const summarize = (row: HistoryRow) => {
-    const sent = row.metadata?.sent_results ?? [];
-    const recipients = row.metadata?.recipients ?? [];
-    const okCount = sent.filter((s) => s.ok).length;
-    const total = sent.length || recipients.length;
-    const status: "ok" | "partial" | "failed" | "unknown" =
-      total === 0 ? "unknown" : okCount === total ? "ok" : okCount === 0 ? "failed" : "partial";
-    return { okCount, total, status };
-  };
-
-  const statusTone = (s: ReturnType<typeof summarize>["status"]) =>
+  const statusTone = (s: StatusKey) =>
     ({ ok: "text-emerald-600", partial: "text-amber-600", failed: "text-rose-600", unknown: "text-muted-foreground" }[s]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const applyClientFilters = (rows: HistoryRow[]) => {
+    let out = rows;
+    if (statusFilters.size > 0) out = out.filter((r) => statusFilters.has(summarizeRow(r).status));
+    if (topRuleFilter) out = out.filter((r) => topRuleFor(r) === topRuleFilter);
+    return out;
+  };
+
+  const applyClientSort = (rows: HistoryRow[]) => {
+    const sorted = [...rows];
+    const statusRank: Record<string, number> = { failed: 0, partial: 1, unknown: 2, ok: 3 };
+    if (sortKey === "status") {
+      sorted.sort((a, b) => statusRank[summarizeRow(a).status] - statusRank[summarizeRow(b).status]);
+    } else if (sortKey === "top_rule") {
+      sorted.sort((a, b) => topRuleFor(a).localeCompare(topRuleFor(b)) || b.created_at.localeCompare(a.created_at));
+    }
+    return sorted;
+  };
+
+  const visible = useMemo(() => applyClientSort(applyClientFilters(history)), [history, statusFilters, topRuleFilter, sortKey]);
+
+  const topRuleOptions = useMemo(() => {
+    const set = new Set<string>();
+    history.forEach((r) => { const t = topRuleFor(r); if (t) set.add(t); });
+    return Array.from(set).sort();
+  }, [history]);
+
+  const exportCsv = async () => {
+    setExporting(true);
+    setResult(null);
+    try {
+      // Fetch up to 5000 rows matching server-side filters (date, action), then apply client filters/sort.
+      let q = supabase
+        .from("security_audit_log")
+        .select("id, created_at, action, metadata")
+        .in("action", ["daily_report_manual_run", "daily_report_sent"]);
+      if (dateFrom) q = q.gte("created_at", new Date(dateFrom).toISOString());
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        q = q.lte("created_at", end.toISOString());
+      }
+      const { data, error } = await q.order("created_at", { ascending: sortKey === "date_asc" }).limit(5000);
+      if (error) throw error;
+      const filtered = applyClientSort(applyClientFilters((data as HistoryRow[]) ?? []));
+      const headers = [
+        "id","created_at","kind","status","ok_recipients","total_recipients",
+        "top_meta_rule","actor_email","recipients","failed_recipients","template_data_present",
+      ];
+      const lines = [headers.join(",")];
+      filtered.forEach((r) => {
+        const s = summarizeRow(r);
+        const sent = r.metadata?.sent_results ?? [];
+        const failed = sent.filter((x) => !x.ok).map((x) => `${x.to}${x.error ? ":" + x.error : ""}`);
+        lines.push([
+          r.id, r.created_at,
+          r.action === "daily_report_manual_run" ? "manual" : "scheduled",
+          s.status, s.okCount, s.total,
+          topRuleFor(r), r.metadata?.actor_email ?? "",
+          (r.metadata?.recipients ?? []).join("; "),
+          failed.join("; "),
+          r.metadata?.template_data ? "yes" : "no",
+        ].map(csvCell).join(","));
+      });
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      a.href = url; a.download = `digest-history-${stamp}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setResult(`Exported ${filtered.length} run${filtered.length === 1 ? "" : "s"}.`);
+    } catch (e) {
+      setResult("Export failed: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const activeStatusList: StatusKey[] = ["ok", "partial", "failed", "unknown"];
 
   return (
     <Card>
@@ -205,31 +302,67 @@ export default function SecurityDailyDigestRunner() {
               <span className="text-muted-foreground">→</span>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-7 w-36 text-xs" />
               <Button size="sm" variant="outline" className="h-7 px-2" onClick={applyFilters}>Apply</Button>
-              {(dateFrom || dateTo) && (
+              {(dateFrom || dateTo || statusFilters.size > 0 || topRuleFilter) && (
                 <Button size="sm" variant="ghost" className="h-7 px-2" onClick={clearFilters}>Clear</Button>
               )}
+              <Button size="sm" variant="outline" className="h-7 px-2" onClick={exportCsv} disabled={exporting} title="Export current sort + filters to CSV">
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Download className="w-3.5 h-3.5 mr-1" />} CSV
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => loadHistory()} disabled={historyLoading} className="h-7 px-2">
                 {historyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               </Button>
             </div>
           </div>
-          {history.length === 0 && !historyLoading ? (
-            <div className="p-4 text-center text-xs text-muted-foreground">No digest runs in this range.</div>
+
+          {/* Filter chips */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-border bg-secondary/10 text-xs">
+            <span className="text-muted-foreground">Status:</span>
+            {activeStatusList.map((s) => {
+              const on = statusFilters.has(s);
+              return (
+                <button
+                  key={s}
+                  onClick={() => toggleStatus(s)}
+                  className={`px-2 py-0.5 rounded-full border text-[11px] capitalize transition ${
+                    on
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background hover:bg-secondary/60 text-muted-foreground"
+                  }`}
+                >
+                  {s}
+                </button>
+              );
+            })}
+            <span className="text-muted-foreground ml-2">Top rule:</span>
+            <select
+              value={topRuleFilter}
+              onChange={(e) => setTopRuleFilter(e.target.value)}
+              className="h-6 px-2 text-[11px] bg-background border border-border rounded"
+              title="Filter by top meta-rule"
+            >
+              <option value="">All</option>
+              {topRuleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {topRuleFilter && (
+              <button onClick={() => setTopRuleFilter("")} className="px-1.5 py-0.5 rounded hover:bg-secondary/60 text-muted-foreground" title="Clear top rule filter">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+            <div className="flex-1" />
+            <span className="text-muted-foreground">{visible.length} of {history.length} on page</span>
+          </div>
+
+          {visible.length === 0 && !historyLoading ? (
+            <div className="p-4 text-center text-xs text-muted-foreground">
+              {history.length === 0 ? "No digest runs in this range." : "No runs match the current chips."}
+            </div>
           ) : (
             <div className="divide-y divide-border">
-              {(() => {
-                const statusRank: Record<string, number> = { failed: 0, partial: 1, unknown: 2, ok: 3 };
-                const sorted = [...history];
-                if (sortKey === "status") {
-                  sorted.sort((a, b) => statusRank[summarize(a).status] - statusRank[summarize(b).status]);
-                } else if (sortKey === "top_rule") {
-                  sorted.sort((a, b) => topRuleFor(a).localeCompare(topRuleFor(b)) || b.created_at.localeCompare(a.created_at));
-                }
-                return sorted.map((row) => {
-                  const s = summarize(row);
-                  const isManual = row.action === "daily_report_manual_run";
-                  const canReplay = !!row.metadata?.template_data;
-                  const topRule = topRuleFor(row);
+              {visible.map((row) => {
+                const s = summarizeRow(row);
+                const isManual = row.action === "daily_report_manual_run";
+                const canReplay = !!row.metadata?.template_data;
+                const topRule = topRuleFor(row);
                 return (
                   <div key={row.id} className="flex items-center gap-2 px-3 py-2 text-xs">
                     <div className="w-40 text-muted-foreground whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</div>
@@ -264,8 +397,7 @@ export default function SecurityDailyDigestRunner() {
                     </Button>
                   </div>
                 );
-                });
-              })()}
+              })}
             </div>
           )}
           {/* Pagination */}
