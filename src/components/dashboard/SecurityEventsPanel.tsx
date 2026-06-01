@@ -147,21 +147,16 @@ export default function SecurityEventsPanel() {
   }, [rows]);
 
   const exportCsv = async () => {
-    // Permission + audit gate: founders-only INSERT policy on security_audit_log
-    // means non-founders will be rejected here and no CSV is produced.
     const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
-    if (!userId) {
+    if (!sessionData.session?.user?.id) {
       alert("Sign in as a founder to export security events.");
       return;
     }
-    const { error: auditError } = await supabase.from("security_audit_log").insert({
-      actor_user_id: userId,
-      action: "csv_export",
-      entity: "security_events",
-      row_count: filtered.length,
-      filters: { window: windowKey, source: sourceKey, query },
-      user_agent: navigator.userAgent.slice(0, 512),
+
+    // Server-side audit (captures IP + user-agent). The edge function enforces
+    // founder role and writes to security_audit_log with full request metadata.
+    const { error: auditError } = await supabase.functions.invoke("log-security-export", {
+      body: { row_count: filtered.length, filters: { window: windowKey, source: sourceKey, query } },
     });
     if (auditError) {
       alert("Export blocked: " + auditError.message);
