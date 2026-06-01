@@ -21,6 +21,15 @@ type HistoryRow = {
 
 const PAGE_SIZE = 25;
 
+type SortKey = "date_desc" | "date_asc" | "status" | "top_rule";
+
+const topRuleFor = (row: HistoryRow): string => {
+  const td = row.metadata?.template_data as { top_meta_rules?: Array<{ rule_name?: string; name?: string }> } | undefined;
+  const list = td?.top_meta_rules ?? [];
+  const first = list[0];
+  return (first?.rule_name ?? first?.name ?? "").toString();
+};
+
 export default function SecurityDailyDigestRunner() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -33,6 +42,7 @@ export default function SecurityDailyDigestRunner() {
   const [totalCount, setTotalCount] = useState(0);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("date_desc");
 
   const loadHistory = async (resetPage = false) => {
     setHistoryLoading(true);
@@ -48,15 +58,18 @@ export default function SecurityDailyDigestRunner() {
       end.setHours(23, 59, 59, 999);
       q = q.lte("created_at", end.toISOString());
     }
+    // Date sort is server-side; other sorts fetch by date desc and reorder
+    // the visible page client-side.
+    const ascending = sortKey === "date_asc";
     const { data, count } = await q
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending })
       .range(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE - 1);
     setHistory((data as HistoryRow[]) ?? []);
     setTotalCount(count ?? 0);
     setHistoryLoading(false);
   };
 
-  useEffect(() => { loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page]);
+  useEffect(() => { loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page, sortKey]);
 
   const applyFilters = () => loadHistory(true);
   const clearFilters = () => { setDateFrom(""); setDateTo(""); setPage(0); setTimeout(() => loadHistory(true), 0); };
