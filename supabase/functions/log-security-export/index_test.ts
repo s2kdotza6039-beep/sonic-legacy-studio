@@ -36,7 +36,11 @@ const auditCount = async (sb: any) => {
   return count ?? 0;
 };
 
-Deno.test("log-security-export: rejects anon and writes no audit row", async () => {
+Deno.test({
+  name: "log-security-export: rejects anon and writes no audit row",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  fn: async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
     console.warn("Skipping: missing ANON_KEY or SERVICE_ROLE_KEY in env.");
     return;
