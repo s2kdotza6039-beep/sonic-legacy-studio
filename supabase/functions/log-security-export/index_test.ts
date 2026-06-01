@@ -63,6 +63,7 @@ Deno.test({
 
   const after = await auditCount(sb);
   assertEquals(after, before, "anon call must NOT create an audit row");
+  },
 });
 
 Deno.test("log-security-export: rejects missing Authorization header", async () => {
