@@ -1,0 +1,205 @@
+[
+  {
+    "table": "public.tracks",
+    "policy": "Public reads active tracks",
+    "operation": "SELECT",
+    "outcome": "allowed",
+    "test": "anon CAN read non-sensitive columns"
+  },
+  {
+    "table": "public.tracks",
+    "policy": "Column REVOKE on r2_object_key",
+    "operation": "SELECT(col)",
+    "outcome": "blocked",
+    "test": "anon CANNOT read r2_object_key"
+  },
+  {
+    "table": "public.tracks",
+    "policy": "Founders manage tracks",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT insert into tracks"
+  },
+  {
+    "table": "storage.submissions",
+    "policy": "Founders read submissions",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon list submissions returns empty (RLS hides objects)"
+  },
+  {
+    "table": "storage.submissions",
+    "policy": "Public submissions INSERT careers/*",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT upload outside careers/ prefix"
+  },
+  {
+    "table": "storage.submissions",
+    "policy": "Public submissions INSERT extension allowlist",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT upload disallowed extensions"
+  },
+  {
+    "table": "storage.contract-files",
+    "policy": "Founders read contract-files",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon list contract-files returns empty (RLS hides objects)"
+  },
+  {
+    "table": "storage.contract-files",
+    "policy": "Founders write contract-files",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT upload to contract-files"
+  },
+  {
+    "table": "storage.contract-files",
+    "policy": "Founders read contract-files",
+    "operation": "GET",
+    "outcome": "blocked",
+    "test": "anon CANNOT download arbitrary contract-files object"
+  },
+  {
+    "table": "public.contract_templates",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read contract_templates"
+  },
+  {
+    "table": "public.contracts",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read contracts"
+  },
+  {
+    "table": "public.payments",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read payments"
+  },
+  {
+    "table": "public.download_tokens",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read download_tokens"
+  },
+  {
+    "table": "public.invoices",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read invoices"
+  },
+  {
+    "table": "public.ai_drafts",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read ai_drafts"
+  },
+  {
+    "table": "public.ai_activity_log",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read ai_activity_log"
+  },
+  {
+    "table": "public.user_roles",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read user_roles"
+  },
+  {
+    "table": "public.security_audit_log",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read security_audit_log"
+  },
+  {
+    "table": "public.security_alert_rules",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "blocked",
+    "test": "anon CANNOT read security_alert_rules"
+  },
+  {
+    "table": "public.security_alert_dispatch_log",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read security_alert_dispatch_log"
+  },
+  {
+    "table": "public.security_alert_dlq",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "empty",
+    "test": "anon CANNOT read security_alert_dlq"
+  },
+  {
+    "table": "public.security_retention_config",
+    "policy": "Founders-only RLS",
+    "operation": "SELECT",
+    "outcome": "blocked",
+    "test": "anon CANNOT read security_retention_config"
+  },
+  {
+    "table": "public.security_audit_log",
+    "policy": "Founders-only RLS",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT insert into security_audit_log"
+  },
+  {
+    "table": "public.security_alert_dispatch_log",
+    "policy": "Founders-only RLS",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT insert into security_alert_dispatch_log"
+  },
+  {
+    "table": "public.security_alert_dlq",
+    "policy": "Founders-only RLS",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT insert into security_alert_dlq"
+  },
+  {
+    "table": "public.security_alert_rules",
+    "policy": "Founders-only RLS",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT insert into security_alert_rules"
+  },
+  {
+    "table": "public.security_retention_config",
+    "policy": "Founders-only RLS",
+    "operation": "INSERT",
+    "outcome": "blocked",
+    "test": "anon CANNOT insert into security_retention_config"
+  },
+  {
+    "table": "edge.log-security-export",
+    "policy": "founder JWT required",
+    "operation": "POST",
+    "outcome": "blocked",
+    "test": "anon POST to log-security-export is rejected as forbidden"
+  },
+  {
+    "table": "edge.log-security-export",
+    "policy": "JWT required",
+    "operation": "POST",
+    "outcome": "blocked",
+    "test": "missing Authorization is rejected"
+  }
+]

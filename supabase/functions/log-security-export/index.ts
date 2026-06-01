@@ -23,24 +23,30 @@ Deno.serve(async (req) => {
     });
   }
 
-  let body: { row_count?: number; filters?: Record<string, unknown> } = {};
+  let body: { row_count?: number; filters?: Record<string, unknown>; entity?: string } = {};
   try { body = await req.json(); } catch { /* empty */ }
 
   const xff = req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "";
   const ip = (xff.split(",")[0] ?? "").trim().slice(0, 64) || null;
   const ua = (req.headers.get("user-agent") ?? "").slice(0, 512) || null;
 
+  // Whitelist of entities that may be exported. Keeps the audit action consistent
+  // and prevents arbitrary entity strings being written to the audit log.
+  const ALLOWED_ENTITIES = new Set(["security_events", "security_audit_log"]);
+  const entity = body.entity && ALLOWED_ENTITIES.has(body.entity) ? body.entity : "security_events";
+
   const sb = createClient(SUPABASE_URL, SERVICE_KEY);
   const { data, error } = await sb.from("security_audit_log").insert({
     actor_user_id: caller.userId,
     action: "csv_export",
-    entity: "security_events",
+    entity,
     row_count: typeof body.row_count === "number" ? body.row_count : null,
     filters: body.filters ?? {},
     ip,
     user_agent: ua,
     metadata: { source: "log-security-export" },
   }).select("id").maybeSingle();
+
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {

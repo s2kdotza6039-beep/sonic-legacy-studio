@@ -164,6 +164,8 @@ describe("founder-only tables are not anon-readable", () => {
     "security_audit_log",
     "security_alert_rules",
     "security_alert_dispatch_log",
+    "security_alert_dlq",
+    "security_retention_config",
   ];
   for (const t of tables) {
     it(`anon CANNOT read ${t}`, async ({ task }) => {
@@ -179,3 +181,50 @@ describe("founder-only tables are not anon-readable", () => {
     });
   }
 });
+
+describe("security tables - writes blocked for anon", () => {
+  const writes: Array<{ table: string; row: Record<string, unknown> }> = [
+    { table: "security_audit_log", row: { action: "csv_export", entity: "security_events" } },
+    { table: "security_alert_dispatch_log", row: { status: "sent", attempt: 1 } },
+    { table: "security_alert_dlq", row: { attempts: 1 } },
+    {
+      table: "security_alert_rules",
+      row: { name: "rogue", event_source: "playback", event_kind: "seek_blocked", threshold: 1, window_minutes: 1, channel: "email", destination: "x@y.io", cooldown_minutes: 1 },
+    },
+    { table: "security_retention_config", row: { id: 1, audit_log_days: 1, dispatch_log_days: 1, dlq_days: 1 } },
+  ];
+  for (const { table, row } of writes) {
+    it(`anon CANNOT insert into ${table}`, async ({ task }) => {
+      const res = await rest(`/${table}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify(row),
+      });
+      expect([401, 403, 400]).toContain(res.status);
+      cover({ table: `public.${table}`, policy: "Founders-only RLS", operation: "INSERT", outcome: "blocked", test: task.name });
+    });
+  }
+});
+
+describe("CSV export edge function permissions", () => {
+  it("anon POST to log-security-export is rejected as forbidden", async ({ task }) => {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/log-security-export`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ entity: "security_events", row_count: 0, filters: {} }),
+    });
+    expect([401, 403]).toContain(res.status);
+    cover({ table: "edge.log-security-export", policy: "founder JWT required", operation: "POST", outcome: "blocked", test: task.name });
+  });
+
+  it("missing Authorization is rejected", async ({ task }) => {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/log-security-export`, {
+      method: "POST",
+      headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect([401, 403]).toContain(res.status);
+    cover({ table: "edge.log-security-export", policy: "JWT required", operation: "POST", outcome: "blocked", test: task.name });
+  });
+});
+
