@@ -298,6 +298,7 @@ Deno.serve(async (req) => {
 
   if (mode === "dryrun") {
     // Evaluate rule(s) WITHOUT sending notifications or writing dispatch rows.
+    // Cooldown is still enforced so "would_dispatch" mirrors real-delivery behavior.
     let q = sb.from("security_alert_rules").select("*");
     if (dryRunRuleId) q = q.eq("id", dryRunRuleId);
     const { data: rs } = await q;
@@ -305,29 +306,76 @@ Deno.serve(async (req) => {
     const now = Date.now();
     for (const rule of (rs ?? []) as Rule[]) {
       const sinceIso = new Date(now - rule.window_minutes * 60_000).toISOString();
+      const cd = cooldownState(rule);
+      let base: Record<string, unknown>;
       if (rule.event_source === "delivery_meta") {
         const meta = await evaluateMetaRule(sb, rule, sinceIso);
-        out.push({
-          rule_id: rule.id, rule: rule.name, kind: rule.event_kind,
-          would_fire: meta.matched > 0, matched: meta.matched, detail: meta.detail,
+        const wouldFire = meta.matched > 0;
+        base = {
+          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
+          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
+          matched: meta.matched, detail: meta.detail,
+          conditions: {
+            threshold_met: wouldFire,
+            cooldown_active: cd.active,
+            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
+            effective_cooldown_min: cd.effective_min,
+          },
           window_minutes: rule.window_minutes, threshold: rule.threshold,
           channel: rule.channel, destination: rule.destination,
-        });
+        };
       } else {
         const cfg = SOURCE_TABLE[rule.event_source];
-        if (!cfg) { out.push({ rule: rule.name, error: "unknown_source" }); continue; }
+        if (!cfg) { out.push({ rule_id: rule.id, rule: rule.name, error: "unknown_source" }); continue; }
         let qq = sb.from(cfg.table).select("*", { count: "exact", head: true }).gte(cfg.tsCol, sinceIso);
         if (rule.event_kind && rule.event_kind !== "*") qq = qq.eq(cfg.kindCol, rule.event_kind);
         const { count } = await qq;
         const matched = count ?? 0;
-        out.push({
-          rule_id: rule.id, rule: rule.name, kind: rule.event_kind,
-          would_fire: matched >= rule.threshold, matched,
+        const wouldFire = matched >= rule.threshold;
+        base = {
+          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
+          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
+          matched,
+          conditions: {
+            threshold_met: wouldFire,
+            cooldown_active: cd.active,
+            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
+            effective_cooldown_min: cd.effective_min,
+          },
           threshold: rule.threshold, window_minutes: rule.window_minutes,
           channel: rule.channel, destination: rule.destination,
-        });
+        };
       }
+      out.push(base);
     }
+
+    // Founder-only audit log entry for every dry-run execution.
+    try {
+      const caller = await resolveCaller(req);
+      const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+      const ua = req.headers.get("user-agent")?.slice(0, 512) ?? null;
+      let actorEmail: string | null = null;
+      if (caller.userId) {
+        try {
+          const { data: u } = await sb.auth.admin.getUserById(caller.userId);
+          actorEmail = u?.user?.email ?? null;
+        } catch { /* best-effort */ }
+      }
+      await sb.from("security_audit_log").insert({
+        actor_user_id: caller.userId,
+        action: "alert_rule_dryrun",
+        entity: "security_alert_rule",
+        row_count: out.length,
+        filters: { rule_id: dryRunRuleId },
+        metadata: { request_id: requestId, actor_email: actorEmail, results: out },
+        ip,
+        user_agent: ua,
+      });
+    } catch (e) {
+      console.error("dryrun audit log insert failed", e);
+    }
+
     return new Response(JSON.stringify({ mode, dry_run: true, results: out }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
