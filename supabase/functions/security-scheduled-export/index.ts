@@ -116,14 +116,7 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
   let deliveryOk = false;
   let deliveryError: string | null = null;
   let attempts = 0;
-  const attemptLog: Array<{
-    attempt: number;
-    started_at: string;
-    finished_at: string;
-    ok: boolean;
-    error: string | null;
-    backoff_ms_before_next: number;
-  }> = [];
+  const attemptLog: Attempt[] = [];
 
   const deliverOnce = async (): Promise<{ ok: boolean; error: string | null }> => {
     if (s.delivery_method === "webhook") {
