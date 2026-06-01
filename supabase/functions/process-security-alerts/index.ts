@@ -144,12 +144,14 @@ async function scanAndDispatch(sb: ReturnType<typeof createClient>) {
   const results: Array<Record<string, unknown>> = [];
 
   for (const rule of (rules ?? []) as Rule[]) {
-    if (rule.last_triggered_at && now - new Date(rule.last_triggered_at).getTime() < rule.cooldown_minutes * 60_000) {
+    const cd = cooldownState(rule);
+    if (cd.active) {
       await sb.from("security_alert_dispatch_log").insert({
         rule_id: rule.id, rule_name: rule.name, channel: rule.channel, destination: rule.destination,
         matched_count: 0, status: "skipped_cooldown", attempt: 0, max_attempts: 0,
+        last_error: `cooldown active: ${Math.ceil(cd.remaining_ms / 60_000)}m remaining (effective ${cd.effective_min}m)`,
       });
-      results.push({ rule: rule.name, status: "skipped_cooldown" });
+      results.push({ rule: rule.name, status: "skipped_cooldown", cooldown_remaining_ms: cd.remaining_ms, effective_cooldown_min: cd.effective_min });
       continue;
     }
 
