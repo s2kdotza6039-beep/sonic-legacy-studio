@@ -27,7 +27,9 @@ import Assistant from "./pages/Assistant";
 import FloatingAssistant from "./components/FloatingAssistant";
 import Unsubscribe from "./pages/Unsubscribe";
 import SandboxPayments from "./pages/SandboxPayments";
+import SecurityRulesDoc from "./pages/SecurityRulesDoc";
 import NotFound from "./pages/NotFound";
+
 
 const queryClient = new QueryClient();
 
@@ -75,6 +77,12 @@ const App = () => (
                 <SandboxPayments />
               </FounderRoute>
             } />
+            <Route path="/dev/security-rules" element={
+              <FounderRoute>
+                <SecurityRulesDoc />
+              </FounderRoute>
+            } />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
           <FloatingAssistant />

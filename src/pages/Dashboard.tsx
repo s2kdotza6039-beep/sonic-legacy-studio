@@ -1,9 +1,11 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert } from "lucide-react";
 import MusicAdmin from "@/components/dashboard/MusicAdmin";
 import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
 import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
 import ReleaseClicksPanel from "@/components/dashboard/ReleaseClicksPanel";
+import SecurityEventsPanel from "@/components/dashboard/SecurityEventsPanel";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +42,9 @@ const TABS = [
   { key: "payfast", label: "PayFast Log", icon: ReceiptText },
   { key: "playback", label: "Playback Log", icon: Activity },
   { key: "cloudclicks", label: "Cloud Clicks", icon: Cloud },
+  { key: "security", label: "Security", icon: ShieldAlert },
 ] as const;
+
 
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -127,6 +131,8 @@ const Dashboard = () => {
             {tab === "payfast" && <PayFastAuditLog />}
             {tab === "playback" && <PlaybackAuditLog />}
             {tab === "cloudclicks" && <ReleaseClicksPanel />}
+            {tab === "security" && <SecurityEventsPanel />}
+
           </div>
           <div>
             <RemindersPanel />

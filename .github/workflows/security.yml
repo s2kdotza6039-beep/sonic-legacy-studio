@@ -1,0 +1,59 @@
+name: Security & RLS
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  rls-and-deps:
+    name: RLS access + dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://dvmftknddmssmpyhnjob.supabase.co' }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # 1) Block PRs that introduce high/critical npm vulnerabilities.
+      - name: npm audit (high+)
+        run: |
+          set -o pipefail
+          npx --yes better-npm-audit audit --level high
+
+      # 2) Static guard: fail if anyone re-introduces an "always true" RLS check
+      #    on INSERT/UPDATE/DELETE inside a migration.
+      - name: Block "WITH CHECK (true)" in migrations
+        run: |
+          if grep -RInE "WITH[[:space:]]+CHECK[[:space:]]*\(\s*true\s*\)" supabase/migrations \
+               | grep -viE "FOR[[:space:]]+SELECT"; then
+            echo "::error::A new migration adds WITH CHECK (true) on a writable policy. Scope it to auth.uid()/has_role."
+            exit 1
+          fi
+
+      # 3) Static guard: fail if any migration GRANTs r2_object_key back to anon/authenticated.
+      - name: Block r2_object_key public exposure
+        run: |
+          if grep -RInE "GRANT[[:space:]]+SELECT[[:space:]]*\([^)]*r2_object_key" supabase/migrations \
+               | grep -viE "service_role|founder"; then
+            echo "::error::A new migration re-grants r2_object_key to a public role. Keep it service_role only."
+            exit 1
+          fi
+
+      # 4) Run the RLS access suite against the live Supabase project.
+      - name: RLS access tests
+        run: bunx vitest run src/test/rlsAccess.test.ts --reporter=verbose
+
+      # 5) Run the rest of the security-adjacent vitest suite.
+      - name: Playback cap + resilience tests
+        run: bunx vitest run src/test/playbackCap.test.ts src/test/playbackResilience.test.ts --reporter=dot
