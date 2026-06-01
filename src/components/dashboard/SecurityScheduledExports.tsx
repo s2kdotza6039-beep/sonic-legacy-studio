@@ -59,14 +59,24 @@ const validateDest = (m: "email" | "webhook", d: string) =>
 
 export default function SecurityScheduledExports() {
   const [rows, setRows] = useState<Schedule[]>([]);
+  const [runs, setRuns] = useState<Record<string, Run[]>>({});
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(EMPTY);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("security_scheduled_exports").select("*").order("created_at", { ascending: false });
-    setRows((data as Schedule[]) ?? []);
+    const [{ data: schedData }, { data: runData }] = await Promise.all([
+      supabase.from("security_scheduled_exports").select("*").order("created_at", { ascending: false }),
+      supabase.from("security_scheduled_export_runs").select("*").order("started_at", { ascending: false }).limit(200),
+    ]);
+    setRows((schedData as Schedule[]) ?? []);
+    const grouped: Record<string, Run[]> = {};
+    for (const r of ((runData as Run[]) ?? [])) {
+      (grouped[r.schedule_id] ??= []).push(r);
+    }
+    setRuns(grouped);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
