@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { CalendarClock, Loader2, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarClock, Loader2, Play, Plus, RefreshCw, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 type Schedule = {
   id: string;
