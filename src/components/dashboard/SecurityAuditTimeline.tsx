@@ -154,24 +154,40 @@ export default function SecurityAuditTimeline() {
     });
   };
 
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportInfo, setExportInfo] = useState<string | null>(null);
+
   const exportCsv = async () => {
     setExporting(true);
+    setExportError(null);
+    setExportInfo(null);
     try {
-      // If a custom range is set, fetch fresh data for that window so the
-      // export isn't limited to the current visible range. Otherwise use the
-      // already-loaded groups.
       let exportGroups = groups;
-      let fromIso: string | null = null;
-      let toIso: string | null = null;
-      if (exportFrom || exportTo) {
-        fromIso = exportFrom ? new Date(exportFrom).toISOString() : new Date(0).toISOString();
+      const usingCustomRange = !!(exportFrom || exportTo);
+      if (usingCustomRange) {
+        const fromIso = exportFrom ? new Date(exportFrom).toISOString() : new Date(0).toISOString();
         const toDate = exportTo ? new Date(exportTo) : new Date();
         if (exportTo) toDate.setHours(23, 59, 59, 999);
-        toIso = toDate.toISOString();
+        const toIso = toDate.toISOString();
+        if (new Date(fromIso) > new Date(toIso)) {
+          throw new Error("Start date is after end date.");
+        }
         const drQ = supabase.from("security_audit_log").select("id, created_at, metadata").eq("action", "alert_rule_dryrun").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
         const dsQ = supabase.from("security_alert_dispatch_log").select("id, created_at, rule_id, rule_name, channel, destination, matched_count, status, attempt").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
         const [dr, ds] = await Promise.all([drQ, dsQ]);
+        if (dr.error) throw new Error(dr.error.message);
+        if (ds.error) throw new Error(ds.error.message);
         exportGroups = buildGroups((dr.data as DryrunRow[]) ?? [], (ds.data as DispatchRow[]) ?? []);
+      }
+
+      const totalRows = exportGroups.reduce((n, g) => n + g.items.length, 0);
+      if (totalRows === 0) {
+        setExportInfo(
+          usingCustomRange
+            ? `No timeline events between ${exportFrom || "start"} and ${exportTo || "now"}.`
+            : "No timeline events in the current window."
+        );
+        return;
       }
 
       const esc = (v: unknown) => {
@@ -197,7 +213,7 @@ export default function SecurityAuditTimeline() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const tag = exportFrom || exportTo
+      const tag = usingCustomRange
         ? `${exportFrom || "start"}_to_${exportTo || "now"}`
         : rangeKey;
       a.download = `security-timeline-${tag}-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -205,6 +221,9 @@ export default function SecurityAuditTimeline() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      setExportInfo(`Exported ${totalRows} event${totalRows === 1 ? "" : "s"}.`);
+    } catch (e) {
+      setExportError("Export failed: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setExporting(false);
     }
