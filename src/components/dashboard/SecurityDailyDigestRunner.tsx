@@ -240,6 +240,11 @@ export default function SecurityDailyDigestRunner() {
                     <div className="text-muted-foreground">
                       {s.okCount}/{s.total} recipient{s.total === 1 ? "" : "s"}
                     </div>
+                    {topRule && (
+                      <div className="text-muted-foreground truncate max-w-[180px]" title={`Top meta-rule: ${topRule}`}>
+                        · top: <span className="font-mono">{topRule}</span>
+                      </div>
+                    )}
                     {row.metadata?.actor_email && (
                       <div className="text-muted-foreground truncate max-w-[200px]" title={row.metadata.actor_email}>
                         by {row.metadata.actor_email}
@@ -259,7 +264,8 @@ export default function SecurityDailyDigestRunner() {
                     </Button>
                   </div>
                 );
-              })}
+                });
+              })()}
             </div>
           )}
           {/* Pagination */}
