@@ -1693,6 +1693,143 @@ export type Database = {
           },
         ]
       }
+      security_alert_dispatch_log: {
+        Row: {
+          channel: string | null
+          created_at: string
+          destination: string | null
+          error: string | null
+          id: string
+          matched_count: number | null
+          payload: Json | null
+          rule_id: string | null
+          rule_name: string | null
+          status: string
+        }
+        Insert: {
+          channel?: string | null
+          created_at?: string
+          destination?: string | null
+          error?: string | null
+          id?: string
+          matched_count?: number | null
+          payload?: Json | null
+          rule_id?: string | null
+          rule_name?: string | null
+          status: string
+        }
+        Update: {
+          channel?: string | null
+          created_at?: string
+          destination?: string | null
+          error?: string | null
+          id?: string
+          matched_count?: number | null
+          payload?: Json | null
+          rule_id?: string | null
+          rule_name?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_alert_dispatch_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "security_alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_alert_rules: {
+        Row: {
+          channel: string
+          cooldown_minutes: number
+          created_at: string
+          created_by: string | null
+          destination: string
+          enabled: boolean
+          event_kind: string
+          event_source: string
+          id: string
+          last_triggered_at: string | null
+          name: string
+          threshold: number
+          updated_at: string
+          window_minutes: number
+        }
+        Insert: {
+          channel: string
+          cooldown_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          destination: string
+          enabled?: boolean
+          event_kind: string
+          event_source: string
+          id?: string
+          last_triggered_at?: string | null
+          name: string
+          threshold?: number
+          updated_at?: string
+          window_minutes?: number
+        }
+        Update: {
+          channel?: string
+          cooldown_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          destination?: string
+          enabled?: boolean
+          event_kind?: string
+          event_source?: string
+          id?: string
+          last_triggered_at?: string | null
+          name?: string
+          threshold?: number
+          updated_at?: string
+          window_minutes?: number
+        }
+        Relationships: []
+      }
+      security_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          entity: string | null
+          filters: Json | null
+          id: string
+          ip: string | null
+          metadata: Json | null
+          row_count: number | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity?: string | null
+          filters?: Json | null
+          id?: string
+          ip?: string | null
+          metadata?: Json | null
+          row_count?: number | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity?: string | null
+          filters?: Json | null
+          id?: string
+          ip?: string | null
+          metadata?: Json | null
+          row_count?: number | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       songs: {
         Row: {
           actual_publishing: number

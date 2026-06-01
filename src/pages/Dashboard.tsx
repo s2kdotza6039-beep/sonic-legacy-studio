@@ -5,6 +5,7 @@ import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
 import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
 import ReleaseClicksPanel from "@/components/dashboard/ReleaseClicksPanel";
 import SecurityEventsPanel from "@/components/dashboard/SecurityEventsPanel";
+import SecurityAlertsPanel from "@/components/dashboard/SecurityAlertsPanel";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -131,7 +132,12 @@ const Dashboard = () => {
             {tab === "payfast" && <PayFastAuditLog />}
             {tab === "playback" && <PlaybackAuditLog />}
             {tab === "cloudclicks" && <ReleaseClicksPanel />}
-            {tab === "security" && <SecurityEventsPanel />}
+            {tab === "security" && (
+              <div className="space-y-4">
+                <SecurityEventsPanel />
+                <SecurityAlertsPanel />
+              </div>
+            )}
 
           </div>
           <div>

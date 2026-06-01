@@ -6,17 +6,26 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      strict:
+        description: "Run staging-only strict RLS/SECURITY DEFINER suite"
+        required: false
+        default: "false"
 
 jobs:
   rls-and-deps:
     name: RLS access + dependency audit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://dvmftknddmssmpyhnjob.supabase.co' }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      RLS_COVERAGE_OUT: ${{ github.workspace }}/rls-coverage.json
+      STRICT_SECURITY_TESTS: ${{ (github.event.inputs.strict == 'true' || github.ref == 'refs/heads/staging') && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -25,14 +34,31 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # 1) Block PRs that introduce high/critical npm vulnerabilities.
+      # ---- Secret scanning (gitleaks) ---------------------------------------
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+
+      # ---- Dependency vulns + freshness -------------------------------------
       - name: npm audit (high+)
         run: |
           set -o pipefail
           npx --yes better-npm-audit audit --level high
 
-      # 2) Static guard: fail if anyone re-introduces an "always true" RLS check
-      #    on INSERT/UPDATE/DELETE inside a migration.
+      - name: Dependency update report (non-blocking)
+        run: |
+          {
+            echo "## Dependency freshness"
+            echo ""
+            echo '```'
+            bunx --bun npm-check-updates --jsonUpgraded --dep prod,dev || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ---- Migration static guards ------------------------------------------
       - name: Block "WITH CHECK (true)" in migrations
         run: |
           if grep -RInE "WITH[[:space:]]+CHECK[[:space:]]*\(\s*true\s*\)" supabase/migrations \
@@ -41,7 +67,6 @@ jobs:
             exit 1
           fi
 
-      # 3) Static guard: fail if any migration GRANTs r2_object_key back to anon/authenticated.
       - name: Block r2_object_key public exposure
         run: |
           if grep -RInE "GRANT[[:space:]]+SELECT[[:space:]]*\([^)]*r2_object_key" supabase/migrations \
@@ -50,10 +75,27 @@ jobs:
             exit 1
           fi
 
-      # 4) Run the RLS access suite against the live Supabase project.
+      # ---- RLS test suite (writes coverage JSON via reporter) ---------------
       - name: RLS access tests
         run: bunx vitest run src/test/rlsAccess.test.ts --reporter=verbose
 
-      # 5) Run the rest of the security-adjacent vitest suite.
+      - name: Append RLS coverage to job summary
+        if: always()
+        run: bun run scripts/rls-coverage-summary.ts >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload RLS coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rls-coverage
+          path: rls-coverage.json
+          if-no-files-found: ignore
+
+      # ---- Other security-adjacent tests ------------------------------------
       - name: Playback cap + resilience tests
         run: bunx vitest run src/test/playbackCap.test.ts src/test/playbackResilience.test.ts --reporter=dot
+
+      # ---- Staging-only strict suite ----------------------------------------
+      - name: Strict RLS / SECURITY DEFINER validation (staging only)
+        if: env.STRICT_SECURITY_TESTS == '1'
+        run: bunx vitest run src/test/rlsStrict.test.ts --reporter=verbose
