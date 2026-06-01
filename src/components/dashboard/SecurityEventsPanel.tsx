@@ -146,7 +146,28 @@ export default function SecurityEventsPanel() {
     return c;
   }, [rows]);
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
+    // Permission + audit gate: founders-only INSERT policy on security_audit_log
+    // means non-founders will be rejected here and no CSV is produced.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) {
+      alert("Sign in as a founder to export security events.");
+      return;
+    }
+    const { error: auditError } = await supabase.from("security_audit_log").insert({
+      actor_user_id: userId,
+      action: "csv_export",
+      entity: "security_events",
+      row_count: filtered.length,
+      filters: { window: windowKey, source: sourceKey, query },
+      user_agent: navigator.userAgent.slice(0, 512),
+    });
+    if (auditError) {
+      alert("Export blocked: " + auditError.message);
+      return;
+    }
+
     const header = ["at", "source", "kind", "actor", "target", "detail"];
     const lines = [header.join(",")];
     for (const r of filtered) {
