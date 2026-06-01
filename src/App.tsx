@@ -28,6 +28,7 @@ import FloatingAssistant from "./components/FloatingAssistant";
 import Unsubscribe from "./pages/Unsubscribe";
 import SandboxPayments from "./pages/SandboxPayments";
 import SecurityRulesDoc from "./pages/SecurityRulesDoc";
+import SecurityHashDrilldown from "./pages/SecurityHashDrilldown";
 import NotFound from "./pages/NotFound";
 
 
@@ -82,6 +83,12 @@ const App = () => (
                 <SecurityRulesDoc />
               </FounderRoute>
             } />
+            <Route path="/dashboard/security/hash/:auditId" element={
+              <FounderRoute>
+                <SecurityHashDrilldown />
+              </FounderRoute>
+            } />
+
 
             <Route path="*" element={<NotFound />} />
           </Routes>
