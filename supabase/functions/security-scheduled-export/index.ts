@@ -72,11 +72,26 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
   }
 
   const header = ["created_at", "actor_user_id", "action", "entity", "row_count", "ip", "user_agent", "filters", "metadata"];
-  const lines = [header.join(",")];
+  const baseLines = [header.join(",")];
   for (const r of all) {
-    lines.push([r.created_at, r.actor_user_id, r.action, r.entity, r.row_count, r.ip, r.user_agent, r.filters, r.metadata].map(csvEscape).join(","));
+    baseLines.push([r.created_at, r.actor_user_id, r.action, r.entity, r.row_count, r.ip, r.user_agent, r.filters, r.metadata].map(csvEscape).join(","));
   }
-  const csv = lines.join("\n");
+  const baseCsv = baseLines.join("\n");
+
+  // Appends a "# retry_attempts" CSV block so analysts can correlate the data
+  // export with the delivery attempts (started/finished timestamps and the
+  // computed exponential backoff applied before each next attempt).
+  const buildCsvWithAttempts = (attemptsList: typeof attemptLog) => {
+    if (attemptsList.length === 0) return baseCsv;
+    const attemptHeader = "# retry_attempts: attempt,started_at,finished_at,duration_ms,ok,backoff_ms_before_next,error";
+    const attemptRows = attemptsList.map((a) => {
+      const dur = Math.max(0, new Date(a.finished_at).getTime() - new Date(a.started_at).getTime());
+      return [a.attempt, a.started_at, a.finished_at, dur, a.ok ? "true" : "false", a.backoff_ms_before_next, a.error ?? ""].map(csvEscape).join(",");
+    });
+    return baseCsv + "\n\n" + attemptHeader + "\nattempt,started_at,finished_at,duration_ms,ok,backoff_ms_before_next,error\n" + attemptRows.join("\n");
+  };
+  // Initial csv for the first delivery (no prior attempts yet).
+  let csv = baseCsv;
 
   // Insert a "queued" run row up front so the UI can show in-flight attempts.
   const { data: runRow } = await sb.from("security_scheduled_export_runs").insert({
