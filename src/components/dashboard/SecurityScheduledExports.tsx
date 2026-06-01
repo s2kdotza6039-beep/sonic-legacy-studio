@@ -262,7 +262,7 @@ export default function SecurityScheduledExports() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
