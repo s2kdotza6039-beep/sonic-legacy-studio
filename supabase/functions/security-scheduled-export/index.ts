@@ -19,6 +19,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const MAX_ROWS = 5000;
 const PAGE = 1000;
+const MAX_RETRIES = 2; // 1 initial attempt + 2 retries = 3 attempts total
 
 type Schedule = {
   id: string;
