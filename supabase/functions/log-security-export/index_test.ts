@@ -27,7 +27,8 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const fnUrl = `${SUPABASE_URL}/functions/v1/log-security-export`;
 
-const auditCount = async (sb: ReturnType<typeof createClient>) => {
+// deno-lint-ignore no-explicit-any
+const auditCount = async (sb: any) => {
   const { count } = await sb
     .from("security_audit_log")
     .select("*", { count: "exact", head: true })
