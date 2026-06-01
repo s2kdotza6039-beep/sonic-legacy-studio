@@ -94,7 +94,17 @@ export default function SecurityHashVerifier() {
           <Button size="sm" onClick={verify} disabled={!selected || verifying}>
             {verifying ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Hash className="w-4 h-4 mr-1" />} Verify Now
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!selected}
+            onClick={() => selected && window.open(`/dashboard/security/hash/${selected}`, "_blank")}
+            title="Open full drill-down with field-level diff highlights"
+          >
+            Drill-down
+          </Button>
         </div>
+
 
         {result && !result.ok && (
           <div className="text-xs text-rose-600">Error: {result.error}</div>
