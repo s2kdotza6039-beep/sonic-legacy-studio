@@ -170,6 +170,8 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
       destination: s.destination,
       delivery_ok: deliveryOk,
       delivery_error: deliveryError,
+      attempts,
+      run_id: runId,
     },
   });
 
