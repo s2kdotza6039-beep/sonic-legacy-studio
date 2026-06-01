@@ -78,22 +78,34 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
   }
   const csv = lines.join("\n");
 
+  // Insert a "queued" run row up front so the UI can show in-flight attempts.
+  const { data: runRow } = await sb.from("security_scheduled_export_runs").insert({
+    schedule_id: s.id,
+    status: "queued",
+    retry_count: 0,
+    row_count: all.length,
+    delivery_method: s.delivery_method,
+    destination: s.destination,
+  }).select("id").single();
+  const runId = (runRow as { id?: string } | null)?.id ?? null;
+
   let deliveryOk = false;
   let deliveryError: string | null = null;
-  if (s.delivery_method === "webhook") {
-    try {
-      const r = await fetch(s.destination, {
-        method: "POST",
-        headers: { "Content-Type": "text/csv", "x-export-name": s.name, "x-export-rows": String(all.length) },
-        body: csv,
-      });
-      deliveryOk = r.ok;
-      if (!r.ok) deliveryError = `${r.status} ${(await r.text()).slice(0, 200)}`;
-    } catch (e) {
-      deliveryError = e instanceof Error ? e.message : String(e);
+  let attempts = 0;
+
+  const deliverOnce = async (): Promise<{ ok: boolean; error: string | null }> => {
+    if (s.delivery_method === "webhook") {
+      try {
+        const r = await fetch(s.destination, {
+          method: "POST",
+          headers: { "Content-Type": "text/csv", "x-export-name": s.name, "x-export-rows": String(all.length) },
+          body: csv,
+        });
+        return { ok: r.ok, error: r.ok ? null : `${r.status} ${(await r.text()).slice(0, 200)}` };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
     }
-  } else {
-    // Email: send CSV inline as <pre> preview + summary.
     try {
       const truncated = csv.length > 90_000 ? csv.slice(0, 90_000) + "\n…(truncated)" : csv;
       const html = `<h2>Scheduled security audit export: ${s.name}</h2>
@@ -112,11 +124,29 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
           idempotency_key: `sched-export-${s.id}-${Date.now()}`,
         }),
       });
-      deliveryOk = r.ok;
-      if (!r.ok) deliveryError = `${r.status} ${(await r.text()).slice(0, 200)}`;
+      return { ok: r.ok, error: r.ok ? null : `${r.status} ${(await r.text()).slice(0, 200)}` };
     } catch (e) {
-      deliveryError = e instanceof Error ? e.message : String(e);
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
+  };
+
+  for (let i = 0; i <= MAX_RETRIES; i++) {
+    attempts = i + 1;
+    const out = await deliverOnce();
+    deliveryOk = out.ok;
+    deliveryError = out.error;
+    if (out.ok) break;
+    if (i < MAX_RETRIES) await new Promise((r) => setTimeout(r, 500 * Math.pow(2, i)));
+  }
+
+  if (runId) {
+    await sb.from("security_scheduled_export_runs").update({
+      status: deliveryOk ? "sent" : "failed",
+      retry_count: Math.max(0, attempts - 1),
+      finished_at: new Date().toISOString(),
+      row_count: all.length,
+      error_message: deliveryError,
+    }).eq("id", runId);
   }
 
   await sb.from("security_scheduled_exports").update({
