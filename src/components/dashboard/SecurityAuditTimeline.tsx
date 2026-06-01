@@ -41,6 +41,12 @@ type Item = {
   outcome: string;
   outcomeTone: "rose" | "amber" | "emerald" | "muted";
   detail: string;
+  matched?: number;
+  threshold?: number;
+  cooldownActive?: boolean;
+  cooldownRemainingMin?: number;
+  nextAllowedAt?: string | null;
+  attempt?: number;
 };
 
 type GroupKey = string;
