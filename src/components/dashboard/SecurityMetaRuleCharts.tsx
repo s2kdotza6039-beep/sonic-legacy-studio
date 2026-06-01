@@ -112,6 +112,52 @@ export default function SecurityMetaRuleCharts() {
     });
   }, [rules, dispatch, dlq, windowKey]);
 
+  const exportCsv = async () => {
+    // Custom date-range CSV export: re-fetch within [csvFrom, csvTo] if set,
+    // otherwise re-use the currently loaded windowed dataset.
+    let dispatchRows = dispatch;
+    let dlqRows = dlq;
+    let fromIso: string;
+    let toIso: string = new Date().toISOString();
+    if (csvFrom && csvTo) {
+      fromIso = new Date(csvFrom).toISOString();
+      toIso = new Date(csvTo + "T23:59:59.999Z").toISOString();
+      const [d, q] = await Promise.all([
+        supabase.from("security_alert_dispatch_log").select("rule_id,status,attempt,created_at").gte("created_at", fromIso).lte("created_at", toIso).limit(10000),
+        supabase.from("security_alert_dlq").select("rule_id,created_at").gte("created_at", fromIso).lte("created_at", toIso).limit(5000),
+      ]);
+      dispatchRows = (d.data as Dispatch[]) ?? [];
+      dlqRows = (q.data as Dlq[]) ?? [];
+    } else {
+      const w = WINDOWS.find((x) => x.key === windowKey)!;
+      fromIso = new Date(Date.now() - w.hours * 3600_000).toISOString();
+    }
+    const header = ["rule_id", "rule_name", "bucket_iso", "attempts", "retry_rate_pct", "dlq_rate_pct"];
+    const lines: string[] = [header.join(",")];
+    const esc = (s: string) => /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    for (const rule of rules) {
+      const ds = dispatchRows.filter((x) => x.rule_id === rule.id);
+      const qs = dlqRows.filter((x) => x.rule_id === rule.id);
+      const series = buildSeries(windowKey, ds, qs);
+      for (const s of series) {
+        lines.push([
+          esc(rule.id), esc(rule.name), new Date(s.t).toISOString(),
+          String(s.attempts), s.retryRate.toFixed(2), s.dlqRate.toFixed(2),
+        ].join(","));
+      }
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `security-meta-rule-trends_${fromIso.slice(0, 10)}_to_${toIso.slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const [csvFrom, setCsvFrom] = useState<string>("");
+  const [csvTo, setCsvTo] = useState<string>("");
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -122,7 +168,7 @@ export default function SecurityMetaRuleCharts() {
             spot trends before a threshold is breached.
           </CardDescription>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap justify-end">
           {WINDOWS.map((w) => (
             <button key={w.key} onClick={() => setWindowKey(w.key)}
               className={`px-2.5 py-1 text-xs rounded-full border ${windowKey === w.key ? "border-primary text-primary" : "border-border text-muted-foreground"}`}>
@@ -135,6 +181,23 @@ export default function SecurityMetaRuleCharts() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-end gap-2 p-3 border border-border rounded-md bg-secondary/10">
+          <label className="text-xs space-y-1">
+            <span className="block text-muted-foreground">CSV from</span>
+            <Input type="date" value={csvFrom} onChange={(e) => setCsvFrom(e.target.value)} className="h-8 w-40" />
+          </label>
+          <label className="text-xs space-y-1">
+            <span className="block text-muted-foreground">CSV to</span>
+            <Input type="date" value={csvTo} onChange={(e) => setCsvTo(e.target.value)} className="h-8 w-40" />
+          </label>
+          <Button size="sm" variant="outline" onClick={exportCsv} disabled={loading || rules.length === 0}>
+            <Download className="w-4 h-4 mr-1" /> Export CSV
+          </Button>
+          <p className="text-[11px] text-muted-foreground flex-1 min-w-[200px]">
+            Leave dates blank to export the current {windowKey} window. Columns:
+            <code className="ml-1 font-mono">rule_id, rule_name, bucket_iso, attempts, retry_rate_pct, dlq_rate_pct</code>.
+          </p>
+        </div>
         {perRule.length === 0 && !loading && (
           <p className="text-sm text-muted-foreground p-6 text-center">
             No delivery_meta rules configured. Add one in “Security Alert Rules”.
