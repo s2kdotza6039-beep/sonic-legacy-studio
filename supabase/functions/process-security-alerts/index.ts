@@ -25,12 +25,46 @@ const CHANNEL_MIN_COOLDOWN_MIN: Record<"email" | "webhook", number> = {
   webhook: 1,
 };
 
-function cooldownState(rule: Rule): { active: boolean; remaining_ms: number; effective_min: number } {
+function cooldownState(rule: Rule): { active: boolean; remaining_ms: number; effective_min: number; next_allowed_at: string | null } {
   const effective = Math.max(CHANNEL_MIN_COOLDOWN_MIN[rule.channel] ?? 0, rule.cooldown_minutes);
-  if (!rule.last_triggered_at) return { active: false, remaining_ms: 0, effective_min: effective };
-  const elapsed = Date.now() - new Date(rule.last_triggered_at).getTime();
+  if (!rule.last_triggered_at) return { active: false, remaining_ms: 0, effective_min: effective, next_allowed_at: null };
+  const lastTriggered = new Date(rule.last_triggered_at).getTime();
+  const elapsed = Date.now() - lastTriggered;
   const windowMs = effective * 60_000;
-  return { active: elapsed < windowMs, remaining_ms: Math.max(0, windowMs - elapsed), effective_min: effective };
+  const nextAllowed = new Date(lastTriggered + windowMs).toISOString();
+  return { active: elapsed < windowMs, remaining_ms: Math.max(0, windowMs - elapsed), effective_min: effective, next_allowed_at: nextAllowed };
+}
+
+// Deterministic JSON stringify for stable hashing (sorts keys recursively).
+function stableStringify(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+  const keys = Object.keys(v as Record<string, unknown>).sort();
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + stableStringify((v as Record<string, unknown>)[k])).join(",") + "}";
+}
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Hash the time-invariant rule config + computed evaluation results so the
+// same inputs always produce the same hash. Deliberately excludes
+// `cooldown_remaining_min` / `next_allowed_at` (time-varying).
+async function evaluationHash(rule: Rule, matched: number, detail: Record<string, unknown>): Promise<string> {
+  const fingerprint = {
+    rule_id: rule.id,
+    source: rule.event_source,
+    kind: rule.event_kind,
+    threshold: rule.threshold,
+    window_minutes: rule.window_minutes,
+    channel: rule.channel,
+    destination: rule.destination,
+    cooldown_minutes: rule.cooldown_minutes,
+    matched,
+    detail,
+  };
+  return (await sha256Hex(stableStringify(fingerprint))).slice(0, 32);
 }
 
 type Rule = {
