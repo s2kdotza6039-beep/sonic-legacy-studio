@@ -193,8 +193,8 @@ export default function SecurityScheduledExports() {
                   return next;
                 });
                 return (
-                  <>
-                    <tr key={r.id} className="border-t border-border">
+                  <Fragment key={r.id}>
+                    <tr className="border-t border-border">
                       <td className="p-2">
                         <button onClick={toggleOpen} className="text-muted-foreground hover:text-foreground" title="Run history">
                           {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
