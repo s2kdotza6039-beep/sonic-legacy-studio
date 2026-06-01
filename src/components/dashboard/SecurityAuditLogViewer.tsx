@@ -341,6 +341,23 @@ export default function SecurityAuditLogViewer() {
             </button>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs border border-dashed border-border rounded-md p-2">
+          <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground">Presets:</span>
+          {presets.length === 0 && <span className="text-muted-foreground italic">none saved</span>}
+          {presets.map((p) => (
+            <span key={p.id} className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary/30 pl-2 pr-1 py-0.5">
+              <button onClick={() => applyPreset(p)} className="hover:text-primary" title="Apply preset">{p.name}</button>
+              <button onClick={() => deletePreset(p.id)} className="text-muted-foreground hover:text-rose-500"><Trash2 className="w-3 h-3" /></button>
+            </span>
+          ))}
+          <div className="flex items-center gap-1 ml-auto">
+            <Input className="h-7 text-xs w-44" placeholder="Save current as…" value={presetName} onChange={(e) => setPresetName(e.target.value)} />
+            <Button variant="outline" size="sm" onClick={savePreset} disabled={!presetName.trim()}>
+              <BookmarkPlus className="w-3.5 h-3.5 mr-1" /> Save
+            </Button>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
           <select value={action} onChange={(e) => setAction(e.target.value)} disabled={actionTab !== "all"}
             className="px-2 py-1.5 text-xs bg-background border border-border rounded disabled:opacity-50">
