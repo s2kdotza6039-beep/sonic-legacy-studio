@@ -69,10 +69,28 @@ Deno.serve(async (req) => {
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  let body: { window_hours?: number; dry_run?: boolean; preview?: boolean; manual?: boolean; recipients?: string[] } = {};
+  let body: { window_hours?: number; dry_run?: boolean; preview?: boolean; manual?: boolean; recipients?: string[]; template_data?: Record<string, unknown> } = {};
   try { body = await req.json(); } catch { /* empty body ok */ }
   const windowHours = Math.max(1, Math.min(168, body.window_hours ?? 24));
   const windowMs = windowHours * 3600_000;
+
+  // Re-render an old run's stored templateData without recomputing metrics.
+  if (body.preview && body.template_data && typeof body.template_data === "object") {
+    try {
+      const td = body.template_data as Record<string, unknown>;
+      const html = await renderAsync(React.createElement(dailyReportTemplate.component, td));
+      const subject = typeof dailyReportTemplate.subject === "function"
+        ? dailyReportTemplate.subject(td)
+        : dailyReportTemplate.subject;
+      return new Response(JSON.stringify({ ok: true, preview: true, replay: true, subject, html, templateData: td }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
 
   const now = Date.now();
   const currentSince = new Date(now - windowMs).toISOString();
