@@ -249,22 +249,65 @@ export default function SecurityScheduledExports() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {scheduleRuns.slice(0, 10).map((run) => (
-                                    <tr key={run.id} className="border-t border-border/60">
-                                      <td className="p-1.5 whitespace-nowrap">{new Date(run.started_at).toLocaleString()}</td>
-                                      <td className="p-1.5">
-                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                          run.status === "sent" ? "bg-emerald-500/15 text-emerald-600"
-                                          : run.status === "failed" ? "bg-rose-500/15 text-rose-600"
-                                          : "bg-amber-500/15 text-amber-600"
-                                        }`}>{run.status}</span>
-                                      </td>
-                                      <td className="p-1.5">{run.retry_count}</td>
-                                      <td className="p-1.5">{run.row_count ?? "—"}</td>
-                                      <td className="p-1.5 whitespace-nowrap">{run.finished_at ? new Date(run.finished_at).toLocaleString() : "—"}</td>
-                                      <td className="p-1.5 text-rose-600 max-w-[280px] truncate" title={run.error_message ?? ""}>{run.error_message ?? "—"}</td>
-                                    </tr>
-                                  ))}
+                                  {scheduleRuns.slice(0, 10).map((run) => {
+                                    const attemptLog = run.metadata?.attempts ?? [];
+                                    return (
+                                      <Fragment key={run.id}>
+                                        <tr className="border-t border-border/60">
+                                          <td className="p-1.5 whitespace-nowrap">{new Date(run.started_at).toLocaleString()}</td>
+                                          <td className="p-1.5">
+                                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                              run.status === "sent" ? "bg-emerald-500/15 text-emerald-600"
+                                              : run.status === "failed" ? "bg-rose-500/15 text-rose-600"
+                                              : "bg-amber-500/15 text-amber-600"
+                                            }`}>{run.status}</span>
+                                          </td>
+                                          <td className="p-1.5">{run.retry_count}</td>
+                                          <td className="p-1.5">{run.row_count ?? "—"}</td>
+                                          <td className="p-1.5 whitespace-nowrap">{run.finished_at ? new Date(run.finished_at).toLocaleString() : "—"}</td>
+                                          <td className="p-1.5 text-rose-600 max-w-[280px] truncate" title={run.error_message ?? ""}>{run.error_message ?? "—"}</td>
+                                        </tr>
+                                        {attemptLog.length > 0 && (
+                                          <tr className="bg-background/40">
+                                            <td colSpan={6} className="px-3 pb-2">
+                                              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 mb-1">Attempt timeline</div>
+                                              <table className="w-full text-[10px]">
+                                                <thead className="text-muted-foreground">
+                                                  <tr>
+                                                    <th className="text-left p-1">#</th>
+                                                    <th className="text-left p-1">Started</th>
+                                                    <th className="text-left p-1">Finished</th>
+                                                    <th className="text-left p-1">Duration</th>
+                                                    <th className="text-left p-1">Result</th>
+                                                    <th className="text-left p-1">Backoff before next</th>
+                                                    <th className="text-left p-1">Error</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {attemptLog.map((a) => {
+                                                    const dur = Math.max(0, new Date(a.finished_at).getTime() - new Date(a.started_at).getTime());
+                                                    return (
+                                                      <tr key={a.attempt} className="border-t border-border/40">
+                                                        <td className="p-1 font-mono">{a.attempt}</td>
+                                                        <td className="p-1 whitespace-nowrap font-mono">{new Date(a.started_at).toLocaleTimeString()}</td>
+                                                        <td className="p-1 whitespace-nowrap font-mono">{new Date(a.finished_at).toLocaleTimeString()}</td>
+                                                        <td className="p-1 font-mono">{dur}ms</td>
+                                                        <td className="p-1">
+                                                          <span className={a.ok ? "text-emerald-600" : "text-rose-600"}>{a.ok ? "ok" : "failed"}</span>
+                                                        </td>
+                                                        <td className="p-1 font-mono">{a.backoff_ms_before_next > 0 ? `${a.backoff_ms_before_next}ms` : "—"}</td>
+                                                        <td className="p-1 text-rose-600 max-w-[260px] truncate" title={a.error ?? ""}>{a.error ?? "—"}</td>
+                                                      </tr>
+                                                    );
+                                                  })}
+                                                </tbody>
+                                              </table>
+                                            </td>
+                                          </tr>
+                                        )}
+                                      </Fragment>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
