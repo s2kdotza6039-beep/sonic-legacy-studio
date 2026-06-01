@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { LineChart, Loader2, RefreshCw } from "lucide-react";
+import { Download, LineChart, Loader2, RefreshCw } from "lucide-react";
 
 // Per-meta-rule trend charts: founders watch attempts, retry rate, and DLQ rate
 // trend lines for each delivery_meta rule so they can spot problems BEFORE the
