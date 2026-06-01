@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { BellRing, Plus, Trash2, Send, Loader2, Save, Pencil, X, Repeat, Database } from "lucide-react";
+import { BellRing, Plus, Trash2, Send, Loader2, Save, Pencil, X, Repeat, Database, FlaskConical, Settings2 } from "lucide-react";
 
 type Rule = {
   id: string;
