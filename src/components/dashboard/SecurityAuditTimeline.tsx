@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, RefreshCw, Timer, ChevronDown, ChevronRight, Download } from "lucide-react";
 
@@ -71,6 +72,9 @@ export default function SecurityAuditTimeline() {
   const [dryruns, setDryruns] = useState<DryrunRow[]>([]);
   const [dispatches, setDispatches] = useState<DispatchRow[]>([]);
   const [expanded, setExpanded] = useState<Set<GroupKey>>(new Set());
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const sinceIso = useMemo(() => {
     const r = RANGES.find((x) => x.key === rangeKey)!;
@@ -90,7 +94,7 @@ export default function SecurityAuditTimeline() {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [rangeKey]);
 
-  const groups = useMemo((): Group[] => {
+  const buildGroups = (drs: DryrunRow[], dss: DispatchRow[]): Group[] => {
     const map = new Map<GroupKey, Group>();
     const upsert = (rule: string, channel: string, destination: string, item: Item) => {
       const key = `${rule}|${channel}|${destination}`;
@@ -99,7 +103,7 @@ export default function SecurityAuditTimeline() {
       map.set(key, g);
     };
 
-    for (const r of dryruns) {
+    for (const r of drs) {
       const dr = r.metadata?.results?.[0];
       if (!dr) continue;
       const cdActive = dr.conditions?.cooldown_active === true;
@@ -120,7 +124,7 @@ export default function SecurityAuditTimeline() {
         nextAllowedAt: next ?? null,
       });
     }
-    for (const d of dispatches) {
+    for (const d of dss) {
       const tone: Item["outcomeTone"] = d.status === "sent" ? "rose" : d.status === "skipped_cooldown" ? "amber" : d.status === "failed" || d.status === "dlq" ? "muted" : "emerald";
       upsert(d.rule_name ?? "(rule)", d.channel ?? "?", d.destination ?? "?", {
         ts: d.created_at,
@@ -138,7 +142,9 @@ export default function SecurityAuditTimeline() {
     for (const g of arr) g.items.sort((a, b) => b.ts.localeCompare(a.ts));
     arr.sort((a, b) => b.items.length - a.items.length);
     return arr;
-  }, [dryruns, dispatches]);
+  };
+
+  const groups = useMemo(() => buildGroups(dryruns, dispatches), [dryruns, dispatches]);
 
   const toggle = (k: GroupKey) => {
     setExpanded((prev) => {
@@ -148,37 +154,60 @@ export default function SecurityAuditTimeline() {
     });
   };
 
-  const exportCsv = () => {
-    const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = [
-      "rule", "channel", "destination", "event_kind", "timestamp", "outcome",
-      "matched", "threshold", "attempt", "cooldown_active", "cooldown_remaining_min", "next_allowed_at",
-    ];
-    const lines = [header.join(",")];
-    for (const g of groups) {
-      // Items are already sorted newest-first per group. Export oldest-first so
-      // cooldown transitions read chronologically.
-      const ordered = [...g.items].sort((a, b) => a.ts.localeCompare(b.ts));
-      for (const it of ordered) {
-        lines.push([
-          g.rule, g.channel, g.destination, it.kind, it.ts, it.outcome,
-          it.matched ?? "", it.threshold ?? "", it.attempt ?? "",
-          it.cooldownActive ?? "", it.cooldownRemainingMin ?? "", it.nextAllowedAt ?? "",
-        ].map(esc).join(","));
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      // If a custom range is set, fetch fresh data for that window so the
+      // export isn't limited to the current visible range. Otherwise use the
+      // already-loaded groups.
+      let exportGroups = groups;
+      let fromIso: string | null = null;
+      let toIso: string | null = null;
+      if (exportFrom || exportTo) {
+        fromIso = exportFrom ? new Date(exportFrom).toISOString() : new Date(0).toISOString();
+        const toDate = exportTo ? new Date(exportTo) : new Date();
+        if (exportTo) toDate.setHours(23, 59, 59, 999);
+        toIso = toDate.toISOString();
+        const drQ = supabase.from("security_audit_log").select("id, created_at, metadata").eq("action", "alert_rule_dryrun").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
+        const dsQ = supabase.from("security_alert_dispatch_log").select("id, created_at, rule_id, rule_name, channel, destination, matched_count, status, attempt").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
+        const [dr, ds] = await Promise.all([drQ, dsQ]);
+        exportGroups = buildGroups((dr.data as DryrunRow[]) ?? [], (ds.data as DispatchRow[]) ?? []);
       }
+
+      const esc = (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = [
+        "rule", "channel", "destination", "event_kind", "timestamp", "outcome",
+        "matched", "threshold", "attempt", "cooldown_active", "cooldown_remaining_min", "next_allowed_at",
+      ];
+      const lines = [header.join(",")];
+      for (const g of exportGroups) {
+        const ordered = [...g.items].sort((a, b) => a.ts.localeCompare(b.ts));
+        for (const it of ordered) {
+          lines.push([
+            g.rule, g.channel, g.destination, it.kind, it.ts, it.outcome,
+            it.matched ?? "", it.threshold ?? "", it.attempt ?? "",
+            it.cooldownActive ?? "", it.cooldownRemainingMin ?? "", it.nextAllowedAt ?? "",
+          ].map(esc).join(","));
+        }
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const tag = exportFrom || exportTo
+        ? `${exportFrom || "start"}_to_${exportTo || "now"}`
+        : rangeKey;
+      a.download = `security-timeline-${tag}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
     }
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `security-timeline-${rangeKey}-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -192,7 +221,7 @@ export default function SecurityAuditTimeline() {
           </CardDescription>
         </div>
         <div className="flex gap-2">
-          <div className="flex flex-wrap gap-1 text-xs">
+          <div className="flex flex-wrap items-center gap-1 text-xs">
             {RANGES.map((r) => (
               <button key={r.key} onClick={() => setRangeKey(r.key)}
                 className={`px-2.5 py-1 rounded-full border ${rangeKey === r.key ? "border-primary text-primary" : "border-border text-muted-foreground"}`}>
@@ -200,8 +229,13 @@ export default function SecurityAuditTimeline() {
               </button>
             ))}
           </div>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || groups.length === 0}>
-            <Download className="w-4 h-4 mr-1" /> CSV
+          <div className="flex items-center gap-1 text-xs" title="CSV export window (overrides quick-range)">
+            <Input type="date" value={exportFrom} onChange={(e) => setExportFrom(e.target.value)} className="h-8 w-36 text-xs" />
+            <span className="text-muted-foreground">→</span>
+            <Input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} className="h-8 w-36 text-xs" />
+          </div>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || exporting || (groups.length === 0 && !exportFrom && !exportTo)}>
+            {exporting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />} CSV
           </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}

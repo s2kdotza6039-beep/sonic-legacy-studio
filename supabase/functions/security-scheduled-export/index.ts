@@ -86,12 +86,21 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
     row_count: all.length,
     delivery_method: s.delivery_method,
     destination: s.destination,
+    metadata: { attempts: [] },
   }).select("id").single();
   const runId = (runRow as { id?: string } | null)?.id ?? null;
 
   let deliveryOk = false;
   let deliveryError: string | null = null;
   let attempts = 0;
+  const attemptLog: Array<{
+    attempt: number;
+    started_at: string;
+    finished_at: string;
+    ok: boolean;
+    error: string | null;
+    backoff_ms_before_next: number;
+  }> = [];
 
   const deliverOnce = async (): Promise<{ ok: boolean; error: string | null }> => {
     if (s.delivery_method === "webhook") {
@@ -132,11 +141,15 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
 
   for (let i = 0; i <= MAX_RETRIES; i++) {
     attempts = i + 1;
+    const startedAt = new Date().toISOString();
     const out = await deliverOnce();
+    const finishedAt = new Date().toISOString();
     deliveryOk = out.ok;
     deliveryError = out.error;
+    const backoffMs = out.ok || i >= MAX_RETRIES ? 0 : 500 * Math.pow(2, i);
+    attemptLog.push({ attempt: attempts, started_at: startedAt, finished_at: finishedAt, ok: out.ok, error: out.error, backoff_ms_before_next: backoffMs });
     if (out.ok) break;
-    if (i < MAX_RETRIES) await new Promise((r) => setTimeout(r, 500 * Math.pow(2, i)));
+    if (i < MAX_RETRIES) await new Promise((r) => setTimeout(r, backoffMs));
   }
 
   if (runId) {
@@ -146,6 +159,7 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
       finished_at: new Date().toISOString(),
       row_count: all.length,
       error_message: deliveryError,
+      metadata: { attempts: attemptLog },
     }).eq("id", runId);
   }
 
