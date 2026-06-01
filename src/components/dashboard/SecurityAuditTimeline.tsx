@@ -253,7 +253,7 @@ export default function SecurityAuditTimeline() {
             <span className="text-muted-foreground">→</span>
             <Input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} className="h-8 w-36 text-xs" />
           </div>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || exporting || (groups.length === 0 && !exportFrom && !exportTo)}>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || exporting}>
             {exporting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />} CSV
           </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -262,7 +262,28 @@ export default function SecurityAuditTimeline() {
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {groups.length === 0 && !loading && (
+        {(exportError || exportInfo || exporting) && (
+          <div
+            className={`text-xs rounded-md border px-3 py-2 ${
+              exportError
+                ? "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                : exporting
+                ? "border-border bg-secondary/30 text-muted-foreground"
+                : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            }`}
+            role={exportError ? "alert" : "status"}
+          >
+            {exporting
+              ? "Building CSV…"
+              : exportError ?? exportInfo}
+          </div>
+        )}
+        {loading && groups.length === 0 && (
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-6">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading timeline…
+          </div>
+        )}
+        {!loading && groups.length === 0 && (
           <div className="text-center text-xs text-muted-foreground py-6">No activity in the selected window.</div>
         )}
         {groups.map((g) => {
