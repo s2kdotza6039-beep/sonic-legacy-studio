@@ -184,7 +184,48 @@ export default function SecurityAuditLogViewer() {
     setEntities(Array.from(e).sort());
   };
 
-  useEffect(() => { refreshFacets(); }, []);
+  const loadPresets = async () => {
+    const { data } = await supabase
+      .from("security_audit_log_presets")
+      .select("id, name, filters")
+      .order("name");
+    setPresets((data as typeof presets) ?? []);
+  };
+
+  const applyPreset = (p: { filters: Record<string, unknown> }) => {
+    const f = p.filters ?? {};
+    if (typeof f.rangeKey === "string") setRangeKey(f.rangeKey as (typeof RANGES)[number]["key"]);
+    if (typeof f.actionTab === "string") setActionTab(f.actionTab as (typeof ACTION_TABS)[number]["key"]);
+    if (typeof f.action === "string") setAction(f.action);
+    if (typeof f.entity === "string") setEntity(f.entity);
+    if (typeof f.actor === "string") setActor(f.actor);
+    if (typeof f.destination === "string") setDestination(f.destination);
+    if (typeof f.matched === "string") setMatched(f.matched as (typeof MATCHED_CONDITIONS)[number]["key"]);
+    if (typeof f.search === "string") setSearch(f.search);
+  };
+
+  const savePreset = async () => {
+    const name = presetName.trim();
+    if (!name) return;
+    const { data: s } = await supabase.auth.getSession();
+    const uid = s.session?.user?.id;
+    if (!uid) return alert("Sign in");
+    const filters = { rangeKey, actionTab, action, entity, actor, destination, matched, search };
+    const { error } = await supabase
+      .from("security_audit_log_presets")
+      .upsert({ owner_user_id: uid, name, filters }, { onConflict: "owner_user_id,name" });
+    if (error) return alert(error.message);
+    setPresetName("");
+    loadPresets();
+  };
+
+  const deletePreset = async (id: string) => {
+    if (!confirm("Delete this preset?")) return;
+    const { error } = await supabase.from("security_audit_log_presets").delete().eq("id", id);
+    if (error) alert(error.message); else loadPresets();
+  };
+
+  useEffect(() => { refreshFacets(); loadPresets(); }, []);
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ },
     [rangeKey, effectiveAction, entity, actor, destination, matched, search, page, pageSize]);
   useEffect(() => { setPage(0); },
