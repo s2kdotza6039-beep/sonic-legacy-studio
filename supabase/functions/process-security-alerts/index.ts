@@ -129,9 +129,6 @@ async function scanAndDispatch(sb: ReturnType<typeof createClient>) {
   const results: Array<Record<string, unknown>> = [];
 
   for (const rule of (rules ?? []) as Rule[]) {
-    const cfg = SOURCE_TABLE[rule.event_source];
-    if (!cfg) continue;
-
     if (rule.last_triggered_at && now - new Date(rule.last_triggered_at).getTime() < rule.cooldown_minutes * 60_000) {
       await sb.from("security_alert_dispatch_log").insert({
         rule_id: rule.id, rule_name: rule.name, channel: rule.channel, destination: rule.destination,
@@ -141,25 +138,46 @@ async function scanAndDispatch(sb: ReturnType<typeof createClient>) {
       continue;
     }
 
-    const since = new Date(now - rule.window_minutes * 60_000).toISOString();
-    let q = sb.from(cfg.table).select("*", { count: "exact", head: false }).gte(cfg.tsCol, since).limit(5);
-    if (rule.event_kind && rule.event_kind !== "*") q = q.eq(cfg.kindCol, rule.event_kind);
-    const { data: rows, count, error: qErr } = await q;
-    if (qErr) {
-      results.push({ rule: rule.name, status: "query_error", error: qErr.message });
+    const sinceIso = new Date(now - rule.window_minutes * 60_000).toISOString();
+    let matched = 0;
+    let rows: unknown[] = [];
+    let extraDetail: Record<string, unknown> = {};
+
+    if (rule.event_source === "delivery_meta") {
+      const meta = await evaluateMetaRule(sb, rule, sinceIso);
+      matched = meta.matched;
+      rows = meta.sample;
+      extraDetail = meta.detail;
+    } else {
+      const cfg = SOURCE_TABLE[rule.event_source];
+      if (!cfg) continue;
+      let q = sb.from(cfg.table).select("*", { count: "exact", head: false }).gte(cfg.tsCol, sinceIso).limit(5);
+      if (rule.event_kind && rule.event_kind !== "*") q = q.eq(cfg.kindCol, rule.event_kind);
+      const { data: r, count, error: qErr } = await q;
+      if (qErr) {
+        results.push({ rule: rule.name, status: "query_error", error: qErr.message });
+        continue;
+      }
+      matched = count ?? r?.length ?? 0;
+      rows = r ?? [];
+    }
+
+    if (matched < rule.threshold && rule.event_source !== "delivery_meta") {
+      results.push({ rule: rule.name, status: "below_threshold", matched });
       continue;
     }
-    const matched = count ?? rows?.length ?? 0;
-    if (matched < rule.threshold) {
-      results.push({ rule: rule.name, status: "below_threshold", matched });
+    // For meta rules, evaluateMetaRule returns matched=0 when below threshold.
+    if (rule.event_source === "delivery_meta" && matched === 0) {
+      results.push({ rule: rule.name, status: "below_threshold", detail: extraDetail });
       continue;
     }
 
     const payload = {
       rule: rule.name, source: rule.event_source, kind: rule.event_kind,
       matched, threshold: rule.threshold, window_minutes: rule.window_minutes,
-      sample: rows ?? [], at: new Date().toISOString(),
+      sample: rows, detail: extraDetail, at: new Date().toISOString(),
     };
+
 
     try {
       await sendOnce(rule.channel, rule.destination, rule.name, payload,
