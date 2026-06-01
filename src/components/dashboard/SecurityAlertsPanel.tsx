@@ -163,16 +163,22 @@ export default function SecurityAlertsPanel() {
 
   // --- Dry-run "Test this rule": evaluates a single rule WITHOUT dispatching. ---
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const testRule = async (r: Rule) => {
     setTestingId(r.id);
     setTestResult(null);
+    setTestError(null);
     const { data, error } = await supabase.functions.invoke("process-security-alerts", {
       body: { mode: "dryrun", rule_id: r.id },
     });
     setTestingId(null);
-    if (error) { alert(error.message); return; }
+    if (error) {
+      setTestError(error.message || "Dry-run failed");
+      return;
+    }
     const result = (data as { results?: Record<string, unknown>[] })?.results?.[0] ?? null;
+    if (!result) { setTestError("No result returned"); return; }
     setTestResult({ ...result, _rule: r.name });
   };
 
