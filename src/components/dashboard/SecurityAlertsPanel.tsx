@@ -351,30 +351,70 @@ export default function SecurityAlertsPanel() {
         </CardContent>
       </Card>
 
-      {/* Dry-run test result */}
-      {testResult && (
+      {/* Dry-run test result panel */}
+      {(testResult || testError) && (
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
-                <FlaskConical className="w-4 h-4" /> Dry-run: {String(testResult._rule ?? "")}
+                <FlaskConical className="w-4 h-4" /> Dry-run: {String(testResult?._rule ?? "")}
               </CardTitle>
               <CardDescription>
                 Simulated evaluation. No email or webhook was sent and no dispatch row was written.
+                An entry was recorded in the founder-only security audit log.
               </CardDescription>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setTestResult(null)}><X className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => { setTestResult(null); setTestError(null); }}><X className="w-4 h-4" /></Button>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${testResult.would_fire ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"}`}>
-                {testResult.would_fire ? "WOULD FIRE" : "below threshold"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                matched={String(testResult.matched ?? 0)} · threshold={String(testResult.threshold ?? 0)} · window={String(testResult.window_minutes ?? 0)}m
-              </span>
-            </div>
-            <pre className="text-[11px] font-mono bg-secondary/30 p-3 rounded overflow-x-auto">{JSON.stringify(testResult, null, 2)}</pre>
+          <CardContent className="space-y-3">
+            {testError && (
+              <div className="text-xs p-3 rounded bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 font-mono">
+                {testError}
+              </div>
+            )}
+            {testResult && (() => {
+              const r = testResult as Record<string, unknown>;
+              const cond = (r.conditions ?? {}) as Record<string, unknown>;
+              const detail = (r.detail ?? {}) as Record<string, unknown>;
+              const wouldDispatch = Boolean(r.would_dispatch);
+              const wouldFire = Boolean(r.would_fire);
+              const cdActive = Boolean(cond.cooldown_active);
+              return (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${wouldDispatch ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"}`}>
+                      {wouldDispatch ? "WOULD DISPATCH" : "would NOT dispatch"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      threshold met: <strong>{String(wouldFire)}</strong> · cooldown active: <strong>{String(cdActive)}</strong>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <Metric label="Matched" value={String(r.matched ?? 0)} />
+                    <Metric label="Threshold" value={String(r.threshold ?? 0)} />
+                    <Metric label="Window (min)" value={String(r.window_minutes ?? 0)} />
+                    <Metric label="Channel" value={`${String(r.channel ?? "")}`} />
+                    <Metric label="Cooldown remaining (min)" value={String(cond.cooldown_remaining_min ?? 0)} />
+                    <Metric label="Effective cooldown (min)" value={String(cond.effective_cooldown_min ?? 0)} />
+                    {r.source === "delivery_meta" && (
+                      <>
+                        <Metric label="Total attempts" value={String(detail.total_attempts ?? 0)} />
+                        <Metric label="Retries" value={String(detail.retries ?? 0)} />
+                        <Metric label="Retry rate %" value={`${detail.retry_rate_pct ?? 0}`} />
+                        <Metric label="DLQ count" value={String(detail.dlq_count ?? 0)} />
+                        <Metric label="DLQ rate %" value={`${detail.dlq_rate_pct ?? 0}`} />
+                      </>
+                    )}
+                  </div>
+
+                  <details className="text-[11px]">
+                    <summary className="cursor-pointer text-muted-foreground">Raw response</summary>
+                    <pre className="font-mono bg-secondary/30 p-3 rounded overflow-x-auto mt-2">{JSON.stringify(r, null, 2)}</pre>
+                  </details>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
