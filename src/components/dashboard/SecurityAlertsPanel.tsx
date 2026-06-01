@@ -10,7 +10,7 @@ type Rule = {
   id: string;
   name: string;
   enabled: boolean;
-  event_source: "playback" | "payfast" | "ai" | "audit";
+  event_source: "playback" | "payfast" | "ai" | "audit" | "delivery_meta";
   event_kind: string;
   threshold: number;
   window_minutes: number;
@@ -19,6 +19,9 @@ type Rule = {
   cooldown_minutes: number;
   last_triggered_at: string | null;
 };
+
+const META_KINDS = ["delivery_spike", "retry_rate_high", "dlq_rate_high"] as const;
+const SOURCE_OPTIONS = ["playback", "payfast", "ai", "audit", "delivery_meta"] as const;
 
 type DlqRow = {
   id: string;
