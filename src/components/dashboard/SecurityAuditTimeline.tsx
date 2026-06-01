@@ -151,37 +151,60 @@ export default function SecurityAuditTimeline() {
     });
   };
 
-  const exportCsv = () => {
-    const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = [
-      "rule", "channel", "destination", "event_kind", "timestamp", "outcome",
-      "matched", "threshold", "attempt", "cooldown_active", "cooldown_remaining_min", "next_allowed_at",
-    ];
-    const lines = [header.join(",")];
-    for (const g of groups) {
-      // Items are already sorted newest-first per group. Export oldest-first so
-      // cooldown transitions read chronologically.
-      const ordered = [...g.items].sort((a, b) => a.ts.localeCompare(b.ts));
-      for (const it of ordered) {
-        lines.push([
-          g.rule, g.channel, g.destination, it.kind, it.ts, it.outcome,
-          it.matched ?? "", it.threshold ?? "", it.attempt ?? "",
-          it.cooldownActive ?? "", it.cooldownRemainingMin ?? "", it.nextAllowedAt ?? "",
-        ].map(esc).join(","));
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      // If a custom range is set, fetch fresh data for that window so the
+      // export isn't limited to the current visible range. Otherwise use the
+      // already-loaded groups.
+      let exportGroups = groups;
+      let fromIso: string | null = null;
+      let toIso: string | null = null;
+      if (exportFrom || exportTo) {
+        fromIso = exportFrom ? new Date(exportFrom).toISOString() : new Date(0).toISOString();
+        const toDate = exportTo ? new Date(exportTo) : new Date();
+        if (exportTo) toDate.setHours(23, 59, 59, 999);
+        toIso = toDate.toISOString();
+        const drQ = supabase.from("security_audit_log").select("id, created_at, metadata").eq("action", "alert_rule_dryrun").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
+        const dsQ = supabase.from("security_alert_dispatch_log").select("id, created_at, rule_id, rule_name, channel, destination, matched_count, status, attempt").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
+        const [dr, ds] = await Promise.all([drQ, dsQ]);
+        exportGroups = buildGroups((dr.data as DryrunRow[]) ?? [], (ds.data as DispatchRow[]) ?? []);
       }
+
+      const esc = (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = [
+        "rule", "channel", "destination", "event_kind", "timestamp", "outcome",
+        "matched", "threshold", "attempt", "cooldown_active", "cooldown_remaining_min", "next_allowed_at",
+      ];
+      const lines = [header.join(",")];
+      for (const g of exportGroups) {
+        const ordered = [...g.items].sort((a, b) => a.ts.localeCompare(b.ts));
+        for (const it of ordered) {
+          lines.push([
+            g.rule, g.channel, g.destination, it.kind, it.ts, it.outcome,
+            it.matched ?? "", it.threshold ?? "", it.attempt ?? "",
+            it.cooldownActive ?? "", it.cooldownRemainingMin ?? "", it.nextAllowedAt ?? "",
+          ].map(esc).join(","));
+        }
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const tag = exportFrom || exportTo
+        ? `${exportFrom || "start"}_to_${exportTo || "now"}`
+        : rangeKey;
+      a.download = `security-timeline-${tag}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
     }
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `security-timeline-${rangeKey}-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   };
 
   return (
