@@ -181,7 +181,7 @@ async function scanAndDispatch(sb: ReturnType<typeof createClient>) {
 
     try {
       await sendOnce(rule.channel, rule.destination, rule.name, payload,
-        rule.event_source, rule.event_kind, rule.window_minutes, rule.threshold, matched, rows ?? []);
+        rule.event_source, rule.event_kind, rule.window_minutes, rule.threshold, matched, rows);
       await sb.from("security_alert_rules").update({ last_triggered_at: new Date().toISOString() }).eq("id", rule.id);
       await sb.from("security_alert_dispatch_log").insert({
         rule_id: rule.id, rule_name: rule.name, channel: rule.channel, destination: rule.destination,
