@@ -1695,39 +1695,54 @@ export type Database = {
       }
       security_alert_dispatch_log: {
         Row: {
+          attempt: number
           channel: string | null
           created_at: string
           destination: string | null
           error: string | null
           id: string
+          last_error: string | null
           matched_count: number | null
+          max_attempts: number
+          next_retry_at: string | null
           payload: Json | null
           rule_id: string | null
           rule_name: string | null
+          rule_snapshot: Json | null
           status: string
         }
         Insert: {
+          attempt?: number
           channel?: string | null
           created_at?: string
           destination?: string | null
           error?: string | null
           id?: string
+          last_error?: string | null
           matched_count?: number | null
+          max_attempts?: number
+          next_retry_at?: string | null
           payload?: Json | null
           rule_id?: string | null
           rule_name?: string | null
+          rule_snapshot?: Json | null
           status: string
         }
         Update: {
+          attempt?: number
           channel?: string | null
           created_at?: string
           destination?: string | null
           error?: string | null
           id?: string
+          last_error?: string | null
           matched_count?: number | null
+          max_attempts?: number
+          next_retry_at?: string | null
           payload?: Json | null
           rule_id?: string | null
           rule_name?: string | null
+          rule_snapshot?: Json | null
           status?: string
         }
         Relationships: [
@@ -1739,6 +1754,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      security_alert_dlq: {
+        Row: {
+          attempts: number
+          channel: string | null
+          created_at: string
+          destination: string | null
+          first_failed_at: string | null
+          id: string
+          last_error: string | null
+          matched_count: number | null
+          payload: Json | null
+          rule_id: string | null
+          rule_name: string | null
+          rule_snapshot: Json | null
+        }
+        Insert: {
+          attempts?: number
+          channel?: string | null
+          created_at?: string
+          destination?: string | null
+          first_failed_at?: string | null
+          id?: string
+          last_error?: string | null
+          matched_count?: number | null
+          payload?: Json | null
+          rule_id?: string | null
+          rule_name?: string | null
+          rule_snapshot?: Json | null
+        }
+        Update: {
+          attempts?: number
+          channel?: string | null
+          created_at?: string
+          destination?: string | null
+          first_failed_at?: string | null
+          id?: string
+          last_error?: string | null
+          matched_count?: number | null
+          payload?: Json | null
+          rule_id?: string | null
+          rule_name?: string | null
+          rule_snapshot?: Json | null
+        }
+        Relationships: []
       }
       security_alert_rules: {
         Row: {
@@ -1827,6 +1887,39 @@ export type Database = {
           metadata?: Json | null
           row_count?: number | null
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      security_retention_config: {
+        Row: {
+          audit_log_days: number
+          cleanup_enabled: boolean
+          dispatch_log_days: number
+          dlq_days: number
+          id: number
+          last_cleanup_at: string | null
+          last_cleanup_summary: Json | null
+          updated_at: string
+        }
+        Insert: {
+          audit_log_days?: number
+          cleanup_enabled?: boolean
+          dispatch_log_days?: number
+          dlq_days?: number
+          id?: number
+          last_cleanup_at?: string | null
+          last_cleanup_summary?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          audit_log_days?: number
+          cleanup_enabled?: boolean
+          dispatch_log_days?: number
+          dlq_days?: number
+          id?: number
+          last_cleanup_at?: string | null
+          last_cleanup_summary?: Json | null
+          updated_at?: string
         }
         Relationships: []
       }
