@@ -268,14 +268,54 @@ Deno.serve(async (req) => {
   if (denied) return denied;
 
   let mode = "scan";
+  let dryRunRuleId: string | null = null;
   try {
     if (req.headers.get("Content-Type")?.includes("application/json")) {
       const body = await req.json();
       if (body?.mode === "retry") mode = "retry";
+      if (body?.mode === "dryrun") { mode = "dryrun"; dryRunRuleId = body?.rule_id ?? null; }
     }
   } catch { /* empty body ok */ }
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  if (mode === "dryrun") {
+    // Evaluate rule(s) WITHOUT sending notifications or writing dispatch rows.
+    let q = sb.from("security_alert_rules").select("*");
+    if (dryRunRuleId) q = q.eq("id", dryRunRuleId);
+    const { data: rs } = await q;
+    const out: Array<Record<string, unknown>> = [];
+    const now = Date.now();
+    for (const rule of (rs ?? []) as Rule[]) {
+      const sinceIso = new Date(now - rule.window_minutes * 60_000).toISOString();
+      if (rule.event_source === "delivery_meta") {
+        const meta = await evaluateMetaRule(sb, rule, sinceIso);
+        out.push({
+          rule_id: rule.id, rule: rule.name, kind: rule.event_kind,
+          would_fire: meta.matched > 0, matched: meta.matched, detail: meta.detail,
+          window_minutes: rule.window_minutes, threshold: rule.threshold,
+          channel: rule.channel, destination: rule.destination,
+        });
+      } else {
+        const cfg = SOURCE_TABLE[rule.event_source];
+        if (!cfg) { out.push({ rule: rule.name, error: "unknown_source" }); continue; }
+        let qq = sb.from(cfg.table).select("*", { count: "exact", head: true }).gte(cfg.tsCol, sinceIso);
+        if (rule.event_kind && rule.event_kind !== "*") qq = qq.eq(cfg.kindCol, rule.event_kind);
+        const { count } = await qq;
+        const matched = count ?? 0;
+        out.push({
+          rule_id: rule.id, rule: rule.name, kind: rule.event_kind,
+          would_fire: matched >= rule.threshold, matched,
+          threshold: rule.threshold, window_minutes: rule.window_minutes,
+          channel: rule.channel, destination: rule.destination,
+        });
+      }
+    }
+    return new Response(JSON.stringify({ mode, dry_run: true, results: out }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const results = mode === "retry" ? await retryFailed(sb) : await scanAndDispatch(sb);
 
   return new Response(JSON.stringify({ mode, processed: results.length, results }), {

@@ -143,10 +143,14 @@ export default function SecurityAuditLogViewer() {
       });
       if (auditError) { alert("Export blocked: " + auditError.message); return; }
 
-      const header = ["created_at", "actor_user_id", "action", "entity", "row_count", "ip", "user_agent", "filters"];
+      const header = ["created_at", "actor_user_id", "actor_email", "request_id", "action", "entity", "row_count", "ip", "user_agent", "filters"];
       const lines = [header.join(",")];
       for (const r of all) {
-        lines.push([r.created_at, r.actor_user_id, r.action, r.entity, r.row_count, r.ip, r.user_agent, r.filters].map(csvEscape).join(","));
+        const meta = (r.metadata ?? {}) as { request_id?: string; actor_email?: string };
+        lines.push([
+          r.created_at, r.actor_user_id, meta.actor_email ?? "", meta.request_id ?? "",
+          r.action, r.entity, r.row_count, r.ip, r.user_agent, r.filters,
+        ].map(csvEscape).join(","));
       }
       const blob = new Blob([lines.join("\n")], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
@@ -211,6 +215,8 @@ export default function SecurityAuditLogViewer() {
               <tr>
                 <th className="text-left p-2">When</th>
                 <th className="text-left p-2">Actor</th>
+                <th className="text-left p-2">Email</th>
+                <th className="text-left p-2">Request ID</th>
                 <th className="text-left p-2">Action</th>
                 <th className="text-left p-2">Entity</th>
                 <th className="text-left p-2">Rows</th>
@@ -221,22 +227,27 @@ export default function SecurityAuditLogViewer() {
             </thead>
             <tbody>
               {rows.length === 0 && !loading && (
-                <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No audit entries.</td></tr>
+                <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">No audit entries.</td></tr>
               )}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-border align-top">
-                  <td className="p-2 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
-                  <td className="p-2 font-mono">{r.actor_user_id?.slice(0, 8) ?? "—"}</td>
-                  <td className="p-2 font-mono">{r.action}</td>
-                  <td className="p-2 font-mono">{r.entity ?? "—"}</td>
-                  <td className="p-2">{r.row_count ?? "—"}</td>
-                  <td className="p-2 font-mono">{r.ip ?? "—"}</td>
-                  <td className="p-2 text-muted-foreground truncate max-w-[200px]" title={r.user_agent ?? ""}>{r.user_agent ?? "—"}</td>
-                  <td className="p-2 text-muted-foreground truncate max-w-[260px]" title={JSON.stringify(r.filters ?? {})}>
-                    {r.filters ? JSON.stringify(r.filters) : "—"}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const meta = (r.metadata ?? {}) as { request_id?: string; actor_email?: string };
+                return (
+                  <tr key={r.id} className="border-t border-border align-top">
+                    <td className="p-2 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
+                    <td className="p-2 font-mono">{r.actor_user_id?.slice(0, 8) ?? "—"}</td>
+                    <td className="p-2 truncate max-w-[160px]" title={meta.actor_email ?? ""}>{meta.actor_email ?? "—"}</td>
+                    <td className="p-2 font-mono truncate max-w-[110px]" title={meta.request_id ?? ""}>{meta.request_id?.slice(0, 8) ?? "—"}</td>
+                    <td className="p-2 font-mono">{r.action}</td>
+                    <td className="p-2 font-mono">{r.entity ?? "—"}</td>
+                    <td className="p-2">{r.row_count ?? "—"}</td>
+                    <td className="p-2 font-mono">{r.ip ?? "—"}</td>
+                    <td className="p-2 text-muted-foreground truncate max-w-[200px]" title={r.user_agent ?? ""}>{r.user_agent ?? "—"}</td>
+                    <td className="p-2 text-muted-foreground truncate max-w-[260px]" title={JSON.stringify(r.filters ?? {})}>
+                      {r.filters ? JSON.stringify(r.filters) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

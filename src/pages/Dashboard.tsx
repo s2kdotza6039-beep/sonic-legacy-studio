@@ -7,6 +7,7 @@ import ReleaseClicksPanel from "@/components/dashboard/ReleaseClicksPanel";
 import SecurityEventsPanel from "@/components/dashboard/SecurityEventsPanel";
 import SecurityAlertsPanel from "@/components/dashboard/SecurityAlertsPanel";
 import SecurityDeliveryMetrics from "@/components/dashboard/SecurityDeliveryMetrics";
+import SecurityMetaRuleCharts from "@/components/dashboard/SecurityMetaRuleCharts";
 import SecurityAuditLogViewer from "@/components/dashboard/SecurityAuditLogViewer";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -138,6 +139,7 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <SecurityEventsPanel />
                 <SecurityDeliveryMetrics />
+                <SecurityMetaRuleCharts />
                 <SecurityAlertsPanel />
                 <SecurityAuditLogViewer />
               </div>
