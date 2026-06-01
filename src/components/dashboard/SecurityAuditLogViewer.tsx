@@ -143,10 +143,14 @@ export default function SecurityAuditLogViewer() {
       });
       if (auditError) { alert("Export blocked: " + auditError.message); return; }
 
-      const header = ["created_at", "actor_user_id", "action", "entity", "row_count", "ip", "user_agent", "filters"];
+      const header = ["created_at", "actor_user_id", "actor_email", "request_id", "action", "entity", "row_count", "ip", "user_agent", "filters"];
       const lines = [header.join(",")];
       for (const r of all) {
-        lines.push([r.created_at, r.actor_user_id, r.action, r.entity, r.row_count, r.ip, r.user_agent, r.filters].map(csvEscape).join(","));
+        const meta = (r.metadata ?? {}) as { request_id?: string; actor_email?: string };
+        lines.push([
+          r.created_at, r.actor_user_id, meta.actor_email ?? "", meta.request_id ?? "",
+          r.action, r.entity, r.row_count, r.ip, r.user_agent, r.filters,
+        ].map(csvEscape).join(","));
       }
       const blob = new Blob([lines.join("\n")], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
