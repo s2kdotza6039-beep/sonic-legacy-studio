@@ -267,7 +267,25 @@ export default function SecurityScheduledExports() {
                                           <td className="p-1.5 whitespace-nowrap">{run.finished_at ? new Date(run.finished_at).toLocaleString() : "—"}</td>
                                           <td className="p-1.5 text-rose-600 max-w-[280px] truncate" title={run.error_message ?? ""}>{run.error_message ?? "—"}</td>
                                         </tr>
-                                        {attemptLog.length > 0 && (
+                                        {run.status === "queued" && attemptLog.length === 0 ? (
+                                          <tr className="bg-background/40">
+                                            <td colSpan={6} className="px-3 pb-2 text-[11px] text-muted-foreground italic">
+                                              <Loader2 className="inline w-3 h-3 animate-spin mr-1" /> Run in progress — attempt timeline will populate once delivery completes.
+                                            </td>
+                                          </tr>
+                                        ) : attemptLog.length === 0 && run.retry_count === 0 && run.status === "sent" ? (
+                                          <tr className="bg-background/40">
+                                            <td colSpan={6} className="px-3 pb-2 text-[11px] text-muted-foreground italic">
+                                              Delivered on the first attempt — no retry timeline recorded.
+                                            </td>
+                                          </tr>
+                                        ) : attemptLog.length === 0 ? (
+                                          <tr className="bg-background/40">
+                                            <td colSpan={6} className="px-3 pb-2 text-[11px] text-muted-foreground italic">
+                                              No per-attempt timing recorded for this older run.
+                                            </td>
+                                          </tr>
+                                        ) : (
                                           <tr className="bg-background/40">
                                             <td colSpan={6} className="px-3 pb-2">
                                               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 mb-1">Attempt timeline</div>
