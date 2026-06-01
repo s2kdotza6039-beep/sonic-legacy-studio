@@ -145,6 +145,10 @@ const Dashboard = () => {
                 <SecurityDeliveryMetrics />
                 <SecurityMetaRuleCharts />
                 <SecurityAlertsPanel />
+                <SecurityDailyDigestRunner />
+                <SecurityHashVerifier />
+                <SecurityAuditTimeline />
+                <SecurityScheduledExports />
                 <SecurityAuditLogViewer />
               </div>
             )}
