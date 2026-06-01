@@ -341,46 +341,42 @@ Deno.serve(async (req) => {
     for (const rule of (rs ?? []) as Rule[]) {
       const sinceIso = new Date(now - rule.window_minutes * 60_000).toISOString();
       const cd = cooldownState(rule);
-      let base: Record<string, unknown>;
+      let matched = 0;
+      let detail: Record<string, unknown> = {};
+      let wouldFire = false;
       if (rule.event_source === "delivery_meta") {
         const meta = await evaluateMetaRule(sb, rule, sinceIso);
-        const wouldFire = meta.matched > 0;
-        base = {
-          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
-          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
-          matched: meta.matched, detail: meta.detail,
-          conditions: {
-            threshold_met: wouldFire,
-            cooldown_active: cd.active,
-            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
-            effective_cooldown_min: cd.effective_min,
-          },
-          window_minutes: rule.window_minutes, threshold: rule.threshold,
-          channel: rule.channel, destination: rule.destination,
-        };
+        matched = meta.matched;
+        detail = meta.detail;
+        wouldFire = meta.matched > 0;
       } else {
         const cfg = SOURCE_TABLE[rule.event_source];
         if (!cfg) { out.push({ rule_id: rule.id, rule: rule.name, error: "unknown_source" }); continue; }
         let qq = sb.from(cfg.table).select("*", { count: "exact", head: true }).gte(cfg.tsCol, sinceIso);
         if (rule.event_kind && rule.event_kind !== "*") qq = qq.eq(cfg.kindCol, rule.event_kind);
         const { count } = await qq;
-        const matched = count ?? 0;
-        const wouldFire = matched >= rule.threshold;
-        base = {
-          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
-          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
-          matched,
-          conditions: {
-            threshold_met: wouldFire,
-            cooldown_active: cd.active,
-            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
-            effective_cooldown_min: cd.effective_min,
-          },
-          threshold: rule.threshold, window_minutes: rule.window_minutes,
-          channel: rule.channel, destination: rule.destination,
-        };
+        matched = count ?? 0;
+        wouldFire = matched >= rule.threshold;
       }
-      out.push(base);
+      const hash = await evaluationHash(rule, matched, detail);
+      out.push({
+        rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
+        would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
+        matched,
+        ...(rule.event_source === "delivery_meta" ? { detail } : {}),
+        conditions: {
+          threshold_met: wouldFire,
+          cooldown_active: cd.active,
+          cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
+          effective_cooldown_min: cd.effective_min,
+          next_allowed_at: cd.next_allowed_at,
+          last_triggered_at: rule.last_triggered_at,
+          cooldown_blocked_by: cd.active ? { rule_id: rule.id, rule_name: rule.name, channel: rule.channel, destination: rule.destination } : null,
+        },
+        threshold: rule.threshold, window_minutes: rule.window_minutes,
+        channel: rule.channel, destination: rule.destination,
+        evaluation_hash: hash,
+      });
     }
 
     // Founder-only audit log entry for every dry-run execution.
@@ -396,13 +392,14 @@ Deno.serve(async (req) => {
           actorEmail = u?.user?.email ?? null;
         } catch { /* best-effort */ }
       }
+      const evaluationHashes = out.map((r) => (r as Record<string, unknown>).evaluation_hash).filter(Boolean);
       await sb.from("security_audit_log").insert({
         actor_user_id: caller.userId,
         action: "alert_rule_dryrun",
         entity: "security_alert_rule",
         row_count: out.length,
-        filters: { rule_id: dryRunRuleId },
-        metadata: { request_id: requestId, actor_email: actorEmail, results: out },
+        filters: { rule_id: dryRunRuleId, evaluation_hashes: evaluationHashes },
+        metadata: { request_id: requestId, actor_email: actorEmail, results: out, evaluation_hashes: evaluationHashes },
         ip,
         user_agent: ua,
       });
