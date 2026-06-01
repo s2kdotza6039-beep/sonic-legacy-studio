@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, ChevronRight, ClipboardList, Download, Loader2, RefreshCw } from "lucide-react";
+import { Bookmark, BookmarkPlus, ChevronLeft, ChevronRight, ClipboardList, Download, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 type DryResult = {
   rule?: string;
