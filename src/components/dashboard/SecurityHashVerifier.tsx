@@ -92,7 +92,7 @@ export default function SecurityHashVerifier() {
             })}
           </select>
           <Button size="sm" onClick={verify} disabled={!selected || verifying}>
-            {verifying ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Hash className="w-4 h-4 mr-1" />} Verify
+            {verifying ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Hash className="w-4 h-4 mr-1" />} Verify Now
           </Button>
         </div>
 
