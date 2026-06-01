@@ -10,7 +10,7 @@ type Rule = {
   id: string;
   name: string;
   enabled: boolean;
-  event_source: "playback" | "payfast" | "ai" | "audit";
+  event_source: "playback" | "payfast" | "ai" | "audit" | "delivery_meta";
   event_kind: string;
   threshold: number;
   window_minutes: number;
@@ -19,6 +19,9 @@ type Rule = {
   cooldown_minutes: number;
   last_triggered_at: string | null;
 };
+
+const META_KINDS = ["delivery_spike", "retry_rate_high", "dlq_rate_high"] as const;
+const SOURCE_OPTIONS = ["playback", "payfast", "ai", "audit", "delivery_meta"] as const;
 
 type DlqRow = {
   id: string;
@@ -185,13 +188,16 @@ export default function SecurityAlertsPanel() {
           {/* Create form */}
           <div className="grid grid-cols-1 md:grid-cols-6 gap-2 p-3 border border-border rounded-md bg-secondary/20">
             <Input placeholder="Rule name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="md:col-span-2" />
-            <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.event_source} onChange={(e) => setDraft({ ...draft, event_source: e.target.value as Rule["event_source"] })}>
-              <option value="playback">playback</option>
-              <option value="payfast">payfast</option>
-              <option value="ai">ai</option>
-              <option value="audit">audit</option>
+            <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.event_source} onChange={(e) => setDraft({ ...draft, event_source: e.target.value as Rule["event_source"], event_kind: e.target.value === "delivery_meta" ? "delivery_spike" : draft.event_kind })}>
+              {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
-            <Input placeholder="kind (or *)" value={draft.event_kind} onChange={(e) => setDraft({ ...draft, event_kind: e.target.value })} />
+            {draft.event_source === "delivery_meta" ? (
+              <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.event_kind} onChange={(e) => setDraft({ ...draft, event_kind: e.target.value })}>
+                {META_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            ) : (
+              <Input placeholder="kind (or *)" value={draft.event_kind} onChange={(e) => setDraft({ ...draft, event_kind: e.target.value })} />
+            )}
             <Input type="number" min={1} value={draft.threshold} onChange={(e) => setDraft({ ...draft, threshold: Number(e.target.value) })} title="Threshold" />
             <Input type="number" min={1} value={draft.window_minutes} onChange={(e) => setDraft({ ...draft, window_minutes: Number(e.target.value) })} title="Window (min)" />
             <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.channel} onChange={(e) => setDraft({ ...draft, channel: e.target.value as Rule["channel"] })}>
@@ -236,13 +242,16 @@ export default function SecurityAlertsPanel() {
                       <td className="p-2 font-mono">
                         {isEdit ? (
                           <div className="flex gap-1">
-                            <select className="px-1 py-0.5 text-xs bg-background border border-border rounded" value={editDraft!.event_source} onChange={(e) => setEditDraft({ ...editDraft!, event_source: e.target.value as Rule["event_source"] })}>
-                              <option value="playback">playback</option>
-                              <option value="payfast">payfast</option>
-                              <option value="ai">ai</option>
-                              <option value="audit">audit</option>
+                            <select className="px-1 py-0.5 text-xs bg-background border border-border rounded" value={editDraft!.event_source} onChange={(e) => setEditDraft({ ...editDraft!, event_source: e.target.value as Rule["event_source"], event_kind: e.target.value === "delivery_meta" ? "delivery_spike" : editDraft!.event_kind })}>
+                              {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
-                            <Input className="h-7 text-xs w-28" value={editDraft!.event_kind} onChange={(e) => setEditDraft({ ...editDraft!, event_kind: e.target.value })} />
+                            {editDraft!.event_source === "delivery_meta" ? (
+                              <select className="px-1 py-0.5 text-xs bg-background border border-border rounded" value={editDraft!.event_kind} onChange={(e) => setEditDraft({ ...editDraft!, event_kind: e.target.value })}>
+                                {META_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                              </select>
+                            ) : (
+                              <Input className="h-7 text-xs w-28" value={editDraft!.event_kind} onChange={(e) => setEditDraft({ ...editDraft!, event_kind: e.target.value })} />
+                            )}
                           </div>
                         ) : `${r.event_source} / ${r.event_kind}`}
                       </td>

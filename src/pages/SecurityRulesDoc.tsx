@@ -133,7 +133,57 @@ ON public.tracks TO anon, authenticated;`}</Code>
           </ul>
         </Section>
 
-        <Section icon={AlertTriangle} title="8. Accepted scanner false positives">
+        <Section icon={ShieldCheck} title="8. Security monitoring tables & alert validation">
+          <p>
+            The security monitoring stack lives in five founder-only tables:
+            <code>security_audit_log</code>, <code>security_alert_rules</code>,
+            <code>security_alert_dispatch_log</code>, <code>security_alert_dlq</code>,
+            and <code>security_retention_config</code>. Every policy is{" "}
+            <code>has_role(auth.uid(), 'founder')</code>; anon has zero access and{" "}
+            <code>rlsAccess.test.ts</code> asserts both reads and inserts are blocked.
+          </p>
+          <p className="mt-3">
+            A <code>BEFORE INSERT OR UPDATE</code> trigger{" "}
+            <code>validate_security_alert_rule()</code> enforces:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Email destinations must match the email regex (≤255 chars).</li>
+            <li>Webhook destinations must start with <code>https://</code>.</li>
+            <li>Numeric bounds: threshold ≥ 1, window ≥ 1m, cooldown ≥ 0.</li>
+            <li>For <code>event_source = 'delivery_meta'</code>, <code>event_kind</code> must be one of{" "}
+              <code>delivery_spike</code>, <code>retry_rate_high</code>, <code>dlq_rate_high</code>;
+              rate-based kinds require threshold to be a percentage 1–100.</li>
+          </ul>
+          <p className="mt-3">
+            <code>delivery_meta</code> rules let founders alert on the alerting pipeline itself —
+            a spike in attempts, climbing retry rate, or DLQ rate breach. Evaluated by{" "}
+            <code>process-security-alerts</code>, which excludes the meta-rule's own dispatches
+            to prevent feedback loops.
+          </p>
+        </Section>
+
+        <Section icon={KeyRound} title="9. log-security-export entity whitelist">
+          <p>
+            The <code>log-security-export</code> edge function is the only place CSV exports of
+            security data are recorded. It is founder-only (JWT + <code>has_role</code> check)
+            and writes one row to <code>security_audit_log</code> per export with:
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><code>actor_user_id</code> from the verified JWT (never client-supplied).</li>
+            <li><code>ip</code> from <code>x-forwarded-for</code> / <code>cf-connecting-ip</code> (capped 64 chars).</li>
+            <li><code>user_agent</code> from the request header (capped 512 chars).</li>
+            <li><code>entity</code> restricted to the whitelist: <code>security_events</code> and{" "}
+              <code>security_audit_log</code>. Any other value falls back to <code>security_events</code>.</li>
+          </ul>
+          <p className="mt-3">
+            E2E coverage in <code>supabase/functions/log-security-export/index_test.ts</code>
+            asserts anon callers are rejected with 401/403 AND that no audit row is written.
+            Both the Security Events panel and the Audit Log viewer route CSV exports through
+            this function before downloading.
+          </p>
+        </Section>
+
+        <Section icon={AlertTriangle} title="10. Accepted scanner false positives">
           <p>
             The Supabase linter cannot read column-level GRANTs or function bodies, so it
             keeps flagging:
