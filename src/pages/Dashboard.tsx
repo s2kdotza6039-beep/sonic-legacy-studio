@@ -6,6 +6,8 @@ import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
 import ReleaseClicksPanel from "@/components/dashboard/ReleaseClicksPanel";
 import SecurityEventsPanel from "@/components/dashboard/SecurityEventsPanel";
 import SecurityAlertsPanel from "@/components/dashboard/SecurityAlertsPanel";
+import SecurityDeliveryMetrics from "@/components/dashboard/SecurityDeliveryMetrics";
+import SecurityAuditLogViewer from "@/components/dashboard/SecurityAuditLogViewer";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
