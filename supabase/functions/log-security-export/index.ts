@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  return new Response(JSON.stringify({ ok: true, id: data?.id, ip, ua_recorded: !!ua }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  return new Response(JSON.stringify({ ok: true, id: data?.id, ip, ua_recorded: !!ua, request_id: requestId }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json", "x-request-id": requestId },
   });
 });
