@@ -137,7 +137,9 @@ const Dashboard = () => {
             {tab === "security" && (
               <div className="space-y-4">
                 <SecurityEventsPanel />
+                <SecurityDeliveryMetrics />
                 <SecurityAlertsPanel />
+                <SecurityAuditLogViewer />
               </div>
             )}
 
