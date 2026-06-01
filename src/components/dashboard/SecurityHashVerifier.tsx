@@ -106,6 +106,12 @@ export default function SecurityHashVerifier() {
               {result.hash_match ? "Hash matches — inputs unchanged." : "Hash differs — inputs have drifted."}
               <span className="text-xs text-muted-foreground ml-2">({result.rule_name})</span>
             </div>
+            {!result.hash_match && (result.differing_fields?.length ?? 0) > 0 && (
+              <div className="text-xs px-3 py-2 rounded border border-amber-500/30 bg-amber-500/5">
+                <span className="font-medium">Diff summary:</span>{" "}
+                <span className="font-mono">{result.differing_fields!.join(", ")}</span>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className="p-2 rounded border border-border bg-secondary/20">
                 <div className="text-[10px] uppercase text-muted-foreground">Stored hash</div>
