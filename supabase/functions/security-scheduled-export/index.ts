@@ -164,8 +164,14 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
     const backoffMs = out.ok || i >= MAX_RETRIES ? 0 : 500 * Math.pow(2, i);
     attemptLog.push({ attempt: attempts, started_at: startedAt, finished_at: finishedAt, ok: out.ok, error: out.error, backoff_ms_before_next: backoffMs });
     if (out.ok) break;
+    // Rebuild the CSV body so the next retry's delivered payload contains the
+    // accumulated attempt timeline (start/finish + computed backoff).
+    csv = buildCsvWithAttempts(attemptLog);
     if (i < MAX_RETRIES) await new Promise((r) => setTimeout(r, backoffMs));
   }
+  // Ensure the persisted CSV (and any post-hoc analysis) reflects the final
+  // attempt log even on success.
+  csv = buildCsvWithAttempts(attemptLog);
 
   if (runId) {
     await sb.from("security_scheduled_export_runs").update({
