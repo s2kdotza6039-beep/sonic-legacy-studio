@@ -78,17 +78,25 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
   }
   const baseCsv = baseLines.join("\n");
 
+  type Attempt = {
+    attempt: number;
+    started_at: string;
+    finished_at: string;
+    ok: boolean;
+    error: string | null;
+    backoff_ms_before_next: number;
+  };
+
   // Appends a "# retry_attempts" CSV block so analysts can correlate the data
   // export with the delivery attempts (started/finished timestamps and the
   // computed exponential backoff applied before each next attempt).
-  const buildCsvWithAttempts = (attemptsList: typeof attemptLog) => {
+  const buildCsvWithAttempts = (attemptsList: Attempt[]) => {
     if (attemptsList.length === 0) return baseCsv;
-    const attemptHeader = "# retry_attempts: attempt,started_at,finished_at,duration_ms,ok,backoff_ms_before_next,error";
     const attemptRows = attemptsList.map((a) => {
       const dur = Math.max(0, new Date(a.finished_at).getTime() - new Date(a.started_at).getTime());
       return [a.attempt, a.started_at, a.finished_at, dur, a.ok ? "true" : "false", a.backoff_ms_before_next, a.error ?? ""].map(csvEscape).join(",");
     });
-    return baseCsv + "\n\n" + attemptHeader + "\nattempt,started_at,finished_at,duration_ms,ok,backoff_ms_before_next,error\n" + attemptRows.join("\n");
+    return baseCsv + "\n\n# retry_attempts\nattempt,started_at,finished_at,duration_ms,ok,backoff_ms_before_next,error\n" + attemptRows.join("\n");
   };
   // Initial csv for the first delivery (no prior attempts yet).
   let csv = baseCsv;
