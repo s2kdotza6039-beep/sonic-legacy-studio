@@ -139,6 +139,7 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <SecurityEventsPanel />
                 <SecurityDeliveryMetrics />
+                <SecurityMetaRuleCharts />
                 <SecurityAlertsPanel />
                 <SecurityAuditLogViewer />
               </div>
