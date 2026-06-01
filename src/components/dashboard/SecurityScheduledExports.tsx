@@ -22,6 +22,19 @@ type Schedule = {
   last_row_count: number | null;
 };
 
+type Run = {
+  id: string;
+  schedule_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: "queued" | "sent" | "failed";
+  retry_count: number;
+  row_count: number | null;
+  delivery_method: string | null;
+  destination: string | null;
+  error_message: string | null;
+};
+
 type Draft = {
   name: string;
   cadence: "daily" | "weekly";
