@@ -188,13 +188,16 @@ export default function SecurityAlertsPanel() {
           {/* Create form */}
           <div className="grid grid-cols-1 md:grid-cols-6 gap-2 p-3 border border-border rounded-md bg-secondary/20">
             <Input placeholder="Rule name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="md:col-span-2" />
-            <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.event_source} onChange={(e) => setDraft({ ...draft, event_source: e.target.value as Rule["event_source"] })}>
-              <option value="playback">playback</option>
-              <option value="payfast">payfast</option>
-              <option value="ai">ai</option>
-              <option value="audit">audit</option>
+            <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.event_source} onChange={(e) => setDraft({ ...draft, event_source: e.target.value as Rule["event_source"], event_kind: e.target.value === "delivery_meta" ? "delivery_spike" : draft.event_kind })}>
+              {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
-            <Input placeholder="kind (or *)" value={draft.event_kind} onChange={(e) => setDraft({ ...draft, event_kind: e.target.value })} />
+            {draft.event_source === "delivery_meta" ? (
+              <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.event_kind} onChange={(e) => setDraft({ ...draft, event_kind: e.target.value })}>
+                {META_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            ) : (
+              <Input placeholder="kind (or *)" value={draft.event_kind} onChange={(e) => setDraft({ ...draft, event_kind: e.target.value })} />
+            )}
             <Input type="number" min={1} value={draft.threshold} onChange={(e) => setDraft({ ...draft, threshold: Number(e.target.value) })} title="Threshold" />
             <Input type="number" min={1} value={draft.window_minutes} onChange={(e) => setDraft({ ...draft, window_minutes: Number(e.target.value) })} title="Window (min)" />
             <select className="px-2 py-1 text-sm bg-background border border-border rounded" value={draft.channel} onChange={(e) => setDraft({ ...draft, channel: e.target.value as Rule["channel"] })}>
