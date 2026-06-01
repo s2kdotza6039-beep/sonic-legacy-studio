@@ -154,24 +154,40 @@ export default function SecurityAuditTimeline() {
     });
   };
 
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportInfo, setExportInfo] = useState<string | null>(null);
+
   const exportCsv = async () => {
     setExporting(true);
+    setExportError(null);
+    setExportInfo(null);
     try {
-      // If a custom range is set, fetch fresh data for that window so the
-      // export isn't limited to the current visible range. Otherwise use the
-      // already-loaded groups.
       let exportGroups = groups;
-      let fromIso: string | null = null;
-      let toIso: string | null = null;
-      if (exportFrom || exportTo) {
-        fromIso = exportFrom ? new Date(exportFrom).toISOString() : new Date(0).toISOString();
+      const usingCustomRange = !!(exportFrom || exportTo);
+      if (usingCustomRange) {
+        const fromIso = exportFrom ? new Date(exportFrom).toISOString() : new Date(0).toISOString();
         const toDate = exportTo ? new Date(exportTo) : new Date();
         if (exportTo) toDate.setHours(23, 59, 59, 999);
-        toIso = toDate.toISOString();
+        const toIso = toDate.toISOString();
+        if (new Date(fromIso) > new Date(toIso)) {
+          throw new Error("Start date is after end date.");
+        }
         const drQ = supabase.from("security_audit_log").select("id, created_at, metadata").eq("action", "alert_rule_dryrun").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
         const dsQ = supabase.from("security_alert_dispatch_log").select("id, created_at, rule_id, rule_name, channel, destination, matched_count, status, attempt").gte("created_at", fromIso).lte("created_at", toIso).order("created_at", { ascending: false }).limit(5000);
         const [dr, ds] = await Promise.all([drQ, dsQ]);
+        if (dr.error) throw new Error(dr.error.message);
+        if (ds.error) throw new Error(ds.error.message);
         exportGroups = buildGroups((dr.data as DryrunRow[]) ?? [], (ds.data as DispatchRow[]) ?? []);
+      }
+
+      const totalRows = exportGroups.reduce((n, g) => n + g.items.length, 0);
+      if (totalRows === 0) {
+        setExportInfo(
+          usingCustomRange
+            ? `No timeline events between ${exportFrom || "start"} and ${exportTo || "now"}.`
+            : "No timeline events in the current window."
+        );
+        return;
       }
 
       const esc = (v: unknown) => {
@@ -197,7 +213,7 @@ export default function SecurityAuditTimeline() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const tag = exportFrom || exportTo
+      const tag = usingCustomRange
         ? `${exportFrom || "start"}_to_${exportTo || "now"}`
         : rangeKey;
       a.download = `security-timeline-${tag}-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -205,6 +221,9 @@ export default function SecurityAuditTimeline() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      setExportInfo(`Exported ${totalRows} event${totalRows === 1 ? "" : "s"}.`);
+    } catch (e) {
+      setExportError("Export failed: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setExporting(false);
     }
@@ -234,7 +253,7 @@ export default function SecurityAuditTimeline() {
             <span className="text-muted-foreground">→</span>
             <Input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} className="h-8 w-36 text-xs" />
           </div>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || exporting || (groups.length === 0 && !exportFrom && !exportTo)}>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || exporting}>
             {exporting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />} CSV
           </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -243,7 +262,28 @@ export default function SecurityAuditTimeline() {
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {groups.length === 0 && !loading && (
+        {(exportError || exportInfo || exporting) && (
+          <div
+            className={`text-xs rounded-md border px-3 py-2 ${
+              exportError
+                ? "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                : exporting
+                ? "border-border bg-secondary/30 text-muted-foreground"
+                : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            }`}
+            role={exportError ? "alert" : "status"}
+          >
+            {exporting
+              ? "Building CSV…"
+              : exportError ?? exportInfo}
+          </div>
+        )}
+        {loading && groups.length === 0 && (
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-6">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading timeline…
+          </div>
+        )}
+        {!loading && groups.length === 0 && (
           <div className="text-center text-xs text-muted-foreground py-6">No activity in the selected window.</div>
         )}
         {groups.map((g) => {

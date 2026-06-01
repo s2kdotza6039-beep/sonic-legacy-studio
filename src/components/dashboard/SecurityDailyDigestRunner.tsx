@@ -21,6 +21,15 @@ type HistoryRow = {
 
 const PAGE_SIZE = 25;
 
+type SortKey = "date_desc" | "date_asc" | "status" | "top_rule";
+
+const topRuleFor = (row: HistoryRow): string => {
+  const td = row.metadata?.template_data as { top_meta_rules?: Array<{ rule_name?: string; name?: string }> } | undefined;
+  const list = td?.top_meta_rules ?? [];
+  const first = list[0];
+  return (first?.rule_name ?? first?.name ?? "").toString();
+};
+
 export default function SecurityDailyDigestRunner() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -33,6 +42,7 @@ export default function SecurityDailyDigestRunner() {
   const [totalCount, setTotalCount] = useState(0);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("date_desc");
 
   const loadHistory = async (resetPage = false) => {
     setHistoryLoading(true);
@@ -48,15 +58,18 @@ export default function SecurityDailyDigestRunner() {
       end.setHours(23, 59, 59, 999);
       q = q.lte("created_at", end.toISOString());
     }
+    // Date sort is server-side; other sorts fetch by date desc and reorder
+    // the visible page client-side.
+    const ascending = sortKey === "date_asc";
     const { data, count } = await q
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending })
       .range(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE - 1);
     setHistory((data as HistoryRow[]) ?? []);
     setTotalCount(count ?? 0);
     setHistoryLoading(false);
   };
 
-  useEffect(() => { loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page]);
+  useEffect(() => { loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page, sortKey]);
 
   const applyFilters = () => loadHistory(true);
   const clearFilters = () => { setDateFrom(""); setDateTo(""); setPage(0); setTimeout(() => loadHistory(true), 0); };
@@ -177,6 +190,17 @@ export default function SecurityDailyDigestRunner() {
               <History className="w-4 h-4" /> Run history
             </div>
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                className="h-7 px-2 text-xs bg-background border border-border rounded"
+                title="Sort run history"
+              >
+                <option value="date_desc">Date ↓ (newest)</option>
+                <option value="date_asc">Date ↑ (oldest)</option>
+                <option value="status">Status (failed first)</option>
+                <option value="top_rule">Top meta-rule (A→Z)</option>
+              </select>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-7 w-36 text-xs" />
               <span className="text-muted-foreground">→</span>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-7 w-36 text-xs" />
@@ -193,10 +217,19 @@ export default function SecurityDailyDigestRunner() {
             <div className="p-4 text-center text-xs text-muted-foreground">No digest runs in this range.</div>
           ) : (
             <div className="divide-y divide-border">
-              {history.map((row) => {
-                const s = summarize(row);
-                const isManual = row.action === "daily_report_manual_run";
-                const canReplay = !!row.metadata?.template_data;
+              {(() => {
+                const statusRank: Record<string, number> = { failed: 0, partial: 1, unknown: 2, ok: 3 };
+                const sorted = [...history];
+                if (sortKey === "status") {
+                  sorted.sort((a, b) => statusRank[summarize(a).status] - statusRank[summarize(b).status]);
+                } else if (sortKey === "top_rule") {
+                  sorted.sort((a, b) => topRuleFor(a).localeCompare(topRuleFor(b)) || b.created_at.localeCompare(a.created_at));
+                }
+                return sorted.map((row) => {
+                  const s = summarize(row);
+                  const isManual = row.action === "daily_report_manual_run";
+                  const canReplay = !!row.metadata?.template_data;
+                  const topRule = topRuleFor(row);
                 return (
                   <div key={row.id} className="flex items-center gap-2 px-3 py-2 text-xs">
                     <div className="w-40 text-muted-foreground whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</div>
@@ -207,6 +240,11 @@ export default function SecurityDailyDigestRunner() {
                     <div className="text-muted-foreground">
                       {s.okCount}/{s.total} recipient{s.total === 1 ? "" : "s"}
                     </div>
+                    {topRule && (
+                      <div className="text-muted-foreground truncate max-w-[180px]" title={`Top meta-rule: ${topRule}`}>
+                        · top: <span className="font-mono">{topRule}</span>
+                      </div>
+                    )}
                     {row.metadata?.actor_email && (
                       <div className="text-muted-foreground truncate max-w-[200px]" title={row.metadata.actor_email}>
                         by {row.metadata.actor_email}
@@ -226,7 +264,8 @@ export default function SecurityDailyDigestRunner() {
                     </Button>
                   </div>
                 );
-              })}
+                });
+              })()}
             </div>
           )}
           {/* Pagination */}
