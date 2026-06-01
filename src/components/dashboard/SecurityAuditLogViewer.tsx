@@ -138,6 +138,8 @@ export default function SecurityAuditLogViewer() {
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(50);
   const [actions, setActions] = useState<string[]>([]);
   const [entities, setEntities] = useState<string[]>([]);
+  const [presets, setPresets] = useState<Array<{ id: string; name: string; filters: Record<string, unknown> }>>([]);
+  const [presetName, setPresetName] = useState("");
 
   const sinceIso = useMemo(() => {
     const r = RANGES.find((x) => x.key === rangeKey)!;
