@@ -22,6 +22,15 @@ type Schedule = {
   last_row_count: number | null;
 };
 
+type AttemptLog = {
+  attempt: number;
+  started_at: string;
+  finished_at: string;
+  ok: boolean;
+  error: string | null;
+  backoff_ms_before_next: number;
+};
+
 type Run = {
   id: string;
   schedule_id: string;
@@ -33,6 +42,7 @@ type Run = {
   delivery_method: string | null;
   destination: string | null;
   error_message: string | null;
+  metadata: { attempts?: AttemptLog[] } | null;
 };
 
 type Draft = {
