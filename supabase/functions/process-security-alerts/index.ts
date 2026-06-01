@@ -22,7 +22,7 @@ type Rule = {
   id: string;
   name: string;
   enabled: boolean;
-  event_source: "playback" | "payfast" | "ai" | "audit";
+  event_source: "playback" | "payfast" | "ai" | "audit" | "delivery_meta";
   event_kind: string;
   threshold: number;
   window_minutes: number;
@@ -32,12 +32,59 @@ type Rule = {
   last_triggered_at: string | null;
 };
 
-const SOURCE_TABLE: Record<Rule["event_source"], { table: string; kindCol: string; tsCol: string }> = {
+const SOURCE_TABLE: Record<Exclude<Rule["event_source"], "delivery_meta">, { table: string; kindCol: string; tsCol: string }> = {
   playback: { table: "playback_events", kindCol: "event_kind", tsCol: "created_at" },
   payfast: { table: "payfast_notify_log", kindCol: "outcome", tsCol: "created_at" },
   ai: { table: "ai_activity_log", kindCol: "action", tsCol: "created_at" },
   audit: { table: "security_audit_log", kindCol: "action", tsCol: "created_at" },
 };
+
+// Meta-alert evaluator: inspects the alert delivery infrastructure itself
+// (dispatch attempts, retries, DLQ rate) to surface noisy rules and broken
+// destinations. Returns matched count + sample rows for the email/webhook body.
+async function evaluateMetaRule(
+  sb: ReturnType<typeof createClient>,
+  rule: Rule,
+  sinceIso: string,
+): Promise<{ matched: number; sample: unknown[]; detail: Record<string, unknown> }> {
+  const [{ data: disp }, { data: dlq }] = await Promise.all([
+    sb.from("security_alert_dispatch_log")
+      .select("id, rule_id, rule_name, status, attempt, created_at")
+      .gte("created_at", sinceIso)
+      // Exclude meta-rule's own dispatches to prevent feedback loops.
+      .neq("rule_id", rule.id)
+      .order("created_at", { ascending: false })
+      .limit(2000),
+    sb.from("security_alert_dlq")
+      .select("id, rule_id, rule_name, attempts, last_error, created_at")
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(500),
+  ]);
+  const disps = (disp ?? []) as Array<{ status: string; attempt: number; rule_name: string | null }>;
+  const dlqs = (dlq ?? []) as Array<{ rule_name: string | null; last_error: string | null }>;
+  const total = disps.length;
+  const retries = disps.reduce((acc, r) => acc + Math.max(0, (r.attempt ?? 1) - 1), 0);
+  const retryRatePct = total > 0 ? Math.round((retries / total) * 100) : 0;
+  const dlqRatePct = total > 0 ? Math.round((dlqs.length / total) * 100) : (dlqs.length > 0 ? 100 : 0);
+
+  const detail = { total_attempts: total, retries, retry_rate_pct: retryRatePct, dlq_count: dlqs.length, dlq_rate_pct: dlqRatePct };
+
+  if (rule.event_kind === "delivery_spike") {
+    return { matched: total >= rule.threshold ? total : 0, sample: disps.slice(0, 5), detail };
+  }
+  if (rule.event_kind === "retry_rate_high") {
+    // Require a small baseline before % triggers so 1/1 doesn't fire at 100%.
+    const trigger = total >= 5 && retryRatePct >= rule.threshold;
+    return { matched: trigger ? retryRatePct : 0, sample: disps.slice(0, 5), detail };
+  }
+  if (rule.event_kind === "dlq_rate_high") {
+    const trigger = (total >= 5 && dlqRatePct >= rule.threshold) || dlqs.length >= rule.threshold;
+    return { matched: trigger ? dlqs.length : 0, sample: dlqs.slice(0, 5), detail };
+  }
+  return { matched: 0, sample: [], detail };
+}
+
 
 async function sendOnce(
   channel: "email" | "webhook",
