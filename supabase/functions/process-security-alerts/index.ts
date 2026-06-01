@@ -73,13 +73,8 @@ async function dispatch(rule: Rule, count: number, sample: unknown[]) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const guard = await requireFounder(req);
-  if (!guard.ok) {
-    return new Response(JSON.stringify({ error: guard.reason }), {
-      status: guard.status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  const denied = await requireFounder(req);
+  if (denied) return denied;
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY);
   const { data: rules } = await sb
