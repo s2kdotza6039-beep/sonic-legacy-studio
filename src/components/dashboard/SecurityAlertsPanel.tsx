@@ -327,6 +327,10 @@ export default function SecurityAlertsPanel() {
                           </>
                         ) : (
                           <>
+                            <Button variant="ghost" size="icon" title="Test (dry-run, no notification sent)"
+                              onClick={() => testRule(r)} disabled={testingId === r.id}>
+                              {testingId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FlaskConical className="w-4 h-4" />}
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => startEdit(r)}><Pencil className="w-4 h-4" /></Button>
                             <Button variant="ghost" size="icon" onClick={() => remove(r)}><Trash2 className="w-4 h-4" /></Button>
                           </>
