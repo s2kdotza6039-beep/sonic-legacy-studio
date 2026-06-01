@@ -148,6 +148,39 @@ export default function SecurityAuditTimeline() {
     });
   };
 
+  const exportCsv = () => {
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = [
+      "rule", "channel", "destination", "event_kind", "timestamp", "outcome",
+      "matched", "threshold", "attempt", "cooldown_active", "cooldown_remaining_min", "next_allowed_at",
+    ];
+    const lines = [header.join(",")];
+    for (const g of groups) {
+      // Items are already sorted newest-first per group. Export oldest-first so
+      // cooldown transitions read chronologically.
+      const ordered = [...g.items].sort((a, b) => a.ts.localeCompare(b.ts));
+      for (const it of ordered) {
+        lines.push([
+          g.rule, g.channel, g.destination, it.kind, it.ts, it.outcome,
+          it.matched ?? "", it.threshold ?? "", it.attempt ?? "",
+          it.cooldownActive ?? "", it.cooldownRemainingMin ?? "", it.nextAllowedAt ?? "",
+        ].map(esc).join(","));
+      }
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `security-timeline-${rangeKey}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -167,6 +200,9 @@ export default function SecurityAuditTimeline() {
               </button>
             ))}
           </div>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || groups.length === 0}>
+            <Download className="w-4 h-4 mr-1" /> CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
