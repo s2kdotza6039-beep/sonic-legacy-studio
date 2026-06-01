@@ -93,7 +93,7 @@ export default function SecurityAuditTimeline() {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [rangeKey]);
 
-  const groups = useMemo((): Group[] => {
+  const buildGroups = (drs: DryrunRow[], dss: DispatchRow[]): Group[] => {
     const map = new Map<GroupKey, Group>();
     const upsert = (rule: string, channel: string, destination: string, item: Item) => {
       const key = `${rule}|${channel}|${destination}`;
@@ -102,7 +102,7 @@ export default function SecurityAuditTimeline() {
       map.set(key, g);
     };
 
-    for (const r of dryruns) {
+    for (const r of drs) {
       const dr = r.metadata?.results?.[0];
       if (!dr) continue;
       const cdActive = dr.conditions?.cooldown_active === true;
@@ -123,7 +123,7 @@ export default function SecurityAuditTimeline() {
         nextAllowedAt: next ?? null,
       });
     }
-    for (const d of dispatches) {
+    for (const d of dss) {
       const tone: Item["outcomeTone"] = d.status === "sent" ? "rose" : d.status === "skipped_cooldown" ? "amber" : d.status === "failed" || d.status === "dlq" ? "muted" : "emerald";
       upsert(d.rule_name ?? "(rule)", d.channel ?? "?", d.destination ?? "?", {
         ts: d.created_at,
@@ -141,7 +141,9 @@ export default function SecurityAuditTimeline() {
     for (const g of arr) g.items.sort((a, b) => b.ts.localeCompare(a.ts));
     arr.sort((a, b) => b.items.length - a.items.length);
     return arr;
-  }, [dryruns, dispatches]);
+  };
+
+  const groups = useMemo(() => buildGroups(dryruns, dispatches), [dryruns, dispatches]);
 
   const toggle = (k: GroupKey) => {
     setExpanded((prev) => {
