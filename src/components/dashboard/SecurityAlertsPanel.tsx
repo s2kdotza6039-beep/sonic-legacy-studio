@@ -161,6 +161,49 @@ export default function SecurityAlertsPanel() {
     load();
   };
 
+  // --- Dry-run "Test this rule": evaluates a single rule WITHOUT dispatching. ---
+  const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const testRule = async (r: Rule) => {
+    setTestingId(r.id);
+    setTestResult(null);
+    const { data, error } = await supabase.functions.invoke("process-security-alerts", {
+      body: { mode: "dryrun", rule_id: r.id },
+    });
+    setTestingId(null);
+    if (error) { alert(error.message); return; }
+    const result = (data as { results?: Record<string, unknown>[] })?.results?.[0] ?? null;
+    setTestResult({ ...result, _rule: r.name });
+  };
+
+  // --- Channel defaults: bulk-apply cooldown across all rules of a given channel. ---
+  const [emailCooldown, setEmailCooldown] = useState<number>(30);
+  const [webhookCooldown, setWebhookCooldown] = useState<number>(15);
+  const [defaultEmailDest, setDefaultEmailDest] = useState("");
+  const [defaultWebhookDest, setDefaultWebhookDest] = useState("");
+  const applyChannelCooldown = async (channel: Rule["channel"], minutes: number) => {
+    if (minutes < 0 || !Number.isFinite(minutes)) return alert("Cooldown must be ≥ 0");
+    if (!confirm(`Apply cooldown ${minutes} min to ALL ${channel} rules?`)) return;
+    setBusy(true);
+    const { error } = await supabase.from("security_alert_rules")
+      .update({ cooldown_minutes: minutes }).eq("channel", channel);
+    setBusy(false);
+    if (error) return alert(error.message);
+    load();
+  };
+  const applyChannelDestination = async (channel: Rule["channel"], dest: string) => {
+    if (!validateDestination(channel, dest)) {
+      return alert(channel === "email" ? "Invalid email" : "Webhook URL must use https://");
+    }
+    if (!confirm(`Redirect ALL ${channel} rules to ${dest}?`)) return;
+    setBusy(true);
+    const { error } = await supabase.from("security_alert_rules")
+      .update({ destination: dest }).eq("channel", channel);
+    setBusy(false);
+    if (error) return alert(error.message);
+    load();
+  };
+
   return (
     <div className="space-y-4">
       {/* Alert rules */}
