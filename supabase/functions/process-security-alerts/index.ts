@@ -10,13 +10,28 @@
 // Founder-only via authGuard (service-role calls from cron also pass).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { requireFounder } from "../_shared/authGuard.ts";
+import { requireFounder, resolveCaller } from "../_shared/authGuard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_MS = 60_000; // 1 min, doubled each attempt
+
+// Per-channel hard floor cooldowns enforced server-side so dry-runs and real
+// deliveries cannot bypass anti-spam protections by setting cooldown_minutes=0.
+const CHANNEL_MIN_COOLDOWN_MIN: Record<"email" | "webhook", number> = {
+  email: 5,
+  webhook: 1,
+};
+
+function cooldownState(rule: Rule): { active: boolean; remaining_ms: number; effective_min: number } {
+  const effective = Math.max(CHANNEL_MIN_COOLDOWN_MIN[rule.channel] ?? 0, rule.cooldown_minutes);
+  if (!rule.last_triggered_at) return { active: false, remaining_ms: 0, effective_min: effective };
+  const elapsed = Date.now() - new Date(rule.last_triggered_at).getTime();
+  const windowMs = effective * 60_000;
+  return { active: elapsed < windowMs, remaining_ms: Math.max(0, windowMs - elapsed), effective_min: effective };
+}
 
 type Rule = {
   id: string;
@@ -129,12 +144,14 @@ async function scanAndDispatch(sb: ReturnType<typeof createClient>) {
   const results: Array<Record<string, unknown>> = [];
 
   for (const rule of (rules ?? []) as Rule[]) {
-    if (rule.last_triggered_at && now - new Date(rule.last_triggered_at).getTime() < rule.cooldown_minutes * 60_000) {
+    const cd = cooldownState(rule);
+    if (cd.active) {
       await sb.from("security_alert_dispatch_log").insert({
         rule_id: rule.id, rule_name: rule.name, channel: rule.channel, destination: rule.destination,
         matched_count: 0, status: "skipped_cooldown", attempt: 0, max_attempts: 0,
+        last_error: `cooldown active: ${Math.ceil(cd.remaining_ms / 60_000)}m remaining (effective ${cd.effective_min}m)`,
       });
-      results.push({ rule: rule.name, status: "skipped_cooldown" });
+      results.push({ rule: rule.name, status: "skipped_cooldown", cooldown_remaining_ms: cd.remaining_ms, effective_cooldown_min: cd.effective_min });
       continue;
     }
 
@@ -281,6 +298,7 @@ Deno.serve(async (req) => {
 
   if (mode === "dryrun") {
     // Evaluate rule(s) WITHOUT sending notifications or writing dispatch rows.
+    // Cooldown is still enforced so "would_dispatch" mirrors real-delivery behavior.
     let q = sb.from("security_alert_rules").select("*");
     if (dryRunRuleId) q = q.eq("id", dryRunRuleId);
     const { data: rs } = await q;
@@ -288,29 +306,76 @@ Deno.serve(async (req) => {
     const now = Date.now();
     for (const rule of (rs ?? []) as Rule[]) {
       const sinceIso = new Date(now - rule.window_minutes * 60_000).toISOString();
+      const cd = cooldownState(rule);
+      let base: Record<string, unknown>;
       if (rule.event_source === "delivery_meta") {
         const meta = await evaluateMetaRule(sb, rule, sinceIso);
-        out.push({
-          rule_id: rule.id, rule: rule.name, kind: rule.event_kind,
-          would_fire: meta.matched > 0, matched: meta.matched, detail: meta.detail,
+        const wouldFire = meta.matched > 0;
+        base = {
+          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
+          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
+          matched: meta.matched, detail: meta.detail,
+          conditions: {
+            threshold_met: wouldFire,
+            cooldown_active: cd.active,
+            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
+            effective_cooldown_min: cd.effective_min,
+          },
           window_minutes: rule.window_minutes, threshold: rule.threshold,
           channel: rule.channel, destination: rule.destination,
-        });
+        };
       } else {
         const cfg = SOURCE_TABLE[rule.event_source];
-        if (!cfg) { out.push({ rule: rule.name, error: "unknown_source" }); continue; }
+        if (!cfg) { out.push({ rule_id: rule.id, rule: rule.name, error: "unknown_source" }); continue; }
         let qq = sb.from(cfg.table).select("*", { count: "exact", head: true }).gte(cfg.tsCol, sinceIso);
         if (rule.event_kind && rule.event_kind !== "*") qq = qq.eq(cfg.kindCol, rule.event_kind);
         const { count } = await qq;
         const matched = count ?? 0;
-        out.push({
-          rule_id: rule.id, rule: rule.name, kind: rule.event_kind,
-          would_fire: matched >= rule.threshold, matched,
+        const wouldFire = matched >= rule.threshold;
+        base = {
+          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
+          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
+          matched,
+          conditions: {
+            threshold_met: wouldFire,
+            cooldown_active: cd.active,
+            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
+            effective_cooldown_min: cd.effective_min,
+          },
           threshold: rule.threshold, window_minutes: rule.window_minutes,
           channel: rule.channel, destination: rule.destination,
-        });
+        };
       }
+      out.push(base);
     }
+
+    // Founder-only audit log entry for every dry-run execution.
+    try {
+      const caller = await resolveCaller(req);
+      const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+      const ua = req.headers.get("user-agent")?.slice(0, 512) ?? null;
+      let actorEmail: string | null = null;
+      if (caller.userId) {
+        try {
+          const { data: u } = await sb.auth.admin.getUserById(caller.userId);
+          actorEmail = u?.user?.email ?? null;
+        } catch { /* best-effort */ }
+      }
+      await sb.from("security_audit_log").insert({
+        actor_user_id: caller.userId,
+        action: "alert_rule_dryrun",
+        entity: "security_alert_rule",
+        row_count: out.length,
+        filters: { rule_id: dryRunRuleId },
+        metadata: { request_id: requestId, actor_email: actorEmail, results: out },
+        ip,
+        user_agent: ua,
+      });
+    } catch (e) {
+      console.error("dryrun audit log insert failed", e);
+    }
+
     return new Response(JSON.stringify({ mode, dry_run: true, results: out }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
