@@ -113,6 +113,11 @@ export default function SecurityAuditTimeline() {
         outcome,
         outcomeTone: tone,
         detail: `matched ${dr.matched ?? 0}/${dr.threshold ?? 0}${cdActive ? ` · cooldown ${dr.conditions?.cooldown_remaining_min ?? 0}m left${next ? ` · next ${new Date(next).toLocaleTimeString()}` : ""}` : ""}`,
+        matched: dr.matched,
+        threshold: dr.threshold,
+        cooldownActive: cdActive,
+        cooldownRemainingMin: dr.conditions?.cooldown_remaining_min,
+        nextAllowedAt: next ?? null,
       });
     }
     for (const d of dispatches) {
@@ -124,6 +129,8 @@ export default function SecurityAuditTimeline() {
         outcome: d.status,
         outcomeTone: tone,
         detail: `matched ${d.matched_count ?? 0}`,
+        matched: d.matched_count ?? undefined,
+        attempt: d.attempt,
       });
     }
 
