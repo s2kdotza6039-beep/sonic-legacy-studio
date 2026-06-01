@@ -1,16 +1,21 @@
 // security-daily-report: aggregates the last 24h of security alert delivery
 // metrics per meta-rule and emails a digest to all founders.
 //
-// Top sections:
-//   * top meta-rules by attempt volume
-//   * retry-rate spikes (largest positive Δ% vs prior window)
-//   * DLQ-rate changes (largest absolute Δ% vs prior window)
+// Modes:
+//   * default → enqueue digest emails to founders
+//   * { dry_run: true } → return the templateData and resolved recipients without sending
+//   * { preview: true } → return rendered HTML + subject (founder UI preview)
+//   * { manual: true } → on-demand run; recorded with action="daily_report_manual_run"
 //
 // Triggered by pg_cron daily, or callable by the service role / founder for
 // ad-hoc runs.
+import * as React from "npm:react@18.3.1";
+import { renderAsync } from "npm:@react-email/components@0.0.22";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { requireFounderOrService } from "../_shared/authGuard.ts";
+import { resolveCaller } from "../_shared/authGuard.ts";
+import { template as dailyReportTemplate } from "../_shared/transactional-email-templates/security-daily-report.tsx";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -64,8 +69,7 @@ Deno.serve(async (req) => {
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Optional body: { window_hours?: number, dry_run?: boolean, recipients?: string[] }
-  let body: { window_hours?: number; dry_run?: boolean; recipients?: string[] } = {};
+  let body: { window_hours?: number; dry_run?: boolean; preview?: boolean; manual?: boolean; recipients?: string[] } = {};
   try { body = await req.json(); } catch { /* empty body ok */ }
   const windowHours = Math.max(1, Math.min(168, body.window_hours ?? 24));
   const windowMs = windowHours * 3600_000;
@@ -75,8 +79,6 @@ Deno.serve(async (req) => {
   const priorSince = new Date(now - 2 * windowMs).toISOString();
   const priorUntil = currentSince;
 
-  // Restrict to delivery_meta rules so the digest matches the CSV-ready metrics
-  // shown in SecurityMetaRuleCharts.
   const { data: metaRules } = await sb
     .from("security_alert_rules")
     .select("id,name")
@@ -131,6 +133,25 @@ Deno.serve(async (req) => {
   const date = new Date(now).toISOString().slice(0, 10);
   const templateData = { date, windowHours, totals, topByAttempts, topByRetrySpike, topByDlqChange };
 
+  // Preview: render the email HTML+subject and return without sending.
+  if (body.preview) {
+    let html = "";
+    let subject = "";
+    try {
+      html = await renderAsync(React.createElement(dailyReportTemplate.component, templateData));
+      subject = typeof dailyReportTemplate.subject === "function"
+        ? dailyReportTemplate.subject(templateData)
+        : dailyReportTemplate.subject;
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, preview: true, subject, html, templateData }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   // Resolve recipients: explicit > all founders' emails.
   let recipients: string[] = (body.recipients ?? []).filter((s) => typeof s === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
   if (recipients.length === 0) {
@@ -156,7 +177,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Enqueue one email per founder via the existing transactional email queue.
+  const idemSuffix = body.manual ? `-manual-${Date.now()}` : "";
   const sent: Array<{ to: string; ok: boolean; error?: string }> = [];
   for (const to of recipients) {
     try {
@@ -167,7 +188,7 @@ Deno.serve(async (req) => {
           template_name: "security-daily-report",
           recipient_email: to,
           templateData,
-          idempotency_key: `security-daily-report-${date}-${to}`,
+          idempotency_key: `security-daily-report-${date}-${to}${idemSuffix}`,
         }),
       });
       sent.push({ to, ok: r.ok, error: r.ok ? undefined : `${r.status} ${(await r.text()).slice(0, 200)}` });
@@ -176,15 +197,28 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Audit log entry so the daily run is visible alongside other security events.
+  // Audit entry — manual runs get a distinct action so they show up in the
+  // audit log "Daily reports" tab alongside scheduled runs.
   try {
+    let actorUserId: string | null = null;
+    let actorEmail: string | null = null;
+    if (body.manual) {
+      const caller = await resolveCaller(req);
+      actorUserId = caller.userId;
+      if (caller.userId) {
+        try {
+          const { data: u } = await sb.auth.admin.getUserById(caller.userId);
+          actorEmail = u?.user?.email ?? null;
+        } catch { /* ignore */ }
+      }
+    }
     await sb.from("security_audit_log").insert({
-      actor_user_id: null,
-      action: "daily_report_sent",
+      actor_user_id: actorUserId,
+      action: body.manual ? "daily_report_manual_run" : "daily_report_sent",
       entity: "security_alert_rule",
       row_count: rows.length,
-      filters: { window_hours: windowHours },
-      metadata: { recipients, totals, top_count: topByAttempts.length, sent_results: sent },
+      filters: { window_hours: windowHours, manual: !!body.manual },
+      metadata: { actor_email: actorEmail, recipients, totals, top_count: topByAttempts.length, sent_results: sent },
     });
   } catch { /* best-effort */ }
 
