@@ -1,3 +1,5 @@
+import { requireFounderOrService } from "../_shared/authGuard.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -81,6 +83,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const denied = await requireFounderOrService(req);
+  if (denied) return denied;
+
+
 
   try {
     const API_KEY = Deno.env.get("THE_ODDS_API_KEY");
