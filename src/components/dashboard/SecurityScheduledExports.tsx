@@ -22,11 +22,20 @@ type Schedule = {
   last_row_count: number | null;
 };
 
-const EMPTY = {
+type Draft = {
+  name: string;
+  cadence: "daily" | "weekly";
+  lookback_hours: number;
+  delivery_method: "email" | "webhook";
+  destination: string;
+  filters_action: string;
+  filters_destination: string;
+};
+const EMPTY: Draft = {
   name: "",
-  cadence: "daily" as const,
+  cadence: "daily",
   lookback_hours: 24,
-  delivery_method: "email" as const,
+  delivery_method: "email",
   destination: "",
   filters_action: "all",
   filters_destination: "",
