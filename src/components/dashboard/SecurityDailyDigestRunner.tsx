@@ -190,6 +190,17 @@ export default function SecurityDailyDigestRunner() {
               <History className="w-4 h-4" /> Run history
             </div>
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                className="h-7 px-2 text-xs bg-background border border-border rounded"
+                title="Sort run history"
+              >
+                <option value="date_desc">Date ↓ (newest)</option>
+                <option value="date_asc">Date ↑ (oldest)</option>
+                <option value="status">Status (failed first)</option>
+                <option value="top_rule">Top meta-rule (A→Z)</option>
+              </select>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-7 w-36 text-xs" />
               <span className="text-muted-foreground">→</span>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-7 w-36 text-xs" />
@@ -206,10 +217,19 @@ export default function SecurityDailyDigestRunner() {
             <div className="p-4 text-center text-xs text-muted-foreground">No digest runs in this range.</div>
           ) : (
             <div className="divide-y divide-border">
-              {history.map((row) => {
-                const s = summarize(row);
-                const isManual = row.action === "daily_report_manual_run";
-                const canReplay = !!row.metadata?.template_data;
+              {(() => {
+                const statusRank: Record<string, number> = { failed: 0, partial: 1, unknown: 2, ok: 3 };
+                const sorted = [...history];
+                if (sortKey === "status") {
+                  sorted.sort((a, b) => statusRank[summarize(a).status] - statusRank[summarize(b).status]);
+                } else if (sortKey === "top_rule") {
+                  sorted.sort((a, b) => topRuleFor(a).localeCompare(topRuleFor(b)) || b.created_at.localeCompare(a.created_at));
+                }
+                return sorted.map((row) => {
+                  const s = summarize(row);
+                  const isManual = row.action === "daily_report_manual_run";
+                  const canReplay = !!row.metadata?.template_data;
+                  const topRule = topRuleFor(row);
                 return (
                   <div key={row.id} className="flex items-center gap-2 px-3 py-2 text-xs">
                     <div className="w-40 text-muted-foreground whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</div>
