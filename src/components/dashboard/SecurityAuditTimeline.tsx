@@ -221,7 +221,7 @@ export default function SecurityAuditTimeline() {
           </CardDescription>
         </div>
         <div className="flex gap-2">
-          <div className="flex flex-wrap gap-1 text-xs">
+          <div className="flex flex-wrap items-center gap-1 text-xs">
             {RANGES.map((r) => (
               <button key={r.key} onClick={() => setRangeKey(r.key)}
                 className={`px-2.5 py-1 rounded-full border ${rangeKey === r.key ? "border-primary text-primary" : "border-border text-muted-foreground"}`}>
@@ -229,8 +229,13 @@ export default function SecurityAuditTimeline() {
               </button>
             ))}
           </div>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || groups.length === 0}>
-            <Download className="w-4 h-4 mr-1" /> CSV
+          <div className="flex items-center gap-1 text-xs" title="CSV export window (overrides quick-range)">
+            <Input type="date" value={exportFrom} onChange={(e) => setExportFrom(e.target.value)} className="h-8 w-36 text-xs" />
+            <span className="text-muted-foreground">→</span>
+            <Input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} className="h-8 w-36 text-xs" />
+          </div>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || exporting || (groups.length === 0 && !exportFrom && !exportTo)}>
+            {exporting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />} CSV
           </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
