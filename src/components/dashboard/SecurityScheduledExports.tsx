@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { CalendarClock, Loader2, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarClock, Loader2, Play, Plus, RefreshCw, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 type Schedule = {
   id: string;
@@ -20,6 +20,19 @@ type Schedule = {
   last_status: string | null;
   last_error: string | null;
   last_row_count: number | null;
+};
+
+type Run = {
+  id: string;
+  schedule_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: "queued" | "sent" | "failed";
+  retry_count: number;
+  row_count: number | null;
+  delivery_method: string | null;
+  destination: string | null;
+  error_message: string | null;
 };
 
 type Draft = {
@@ -46,14 +59,24 @@ const validateDest = (m: "email" | "webhook", d: string) =>
 
 export default function SecurityScheduledExports() {
   const [rows, setRows] = useState<Schedule[]>([]);
+  const [runs, setRuns] = useState<Record<string, Run[]>>({});
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(EMPTY);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("security_scheduled_exports").select("*").order("created_at", { ascending: false });
-    setRows((data as Schedule[]) ?? []);
+    const [{ data: schedData }, { data: runData }] = await Promise.all([
+      supabase.from("security_scheduled_exports").select("*").order("created_at", { ascending: false }),
+      supabase.from("security_scheduled_export_runs").select("*").order("started_at", { ascending: false }).limit(200),
+    ]);
+    setRows((schedData as Schedule[]) ?? []);
+    const grouped: Record<string, Run[]> = {};
+    for (const r of ((runData as Run[]) ?? [])) {
+      (grouped[r.schedule_id] ??= []).push(r);
+    }
+    setRuns(grouped);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -147,6 +170,7 @@ export default function SecurityScheduledExports() {
           <table className="w-full text-xs">
             <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-wider">
               <tr>
+                <th className="text-left p-2 w-8"></th>
                 <th className="text-left p-2">Name</th>
                 <th className="text-left p-2">Cadence</th>
                 <th className="text-left p-2">Lookback</th>
@@ -158,31 +182,89 @@ export default function SecurityScheduledExports() {
             </thead>
             <tbody>
               {rows.length === 0 && !loading && (
-                <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No scheduled exports.</td></tr>
+                <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No scheduled exports.</td></tr>
               )}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-border">
-                  <td className="p-2 font-medium">{r.name}</td>
-                  <td className="p-2">{r.cadence}</td>
-                  <td className="p-2">{r.lookback_hours}h</td>
-                  <td className="p-2 font-mono truncate max-w-[220px]" title={r.destination}>{r.delivery_method}: {r.destination}</td>
-                  <td className="p-2">
-                    {r.last_run_at ? (
-                      <div>
-                        <div>{new Date(r.last_run_at).toLocaleString()}</div>
-                        <div className={`text-[10px] ${r.last_status === "ok" ? "text-emerald-600" : "text-rose-600"}`}>
-                          {r.last_status ?? "—"} · {r.last_row_count ?? 0} rows
-                        </div>
-                      </div>
-                    ) : <span className="text-muted-foreground">never</span>}
-                  </td>
-                  <td className="p-2"><Switch checked={r.enabled} onCheckedChange={() => toggle(r)} /></td>
-                  <td className="p-2 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => runNow(r.id)} disabled={busy}><Play className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="sm" onClick={() => del(r.id)}><Trash2 className="w-4 h-4" /></Button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const open = expanded.has(r.id);
+                const scheduleRuns = runs[r.id] ?? [];
+                const toggleOpen = () => setExpanded((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(r.id)) next.delete(r.id); else next.add(r.id);
+                  return next;
+                });
+                return (
+                  <Fragment key={r.id}>
+                    <tr className="border-t border-border">
+                      <td className="p-2">
+                        <button onClick={toggleOpen} className="text-muted-foreground hover:text-foreground" title="Run history">
+                          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
+                      </td>
+                      <td className="p-2 font-medium">{r.name}</td>
+                      <td className="p-2">{r.cadence}</td>
+                      <td className="p-2">{r.lookback_hours}h</td>
+                      <td className="p-2 font-mono truncate max-w-[220px]" title={r.destination}>{r.delivery_method}: {r.destination}</td>
+                      <td className="p-2">
+                        {r.last_run_at ? (
+                          <div>
+                            <div>{new Date(r.last_run_at).toLocaleString()}</div>
+                            <div className={`text-[10px] ${r.last_status === "ok" ? "text-emerald-600" : "text-rose-600"}`}>
+                              {r.last_status ?? "—"} · {r.last_row_count ?? 0} rows
+                            </div>
+                          </div>
+                        ) : <span className="text-muted-foreground">never</span>}
+                      </td>
+                      <td className="p-2"><Switch checked={r.enabled} onCheckedChange={() => toggle(r)} /></td>
+                      <td className="p-2 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => runNow(r.id)} disabled={busy}><Play className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => del(r.id)}><Trash2 className="w-4 h-4" /></Button>
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="bg-secondary/20">
+                        <td colSpan={8} className="p-2">
+                          {scheduleRuns.length === 0 ? (
+                            <div className="text-[11px] text-muted-foreground px-2 py-3">No run history yet.</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-[11px]">
+                                <thead className="text-muted-foreground uppercase tracking-wider">
+                                  <tr>
+                                    <th className="text-left p-1.5">Started</th>
+                                    <th className="text-left p-1.5">Status</th>
+                                    <th className="text-left p-1.5">Retries</th>
+                                    <th className="text-left p-1.5">Rows</th>
+                                    <th className="text-left p-1.5">Finished</th>
+                                    <th className="text-left p-1.5">Error</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {scheduleRuns.slice(0, 10).map((run) => (
+                                    <tr key={run.id} className="border-t border-border/60">
+                                      <td className="p-1.5 whitespace-nowrap">{new Date(run.started_at).toLocaleString()}</td>
+                                      <td className="p-1.5">
+                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                          run.status === "sent" ? "bg-emerald-500/15 text-emerald-600"
+                                          : run.status === "failed" ? "bg-rose-500/15 text-rose-600"
+                                          : "bg-amber-500/15 text-amber-600"
+                                        }`}>{run.status}</span>
+                                      </td>
+                                      <td className="p-1.5">{run.retry_count}</td>
+                                      <td className="p-1.5">{run.row_count ?? "—"}</td>
+                                      <td className="p-1.5 whitespace-nowrap">{run.finished_at ? new Date(run.finished_at).toLocaleString() : "—"}</td>
+                                      <td className="p-1.5 text-rose-600 max-w-[280px] truncate" title={run.error_message ?? ""}>{run.error_message ?? "—"}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

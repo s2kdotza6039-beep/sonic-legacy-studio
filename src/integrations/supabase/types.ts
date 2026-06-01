@@ -1950,6 +1950,51 @@ export type Database = {
         }
         Relationships: []
       }
+      security_scheduled_export_runs: {
+        Row: {
+          created_at: string
+          delivery_method: string | null
+          destination: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json
+          retry_count: number
+          row_count: number | null
+          schedule_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_method?: string | null
+          destination?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json
+          retry_count?: number
+          row_count?: number | null
+          schedule_id: string
+          started_at?: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          delivery_method?: string | null
+          destination?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json
+          retry_count?: number
+          row_count?: number | null
+          schedule_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       security_scheduled_exports: {
         Row: {
           cadence: string

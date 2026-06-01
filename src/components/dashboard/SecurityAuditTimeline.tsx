@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, RefreshCw, Timer, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, RefreshCw, Timer, ChevronDown, ChevronRight, Download } from "lucide-react";
 
 type DryrunRow = {
   id: string;
@@ -41,6 +41,12 @@ type Item = {
   outcome: string;
   outcomeTone: "rose" | "amber" | "emerald" | "muted";
   detail: string;
+  matched?: number;
+  threshold?: number;
+  cooldownActive?: boolean;
+  cooldownRemainingMin?: number;
+  nextAllowedAt?: string | null;
+  attempt?: number;
 };
 
 type GroupKey = string;
@@ -107,6 +113,11 @@ export default function SecurityAuditTimeline() {
         outcome,
         outcomeTone: tone,
         detail: `matched ${dr.matched ?? 0}/${dr.threshold ?? 0}${cdActive ? ` · cooldown ${dr.conditions?.cooldown_remaining_min ?? 0}m left${next ? ` · next ${new Date(next).toLocaleTimeString()}` : ""}` : ""}`,
+        matched: dr.matched,
+        threshold: dr.threshold,
+        cooldownActive: cdActive,
+        cooldownRemainingMin: dr.conditions?.cooldown_remaining_min,
+        nextAllowedAt: next ?? null,
       });
     }
     for (const d of dispatches) {
@@ -118,6 +129,8 @@ export default function SecurityAuditTimeline() {
         outcome: d.status,
         outcomeTone: tone,
         detail: `matched ${d.matched_count ?? 0}`,
+        matched: d.matched_count ?? undefined,
+        attempt: d.attempt,
       });
     }
 
@@ -133,6 +146,39 @@ export default function SecurityAuditTimeline() {
       if (next.has(k)) next.delete(k); else next.add(k);
       return next;
     });
+  };
+
+  const exportCsv = () => {
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = [
+      "rule", "channel", "destination", "event_kind", "timestamp", "outcome",
+      "matched", "threshold", "attempt", "cooldown_active", "cooldown_remaining_min", "next_allowed_at",
+    ];
+    const lines = [header.join(",")];
+    for (const g of groups) {
+      // Items are already sorted newest-first per group. Export oldest-first so
+      // cooldown transitions read chronologically.
+      const ordered = [...g.items].sort((a, b) => a.ts.localeCompare(b.ts));
+      for (const it of ordered) {
+        lines.push([
+          g.rule, g.channel, g.destination, it.kind, it.ts, it.outcome,
+          it.matched ?? "", it.threshold ?? "", it.attempt ?? "",
+          it.cooldownActive ?? "", it.cooldownRemainingMin ?? "", it.nextAllowedAt ?? "",
+        ].map(esc).join(","));
+      }
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `security-timeline-${rangeKey}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -154,6 +200,9 @@ export default function SecurityAuditTimeline() {
               </button>
             ))}
           </div>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || groups.length === 0}>
+            <Download className="w-4 h-4 mr-1" /> CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
