@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, Loader2, Send, Mail, History, RefreshCw } from "lucide-react";
+import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 
 type Preview = { subject: string; html: string; templateData: Record<string, unknown> };
 
@@ -18,6 +19,8 @@ type HistoryRow = {
   } | null;
 };
 
+const PAGE_SIZE = 25;
+
 export default function SecurityDailyDigestRunner() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -26,20 +29,37 @@ export default function SecurityDailyDigestRunner() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [replayingId, setReplayingId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
-  const loadHistory = async () => {
+  const loadHistory = async (resetPage = false) => {
     setHistoryLoading(true);
-    const { data } = await supabase
+    const p = resetPage ? 0 : page;
+    if (resetPage) setPage(0);
+    let q = supabase
       .from("security_audit_log")
-      .select("id, created_at, action, metadata")
-      .in("action", ["daily_report_manual_run", "daily_report_sent"])
+      .select("id, created_at, action, metadata", { count: "exact" })
+      .in("action", ["daily_report_manual_run", "daily_report_sent"]);
+    if (dateFrom) q = q.gte("created_at", new Date(dateFrom).toISOString());
+    if (dateTo) {
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      q = q.lte("created_at", end.toISOString());
+    }
+    const { data, count } = await q
       .order("created_at", { ascending: false })
-      .limit(25);
+      .range(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE - 1);
     setHistory((data as HistoryRow[]) ?? []);
+    setTotalCount(count ?? 0);
     setHistoryLoading(false);
   };
 
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { loadHistory(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [page]);
+
+  const applyFilters = () => loadHistory(true);
+  const clearFilters = () => { setDateFrom(""); setDateTo(""); setPage(0); setTimeout(() => loadHistory(true), 0); };
 
   const loadPreview = async () => {
     setPreviewing(true);
@@ -88,7 +108,7 @@ export default function SecurityDailyDigestRunner() {
       const sent = (data?.sent ?? []) as Array<{ to: string; ok: boolean }>;
       const okCount = sent.filter((s) => s.ok).length;
       setResult(`Sent: ${okCount}/${sent.length} recipients.`);
-      loadHistory();
+      loadHistory(true);
     } catch (e) {
       setResult("Send failed: " + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -108,6 +128,8 @@ export default function SecurityDailyDigestRunner() {
 
   const statusTone = (s: ReturnType<typeof summarize>["status"]) =>
     ({ ok: "text-emerald-600", partial: "text-amber-600", failed: "text-rose-600", unknown: "text-muted-foreground" }[s]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <Card>
@@ -150,16 +172,25 @@ export default function SecurityDailyDigestRunner() {
 
         {/* History */}
         <div className="border border-border rounded-md">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-secondary/30">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-border bg-secondary/30">
             <div className="flex items-center gap-2 text-xs font-medium">
-              <History className="w-4 h-4" /> Manual run history
+              <History className="w-4 h-4" /> Run history
             </div>
-            <Button variant="ghost" size="sm" onClick={loadHistory} disabled={historyLoading} className="h-7 px-2">
-              {historyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            </Button>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-7 w-36 text-xs" />
+              <span className="text-muted-foreground">→</span>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-7 w-36 text-xs" />
+              <Button size="sm" variant="outline" className="h-7 px-2" onClick={applyFilters}>Apply</Button>
+              {(dateFrom || dateTo) && (
+                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={clearFilters}>Clear</Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => loadHistory()} disabled={historyLoading} className="h-7 px-2">
+                {historyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              </Button>
+            </div>
           </div>
           {history.length === 0 && !historyLoading ? (
-            <div className="p-4 text-center text-xs text-muted-foreground">No digest runs recorded yet.</div>
+            <div className="p-4 text-center text-xs text-muted-foreground">No digest runs in this range.</div>
           ) : (
             <div className="divide-y divide-border">
               {history.map((row) => {
@@ -198,6 +229,21 @@ export default function SecurityDailyDigestRunner() {
               })}
             </div>
           )}
+          {/* Pagination */}
+          <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-border bg-secondary/20 text-xs">
+            <div className="text-muted-foreground">
+              {totalCount === 0 ? "0 runs" : `Showing ${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, totalCount)} of ${totalCount}`}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="ghost" className="h-7 px-2" disabled={page === 0 || historyLoading} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                <ChevronLeft className="w-3.5 h-3.5" /> Prev
+              </Button>
+              <div className="text-muted-foreground">Page {page + 1} / {totalPages}</div>
+              <Button size="sm" variant="ghost" className="h-7 px-2" disabled={page + 1 >= totalPages || historyLoading} onClick={() => setPage((p) => p + 1)}>
+                Next <ChevronRight className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
