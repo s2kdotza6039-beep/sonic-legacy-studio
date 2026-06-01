@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
       entity: "security_alert_rule",
       row_count: rows.length,
       filters: { window_hours: windowHours, manual: !!body.manual },
-      metadata: { actor_email: actorEmail, recipients, totals, top_count: topByAttempts.length, sent_results: sent },
+      metadata: { actor_email: actorEmail, recipients, totals, top_count: topByAttempts.length, sent_results: sent, template_data: templateData },
     });
   } catch { /* best-effort */ }
 
