@@ -42,7 +42,7 @@ export default function Listen() {
   const { isFounder } = useUserRole();
 
   useEffect(() => {
-    supabase.from("tracks").select("*").eq("is_active", true)
+    supabase.from("tracks").select("id,slug,title,artist_name,artist_slug,cover_url,duration_seconds,price_standard_cents,price_gold_cents,price_download_cents,pct_free,pct_standard,pct_gold,is_active,sort_order").eq("is_active", true)
       .order("sort_order").then(({ data }) => {
         setTracks((data ?? []) as Track[]);
         setLoading(false);

@@ -108,11 +108,16 @@ export function submitPayFast(
   form.submit();
 }
 
-export async function pollPaymentStatus(ref: string) {
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-status?ref=${encodeURIComponent(ref)}`;
-  const res = await fetch(url, {
-    headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string },
-  });
+export async function pollPaymentStatus(ref: string, opts?: { email?: string | null }) {
+  const qs = new URLSearchParams({ ref });
+  if (opts?.email) qs.set("email", opts.email);
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-status?${qs}`;
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = {
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+  };
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`status ${res.status}`);
   return res.json() as Promise<{
     status: "pending" | "paid" | "failed" | "cancelled";
@@ -123,6 +128,7 @@ export async function pollPaymentStatus(ref: string) {
     pf_payment_id: string | null;
     download_token: string | null;
     download_expires_at: string | null;
+    requires_ownership_proof?: boolean;
   }>;
 }
 
