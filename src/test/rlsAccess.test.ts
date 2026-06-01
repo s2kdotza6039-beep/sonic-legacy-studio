@@ -58,14 +58,20 @@ describe("tracks RLS", () => {
 });
 
 describe("submissions bucket RLS", () => {
-  it("anon CANNOT list submissions", async () => {
+  it("anon list submissions returns empty (RLS hides objects)", async () => {
     const res = await storage("/object/list/submissions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit: 1, prefix: "" }),
+      body: JSON.stringify({ limit: 100, prefix: "" }),
     });
-    expect([400, 401, 403]).toContain(res.status);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(Array.isArray(body) && body.length).toBe(0);
+    } else {
+      expect([400, 401, 403]).toContain(res.status);
+    }
   });
+
 
   it("anon CANNOT upload outside careers/ prefix", async () => {
     const res = await storage("/object/submissions/rogue/test.mp3", {
@@ -87,14 +93,20 @@ describe("submissions bucket RLS", () => {
 });
 
 describe("contract-files bucket RLS", () => {
-  it("anon CANNOT list contract-files", async () => {
+  it("anon list contract-files returns empty (RLS hides objects)", async () => {
     const res = await storage("/object/list/contract-files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit: 1, prefix: "" }),
+      body: JSON.stringify({ limit: 100, prefix: "" }),
     });
-    expect([400, 401, 403]).toContain(res.status);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(Array.isArray(body) && body.length).toBe(0);
+    } else {
+      expect([400, 401, 403]).toContain(res.status);
+    }
   });
+
 
   it("anon CANNOT upload to contract-files", async () => {
     const res = await storage("/object/contract-files/test.pdf", {
