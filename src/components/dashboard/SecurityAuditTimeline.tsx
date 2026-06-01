@@ -71,6 +71,9 @@ export default function SecurityAuditTimeline() {
   const [dryruns, setDryruns] = useState<DryrunRow[]>([]);
   const [dispatches, setDispatches] = useState<DispatchRow[]>([]);
   const [expanded, setExpanded] = useState<Set<GroupKey>>(new Set());
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const sinceIso = useMemo(() => {
     const r = RANGES.find((x) => x.key === rangeKey)!;
