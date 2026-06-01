@@ -1890,6 +1890,33 @@ export type Database = {
         }
         Relationships: []
       }
+      security_audit_log_presets: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          owner_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          owner_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          owner_user_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       security_retention_config: {
         Row: {
           audit_log_days: number
@@ -1919,6 +1946,60 @@ export type Database = {
           id?: number
           last_cleanup_at?: string | null
           last_cleanup_summary?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      security_scheduled_exports: {
+        Row: {
+          cadence: string
+          created_at: string
+          delivery_method: string
+          destination: string
+          enabled: boolean
+          filters: Json
+          id: string
+          last_error: string | null
+          last_row_count: number | null
+          last_run_at: string | null
+          last_status: string | null
+          lookback_hours: number
+          name: string
+          owner_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          cadence: string
+          created_at?: string
+          delivery_method: string
+          destination: string
+          enabled?: boolean
+          filters?: Json
+          id?: string
+          last_error?: string | null
+          last_row_count?: number | null
+          last_run_at?: string | null
+          last_status?: string | null
+          lookback_hours?: number
+          name: string
+          owner_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          cadence?: string
+          created_at?: string
+          delivery_method?: string
+          destination?: string
+          enabled?: boolean
+          filters?: Json
+          id?: string
+          last_error?: string | null
+          last_row_count?: number | null
+          last_run_at?: string | null
+          last_status?: string | null
+          lookback_hours?: number
+          name?: string
+          owner_user_id?: string
           updated_at?: string
         }
         Relationships: []

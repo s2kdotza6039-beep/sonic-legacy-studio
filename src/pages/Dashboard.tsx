@@ -9,6 +9,10 @@ import SecurityAlertsPanel from "@/components/dashboard/SecurityAlertsPanel";
 import SecurityDeliveryMetrics from "@/components/dashboard/SecurityDeliveryMetrics";
 import SecurityMetaRuleCharts from "@/components/dashboard/SecurityMetaRuleCharts";
 import SecurityAuditLogViewer from "@/components/dashboard/SecurityAuditLogViewer";
+import SecurityDailyDigestRunner from "@/components/dashboard/SecurityDailyDigestRunner";
+import SecurityHashVerifier from "@/components/dashboard/SecurityHashVerifier";
+import SecurityAuditTimeline from "@/components/dashboard/SecurityAuditTimeline";
+import SecurityScheduledExports from "@/components/dashboard/SecurityScheduledExports";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -141,6 +145,10 @@ const Dashboard = () => {
                 <SecurityDeliveryMetrics />
                 <SecurityMetaRuleCharts />
                 <SecurityAlertsPanel />
+                <SecurityDailyDigestRunner />
+                <SecurityHashVerifier />
+                <SecurityAuditTimeline />
+                <SecurityScheduledExports />
                 <SecurityAuditLogViewer />
               </div>
             )}

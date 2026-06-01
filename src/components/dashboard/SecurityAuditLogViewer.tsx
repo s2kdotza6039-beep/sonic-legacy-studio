@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, ChevronRight, ClipboardList, Download, Loader2, RefreshCw } from "lucide-react";
+import { Bookmark, BookmarkPlus, ChevronLeft, ChevronRight, ClipboardList, Download, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 type DryResult = {
   rule?: string;
@@ -138,6 +138,8 @@ export default function SecurityAuditLogViewer() {
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(50);
   const [actions, setActions] = useState<string[]>([]);
   const [entities, setEntities] = useState<string[]>([]);
+  const [presets, setPresets] = useState<Array<{ id: string; name: string; filters: Record<string, unknown> }>>([]);
+  const [presetName, setPresetName] = useState("");
 
   const sinceIso = useMemo(() => {
     const r = RANGES.find((x) => x.key === rangeKey)!;
@@ -182,7 +184,48 @@ export default function SecurityAuditLogViewer() {
     setEntities(Array.from(e).sort());
   };
 
-  useEffect(() => { refreshFacets(); }, []);
+  const loadPresets = async () => {
+    const { data } = await supabase
+      .from("security_audit_log_presets")
+      .select("id, name, filters")
+      .order("name");
+    setPresets((data as typeof presets) ?? []);
+  };
+
+  const applyPreset = (p: { filters: Record<string, unknown> }) => {
+    const f = p.filters ?? {};
+    if (typeof f.rangeKey === "string") setRangeKey(f.rangeKey as (typeof RANGES)[number]["key"]);
+    if (typeof f.actionTab === "string") setActionTab(f.actionTab as (typeof ACTION_TABS)[number]["key"]);
+    if (typeof f.action === "string") setAction(f.action);
+    if (typeof f.entity === "string") setEntity(f.entity);
+    if (typeof f.actor === "string") setActor(f.actor);
+    if (typeof f.destination === "string") setDestination(f.destination);
+    if (typeof f.matched === "string") setMatched(f.matched as (typeof MATCHED_CONDITIONS)[number]["key"]);
+    if (typeof f.search === "string") setSearch(f.search);
+  };
+
+  const savePreset = async () => {
+    const name = presetName.trim();
+    if (!name) return;
+    const { data: s } = await supabase.auth.getSession();
+    const uid = s.session?.user?.id;
+    if (!uid) return alert("Sign in");
+    const filters = { rangeKey, actionTab, action, entity, actor, destination, matched, search };
+    const { error } = await supabase
+      .from("security_audit_log_presets")
+      .upsert({ owner_user_id: uid, name, filters }, { onConflict: "owner_user_id,name" });
+    if (error) return alert(error.message);
+    setPresetName("");
+    loadPresets();
+  };
+
+  const deletePreset = async (id: string) => {
+    if (!confirm("Delete this preset?")) return;
+    const { error } = await supabase.from("security_audit_log_presets").delete().eq("id", id);
+    if (error) alert(error.message); else loadPresets();
+  };
+
+  useEffect(() => { refreshFacets(); loadPresets(); }, []);
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ },
     [rangeKey, effectiveAction, entity, actor, destination, matched, search, page, pageSize]);
   useEffect(() => { setPage(0); },
@@ -297,6 +340,23 @@ export default function SecurityAuditLogViewer() {
               {t.label}
             </button>
           ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs border border-dashed border-border rounded-md p-2">
+          <Bookmark className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground">Presets:</span>
+          {presets.length === 0 && <span className="text-muted-foreground italic">none saved</span>}
+          {presets.map((p) => (
+            <span key={p.id} className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary/30 pl-2 pr-1 py-0.5">
+              <button onClick={() => applyPreset(p)} className="hover:text-primary" title="Apply preset">{p.name}</button>
+              <button onClick={() => deletePreset(p.id)} className="text-muted-foreground hover:text-rose-500"><Trash2 className="w-3 h-3" /></button>
+            </span>
+          ))}
+          <div className="flex items-center gap-1 ml-auto">
+            <Input className="h-7 text-xs w-44" placeholder="Save current as…" value={presetName} onChange={(e) => setPresetName(e.target.value)} />
+            <Button variant="outline" size="sm" onClick={savePreset} disabled={!presetName.trim()}>
+              <BookmarkPlus className="w-3.5 h-3.5 mr-1" /> Save
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
           <select value={action} onChange={(e) => setAction(e.target.value)} disabled={actionTab !== "all"}
