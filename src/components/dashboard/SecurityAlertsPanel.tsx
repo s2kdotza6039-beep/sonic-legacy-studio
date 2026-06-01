@@ -388,6 +388,9 @@ export default function SecurityAlertsPanel() {
               const wouldDispatch = Boolean(r.would_dispatch);
               const wouldFire = Boolean(r.would_fire);
               const cdActive = Boolean(cond.cooldown_active);
+              const blockedBy = (cond.cooldown_blocked_by ?? null) as { rule_name?: string; channel?: string; destination?: string } | null;
+              const nextAllowedAt = cond.next_allowed_at as string | null;
+              const hash = (r.evaluation_hash as string | undefined) ?? "";
               return (
                 <>
                   <div className="flex flex-wrap items-center gap-2">
@@ -397,7 +400,28 @@ export default function SecurityAlertsPanel() {
                     <span className="text-xs text-muted-foreground">
                       threshold met: <strong>{String(wouldFire)}</strong> · cooldown active: <strong>{String(cdActive)}</strong>
                     </span>
+                    {hash && (
+                      <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded bg-secondary/40 text-muted-foreground" title="Deterministic SHA-256 of rule config + computed results. Identical inputs → identical hash.">
+                        hash: {hash.slice(0, 12)}…
+                      </span>
+                    )}
                   </div>
+
+                  {cdActive && wouldFire && (
+                    <div className="p-3 rounded border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+                      <div className="font-semibold">Cooldown conflict — dispatch blocked</div>
+                      <div>
+                        Rule <strong>{blockedBy?.rule_name ?? String(r.rule ?? "")}</strong> matched its threshold,
+                        but the <strong>{blockedBy?.channel ?? String(r.channel ?? "")}</strong> cooldown for
+                        <code className="font-mono ml-1">{(blockedBy?.destination ?? String(r.destination ?? "")).slice(0, 80)}</code>
+                        {' '}is still active. Effective cooldown: <strong>{String(cond.effective_cooldown_min ?? "—")}m</strong>
+                        {' '}· remaining: <strong>{String(cond.cooldown_remaining_min ?? 0)}m</strong>.
+                      </div>
+                      <div>
+                        Next allowed dispatch: <strong>{nextAllowedAt ? new Date(nextAllowedAt).toLocaleString() : "—"}</strong>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                     <Metric label="Matched" value={String(r.matched ?? 0)} />
@@ -418,7 +442,7 @@ export default function SecurityAlertsPanel() {
                   </div>
 
                   <details className="text-[11px]">
-                    <summary className="cursor-pointer text-muted-foreground">Raw response</summary>
+                    <summary className="cursor-pointer text-muted-foreground">Raw response (hash: {hash || "—"})</summary>
                     <pre className="font-mono bg-secondary/30 p-3 rounded overflow-x-auto mt-2">{JSON.stringify(r, null, 2)}</pre>
                   </details>
                 </>

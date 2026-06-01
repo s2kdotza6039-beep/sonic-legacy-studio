@@ -25,12 +25,46 @@ const CHANNEL_MIN_COOLDOWN_MIN: Record<"email" | "webhook", number> = {
   webhook: 1,
 };
 
-function cooldownState(rule: Rule): { active: boolean; remaining_ms: number; effective_min: number } {
+function cooldownState(rule: Rule): { active: boolean; remaining_ms: number; effective_min: number; next_allowed_at: string | null } {
   const effective = Math.max(CHANNEL_MIN_COOLDOWN_MIN[rule.channel] ?? 0, rule.cooldown_minutes);
-  if (!rule.last_triggered_at) return { active: false, remaining_ms: 0, effective_min: effective };
-  const elapsed = Date.now() - new Date(rule.last_triggered_at).getTime();
+  if (!rule.last_triggered_at) return { active: false, remaining_ms: 0, effective_min: effective, next_allowed_at: null };
+  const lastTriggered = new Date(rule.last_triggered_at).getTime();
+  const elapsed = Date.now() - lastTriggered;
   const windowMs = effective * 60_000;
-  return { active: elapsed < windowMs, remaining_ms: Math.max(0, windowMs - elapsed), effective_min: effective };
+  const nextAllowed = new Date(lastTriggered + windowMs).toISOString();
+  return { active: elapsed < windowMs, remaining_ms: Math.max(0, windowMs - elapsed), effective_min: effective, next_allowed_at: nextAllowed };
+}
+
+// Deterministic JSON stringify for stable hashing (sorts keys recursively).
+function stableStringify(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+  const keys = Object.keys(v as Record<string, unknown>).sort();
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + stableStringify((v as Record<string, unknown>)[k])).join(",") + "}";
+}
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Hash the time-invariant rule config + computed evaluation results so the
+// same inputs always produce the same hash. Deliberately excludes
+// `cooldown_remaining_min` / `next_allowed_at` (time-varying).
+async function evaluationHash(rule: Rule, matched: number, detail: Record<string, unknown>): Promise<string> {
+  const fingerprint = {
+    rule_id: rule.id,
+    source: rule.event_source,
+    kind: rule.event_kind,
+    threshold: rule.threshold,
+    window_minutes: rule.window_minutes,
+    channel: rule.channel,
+    destination: rule.destination,
+    cooldown_minutes: rule.cooldown_minutes,
+    matched,
+    detail,
+  };
+  return (await sha256Hex(stableStringify(fingerprint))).slice(0, 32);
 }
 
 type Rule = {
@@ -307,46 +341,42 @@ Deno.serve(async (req) => {
     for (const rule of (rs ?? []) as Rule[]) {
       const sinceIso = new Date(now - rule.window_minutes * 60_000).toISOString();
       const cd = cooldownState(rule);
-      let base: Record<string, unknown>;
+      let matched = 0;
+      let detail: Record<string, unknown> = {};
+      let wouldFire = false;
       if (rule.event_source === "delivery_meta") {
         const meta = await evaluateMetaRule(sb, rule, sinceIso);
-        const wouldFire = meta.matched > 0;
-        base = {
-          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
-          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
-          matched: meta.matched, detail: meta.detail,
-          conditions: {
-            threshold_met: wouldFire,
-            cooldown_active: cd.active,
-            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
-            effective_cooldown_min: cd.effective_min,
-          },
-          window_minutes: rule.window_minutes, threshold: rule.threshold,
-          channel: rule.channel, destination: rule.destination,
-        };
+        matched = meta.matched;
+        detail = meta.detail;
+        wouldFire = meta.matched > 0;
       } else {
         const cfg = SOURCE_TABLE[rule.event_source];
         if (!cfg) { out.push({ rule_id: rule.id, rule: rule.name, error: "unknown_source" }); continue; }
         let qq = sb.from(cfg.table).select("*", { count: "exact", head: true }).gte(cfg.tsCol, sinceIso);
         if (rule.event_kind && rule.event_kind !== "*") qq = qq.eq(cfg.kindCol, rule.event_kind);
         const { count } = await qq;
-        const matched = count ?? 0;
-        const wouldFire = matched >= rule.threshold;
-        base = {
-          rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
-          would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
-          matched,
-          conditions: {
-            threshold_met: wouldFire,
-            cooldown_active: cd.active,
-            cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
-            effective_cooldown_min: cd.effective_min,
-          },
-          threshold: rule.threshold, window_minutes: rule.window_minutes,
-          channel: rule.channel, destination: rule.destination,
-        };
+        matched = count ?? 0;
+        wouldFire = matched >= rule.threshold;
       }
-      out.push(base);
+      const hash = await evaluationHash(rule, matched, detail);
+      out.push({
+        rule_id: rule.id, rule: rule.name, source: rule.event_source, kind: rule.event_kind,
+        would_fire: wouldFire, would_dispatch: wouldFire && !cd.active,
+        matched,
+        ...(rule.event_source === "delivery_meta" ? { detail } : {}),
+        conditions: {
+          threshold_met: wouldFire,
+          cooldown_active: cd.active,
+          cooldown_remaining_min: Math.ceil(cd.remaining_ms / 60_000),
+          effective_cooldown_min: cd.effective_min,
+          next_allowed_at: cd.next_allowed_at,
+          last_triggered_at: rule.last_triggered_at,
+          cooldown_blocked_by: cd.active ? { rule_id: rule.id, rule_name: rule.name, channel: rule.channel, destination: rule.destination } : null,
+        },
+        threshold: rule.threshold, window_minutes: rule.window_minutes,
+        channel: rule.channel, destination: rule.destination,
+        evaluation_hash: hash,
+      });
     }
 
     // Founder-only audit log entry for every dry-run execution.
@@ -362,13 +392,14 @@ Deno.serve(async (req) => {
           actorEmail = u?.user?.email ?? null;
         } catch { /* best-effort */ }
       }
+      const evaluationHashes = out.map((r) => (r as Record<string, unknown>).evaluation_hash).filter(Boolean);
       await sb.from("security_audit_log").insert({
         actor_user_id: caller.userId,
         action: "alert_rule_dryrun",
         entity: "security_alert_rule",
         row_count: out.length,
-        filters: { rule_id: dryRunRuleId },
-        metadata: { request_id: requestId, actor_email: actorEmail, results: out },
+        filters: { rule_id: dryRunRuleId, evaluation_hashes: evaluationHashes },
+        metadata: { request_id: requestId, actor_email: actorEmail, results: out, evaluation_hashes: evaluationHashes },
         ip,
         user_agent: ua,
       });
