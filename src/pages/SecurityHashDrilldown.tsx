@@ -21,9 +21,9 @@ type VerifyResult = {
 type AuditRow = {
   id: string;
   created_at: string;
-  actor_email: string | null;
-  metadata: { results?: Array<{ rule?: string; evaluation_hash?: string; rule_id?: string }>; request_id?: string } | null;
+  metadata: { results?: Array<{ rule?: string; evaluation_hash?: string; rule_id?: string }>; request_id?: string; actor_email?: string | null } | null;
 };
+
 
 const fmt = (v: unknown) => v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v);
 const isDrifted = (prev: unknown, curr: unknown) => JSON.stringify(prev) !== JSON.stringify(curr);
@@ -41,10 +41,11 @@ export default function SecurityHashDrilldown() {
     setResult(null);
     const { data } = await supabase
       .from("security_audit_log")
-      .select("id, created_at, actor_email, metadata")
+      .select("id, created_at, metadata")
       .eq("id", auditId)
       .maybeSingle();
     setAudit(data as AuditRow | null);
+
     setLoading(false);
     if (data) await runVerify();
   };
@@ -124,7 +125,7 @@ export default function SecurityHashDrilldown() {
                 </div>
                 <div className="p-3 rounded border border-border bg-secondary/20">
                   <div className="text-[10px] uppercase text-muted-foreground">Actor</div>
-                  <div className="truncate" title={audit.actor_email ?? ""}>{audit.actor_email ?? "—"}</div>
+                  <div className="truncate" title={audit.metadata?.actor_email ?? ""}>{audit.metadata?.actor_email ?? "—"}</div>
                 </div>
                 <div className="p-3 rounded border border-border bg-secondary/20">
                   <div className="text-[10px] uppercase text-muted-foreground">Rule</div>
