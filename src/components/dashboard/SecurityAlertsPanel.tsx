@@ -242,13 +242,16 @@ export default function SecurityAlertsPanel() {
                       <td className="p-2 font-mono">
                         {isEdit ? (
                           <div className="flex gap-1">
-                            <select className="px-1 py-0.5 text-xs bg-background border border-border rounded" value={editDraft!.event_source} onChange={(e) => setEditDraft({ ...editDraft!, event_source: e.target.value as Rule["event_source"] })}>
-                              <option value="playback">playback</option>
-                              <option value="payfast">payfast</option>
-                              <option value="ai">ai</option>
-                              <option value="audit">audit</option>
+                            <select className="px-1 py-0.5 text-xs bg-background border border-border rounded" value={editDraft!.event_source} onChange={(e) => setEditDraft({ ...editDraft!, event_source: e.target.value as Rule["event_source"], event_kind: e.target.value === "delivery_meta" ? "delivery_spike" : editDraft!.event_kind })}>
+                              {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
-                            <Input className="h-7 text-xs w-28" value={editDraft!.event_kind} onChange={(e) => setEditDraft({ ...editDraft!, event_kind: e.target.value })} />
+                            {editDraft!.event_source === "delivery_meta" ? (
+                              <select className="px-1 py-0.5 text-xs bg-background border border-border rounded" value={editDraft!.event_kind} onChange={(e) => setEditDraft({ ...editDraft!, event_kind: e.target.value })}>
+                                {META_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                              </select>
+                            ) : (
+                              <Input className="h-7 text-xs w-28" value={editDraft!.event_kind} onChange={(e) => setEditDraft({ ...editDraft!, event_kind: e.target.value })} />
+                            )}
                           </div>
                         ) : `${r.event_source} / ${r.event_kind}`}
                       </td>
