@@ -10,13 +10,28 @@
 // Founder-only via authGuard (service-role calls from cron also pass).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { requireFounder } from "../_shared/authGuard.ts";
+import { requireFounder, resolveCaller } from "../_shared/authGuard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_MS = 60_000; // 1 min, doubled each attempt
+
+// Per-channel hard floor cooldowns enforced server-side so dry-runs and real
+// deliveries cannot bypass anti-spam protections by setting cooldown_minutes=0.
+const CHANNEL_MIN_COOLDOWN_MIN: Record<"email" | "webhook", number> = {
+  email: 5,
+  webhook: 1,
+};
+
+function cooldownState(rule: Rule): { active: boolean; remaining_ms: number; effective_min: number } {
+  const effective = Math.max(CHANNEL_MIN_COOLDOWN_MIN[rule.channel] ?? 0, rule.cooldown_minutes);
+  if (!rule.last_triggered_at) return { active: false, remaining_ms: 0, effective_min: effective };
+  const elapsed = Date.now() - new Date(rule.last_triggered_at).getTime();
+  const windowMs = effective * 60_000;
+  return { active: elapsed < windowMs, remaining_ms: Math.max(0, windowMs - elapsed), effective_min: effective };
+}
 
 type Rule = {
   id: string;
