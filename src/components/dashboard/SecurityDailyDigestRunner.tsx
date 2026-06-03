@@ -483,18 +483,38 @@ export default function SecurityDailyDigestRunner() {
           <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-border bg-secondary/5 text-xs">
             <span className="text-muted-foreground inline-flex items-center gap-1"><Bookmark className="w-3 h-3" /> Presets:</span>
             {presets.length === 0 && <span className="text-muted-foreground italic">none saved</span>}
-            {presets.map((p) => (
-              <span key={p.name} className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2 pr-1 py-0.5">
-                <button onClick={() => applyPreset(p)} className="text-[11px] hover:underline" title="Apply preset">{p.name}</button>
-                <button onClick={() => deletePreset(p.name)} className="text-muted-foreground hover:text-rose-600" title="Delete preset">
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
+            {presets.map((p) => {
+              const isEditing = editingName === p.name;
+              return (
+                <span key={p.name} className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2 pr-1 py-0.5">
+                  {isEditing ? (
+                    <>
+                      <Input
+                        value={editNameInput}
+                        onChange={(e) => setEditNameInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") commitRename(p.name); if (e.key === "Escape") cancelRename(); }}
+                        className="h-5 w-28 text-[11px] px-1 py-0"
+                        autoFocus
+                      />
+                      <button onClick={() => commitRename(p.name)} className="text-muted-foreground hover:text-emerald-600" title="Save name"><Check className="w-3 h-3" /></button>
+                      <button onClick={cancelRename} className="text-muted-foreground hover:text-rose-600" title="Cancel"><X className="w-3 h-3" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => applyPreset(p)} className="text-[11px] hover:underline" title="Apply preset">{p.name}</button>
+                      <button onClick={() => startRename(p.name)} className="text-muted-foreground hover:text-primary" title="Rename preset"><Pencil className="w-3 h-3" /></button>
+                      <button onClick={() => updatePreset(p.name)} className="text-muted-foreground hover:text-primary" title="Update with current filters"><Save className="w-3 h-3" /></button>
+                      <button onClick={() => deletePreset(p.name)} className="text-muted-foreground hover:text-rose-600" title="Delete preset"><Trash2 className="w-3 h-3" /></button>
+                    </>
+                  )}
+                </span>
+              );
+            })}
             <div className="flex-1" />
             <Input
               value={presetName}
               onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveCurrentAsPreset(); }}
               placeholder="Preset name…"
               className="h-6 w-40 text-[11px]"
             />
