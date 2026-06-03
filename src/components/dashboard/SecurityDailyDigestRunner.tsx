@@ -3,7 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight, Download, X } from "lucide-react";
+import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight, Download, X, Bookmark, Save, Trash2 } from "lucide-react";
+
+type ChannelKey = "manual" | "scheduled";
+type Preset = {
+  name: string;
+  statusFilters: StatusKey[];
+  channelFilters: ChannelKey[];
+  topRuleFilter: string;
+  ruleFilter: string;
+  dateFrom: string;
+  dateTo: string;
+  sortKey: SortKey;
+};
+const PRESETS_KEY = "s2k.digestHistory.presets.v1";
 
 type Preview = { subject: string; html: string; templateData: Record<string, unknown> };
 
