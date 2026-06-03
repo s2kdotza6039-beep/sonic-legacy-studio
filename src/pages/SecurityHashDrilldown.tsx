@@ -103,6 +103,43 @@ export default function SecurityHashDrilldown() {
   }
   const differingSet = new Set(result?.differing_fields ?? []);
 
+  // Group/summary
+  const sourceOf = (field: string): string => {
+    if (field.startsWith("detail.")) return "detail";
+    if (field === "stored_hash" || field === "current_hash" || field.includes("hash")) return "hash";
+    return "top-level";
+  };
+  const entriesWithDrift = compareEntries.map((e) => ({
+    ...e,
+    drift: differingSet.has(e.field) || isDrifted(e.prev, e.curr),
+    source: sourceOf(e.field),
+    reason: diffReason(e.prev, e.curr),
+  }));
+  const totalFields = entriesWithDrift.length;
+  const matchedFields = entriesWithDrift.filter((e) => !e.drift).length;
+  const driftedFields = totalFields - matchedFields;
+  const bySource = entriesWithDrift.reduce<Record<string, { match: number; diff: number }>>((acc, e) => {
+    acc[e.source] ??= { match: 0, diff: 0 };
+    if (e.drift) acc[e.source].diff++; else acc[e.source].match++;
+    return acc;
+  }, {});
+
+  const exportDriftCsv = () => {
+    const drifted = entriesWithDrift.filter((e) => e.drift);
+    const headers = ["field", "source", "old_value", "new_value", "diff_reason"];
+    const lines = [headers.join(",")];
+    drifted.forEach((e) => {
+      lines.push([e.field, e.source, fmt(e.prev), fmt(e.curr), e.reason].map(csvCell).join(","));
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    a.href = url; a.download = `hash-drift-${auditId?.slice(0, 8) ?? "audit"}-${stamp}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto p-6 space-y-4">
@@ -110,10 +147,32 @@ export default function SecurityHashDrilldown() {
           <Link to="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to dashboard
           </Link>
-          <Button variant="outline" size="sm" onClick={runVerify} disabled={verifying || !audit}>
-            {verifying ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />} Re-verify
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-md border border-border overflow-hidden">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`px-2 py-1 text-xs inline-flex items-center gap-1 ${viewMode === "table" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-secondary/60 text-muted-foreground"}`}
+                title="Table view"
+              >
+                <Rows className="w-3.5 h-3.5" /> Table
+              </button>
+              <button
+                onClick={() => setViewMode("side_by_side")}
+                className={`px-2 py-1 text-xs inline-flex items-center gap-1 border-l border-border ${viewMode === "side_by_side" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-secondary/60 text-muted-foreground"}`}
+                title="Side-by-side view"
+              >
+                <Columns className="w-3.5 h-3.5" /> Side-by-side
+              </button>
+            </div>
+            <Button variant="outline" size="sm" onClick={exportDriftCsv} disabled={driftedFields === 0} title="Export drifted fields to CSV">
+              <Download className="w-4 h-4 mr-1" /> Drift CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={runVerify} disabled={verifying || !audit}>
+              {verifying ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />} Re-verify
+            </Button>
+          </div>
         </div>
+
 
         <Card>
           <CardHeader>
