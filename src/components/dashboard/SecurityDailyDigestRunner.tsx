@@ -3,7 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight, Download, X } from "lucide-react";
+import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight, Download, X, Bookmark, Save, Trash2 } from "lucide-react";
+
+type ChannelKey = "manual" | "scheduled";
+type Preset = {
+  name: string;
+  statusFilters: StatusKey[];
+  channelFilters: ChannelKey[];
+  topRuleFilter: string;
+  ruleFilter: string;
+  dateFrom: string;
+  dateTo: string;
+  sortKey: SortKey;
+};
+const PRESETS_KEY = "s2k.digestHistory.presets.v1";
 
 type Preview = { subject: string; html: string; templateData: Record<string, unknown> };
 
@@ -59,8 +72,14 @@ export default function SecurityDailyDigestRunner() {
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date_desc");
   const [statusFilters, setStatusFilters] = useState<Set<StatusKey>>(new Set());
+  const [channelFilters, setChannelFilters] = useState<Set<ChannelKey>>(new Set());
   const [topRuleFilter, setTopRuleFilter] = useState<string>("");
+  const [ruleFilter, setRuleFilter] = useState<string>("");
   const [exporting, setExporting] = useState(false);
+  const [presets, setPresets] = useState<Preset[]>(() => {
+    try { return JSON.parse(localStorage.getItem(PRESETS_KEY) ?? "[]"); } catch { return []; }
+  });
+  const [presetName, setPresetName] = useState("");
 
   const loadHistory = async (resetPage = false) => {
     setHistoryLoading(true);
@@ -89,7 +108,8 @@ export default function SecurityDailyDigestRunner() {
 
   const applyFilters = () => loadHistory(true);
   const clearFilters = () => {
-    setDateFrom(""); setDateTo(""); setStatusFilters(new Set()); setTopRuleFilter(""); setPage(0);
+    setDateFrom(""); setDateTo(""); setStatusFilters(new Set()); setChannelFilters(new Set());
+    setTopRuleFilter(""); setRuleFilter(""); setPage(0);
     setTimeout(() => loadHistory(true), 0);
   };
 
@@ -100,6 +120,51 @@ export default function SecurityDailyDigestRunner() {
       return next;
     });
   };
+  const toggleChannel = (c: ChannelKey) => {
+    setChannelFilters((prev) => {
+      const next = new Set(prev);
+      next.has(c) ? next.delete(c) : next.add(c);
+      return next;
+    });
+  };
+
+  const channelOf = (r: HistoryRow): ChannelKey => r.action === "daily_report_manual_run" ? "manual" : "scheduled";
+  const rulesIn = (r: HistoryRow): string[] => {
+    const td = r.metadata?.template_data as { top_meta_rules?: Array<{ rule_name?: string; name?: string }> } | undefined;
+    return (td?.top_meta_rules ?? []).map((x) => (x.rule_name ?? x.name ?? "").toString()).filter(Boolean);
+  };
+
+  const savePresets = (next: Preset[]) => {
+    setPresets(next);
+    try { localStorage.setItem(PRESETS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+  const saveCurrentAsPreset = () => {
+    const name = presetName.trim();
+    if (!name) { setResult("Enter a preset name first."); return; }
+    const preset: Preset = {
+      name,
+      statusFilters: Array.from(statusFilters),
+      channelFilters: Array.from(channelFilters),
+      topRuleFilter, ruleFilter, dateFrom, dateTo, sortKey,
+    };
+    const next = [...presets.filter((p) => p.name !== name), preset];
+    savePresets(next);
+    setPresetName("");
+    setResult(`Preset “${name}” saved.`);
+  };
+  const applyPreset = (p: Preset) => {
+    setStatusFilters(new Set(p.statusFilters));
+    setChannelFilters(new Set(p.channelFilters));
+    setTopRuleFilter(p.topRuleFilter);
+    setRuleFilter(p.ruleFilter);
+    setDateFrom(p.dateFrom);
+    setDateTo(p.dateTo);
+    setSortKey(p.sortKey);
+    setPage(0);
+    setTimeout(() => loadHistory(true), 0);
+  };
+  const deletePreset = (name: string) => savePresets(presets.filter((p) => p.name !== name));
+
 
   const loadPreview = async () => {
     setPreviewing(true);
@@ -164,7 +229,9 @@ export default function SecurityDailyDigestRunner() {
   const applyClientFilters = (rows: HistoryRow[]) => {
     let out = rows;
     if (statusFilters.size > 0) out = out.filter((r) => statusFilters.has(summarizeRow(r).status));
+    if (channelFilters.size > 0) out = out.filter((r) => channelFilters.has(channelOf(r)));
     if (topRuleFilter) out = out.filter((r) => topRuleFor(r) === topRuleFilter);
+    if (ruleFilter) out = out.filter((r) => rulesIn(r).includes(ruleFilter));
     return out;
   };
 
@@ -179,13 +246,20 @@ export default function SecurityDailyDigestRunner() {
     return sorted;
   };
 
-  const visible = useMemo(() => applyClientSort(applyClientFilters(history)), [history, statusFilters, topRuleFilter, sortKey]);
+  const visible = useMemo(() => applyClientSort(applyClientFilters(history)), [history, statusFilters, channelFilters, topRuleFilter, ruleFilter, sortKey]);
 
   const topRuleOptions = useMemo(() => {
     const set = new Set<string>();
     history.forEach((r) => { const t = topRuleFor(r); if (t) set.add(t); });
     return Array.from(set).sort();
   }, [history]);
+
+  const ruleOptions = useMemo(() => {
+    const set = new Set<string>();
+    history.forEach((r) => rulesIn(r).forEach((n) => set.add(n)));
+    return Array.from(set).sort();
+  }, [history]);
+
 
   const exportCsv = async () => {
     setExporting(true);
@@ -302,7 +376,7 @@ export default function SecurityDailyDigestRunner() {
               <span className="text-muted-foreground">→</span>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-7 w-36 text-xs" />
               <Button size="sm" variant="outline" className="h-7 px-2" onClick={applyFilters}>Apply</Button>
-              {(dateFrom || dateTo || statusFilters.size > 0 || topRuleFilter) && (
+              {(dateFrom || dateTo || statusFilters.size > 0 || channelFilters.size > 0 || topRuleFilter || ruleFilter) && (
                 <Button size="sm" variant="ghost" className="h-7 px-2" onClick={clearFilters}>Clear</Button>
               )}
               <Button size="sm" variant="outline" className="h-7 px-2" onClick={exportCsv} disabled={exporting} title="Export current sort + filters to CSV">
@@ -348,9 +422,65 @@ export default function SecurityDailyDigestRunner() {
                 <X className="w-3 h-3" />
               </button>
             )}
+            <span className="text-muted-foreground ml-2">Channel:</span>
+            {(["manual", "scheduled"] as ChannelKey[]).map((c) => {
+              const on = channelFilters.has(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => toggleChannel(c)}
+                  className={`px-2 py-0.5 rounded-full border text-[11px] capitalize transition ${
+                    on ? "border-primary bg-primary text-primary-foreground"
+                       : "border-border bg-background hover:bg-secondary/60 text-muted-foreground"
+                  }`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+            <span className="text-muted-foreground ml-2">Rule:</span>
+            <select
+              value={ruleFilter}
+              onChange={(e) => setRuleFilter(e.target.value)}
+              className="h-6 px-2 text-[11px] bg-background border border-border rounded"
+              title="Filter by any rule present in the run"
+            >
+              <option value="">Any</option>
+              {ruleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {ruleFilter && (
+              <button onClick={() => setRuleFilter("")} className="px-1.5 py-0.5 rounded hover:bg-secondary/60 text-muted-foreground" title="Clear rule filter">
+                <X className="w-3 h-3" />
+              </button>
+            )}
             <div className="flex-1" />
             <span className="text-muted-foreground">{visible.length} of {history.length} on page</span>
           </div>
+
+          {/* Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-border bg-secondary/5 text-xs">
+            <span className="text-muted-foreground inline-flex items-center gap-1"><Bookmark className="w-3 h-3" /> Presets:</span>
+            {presets.length === 0 && <span className="text-muted-foreground italic">none saved</span>}
+            {presets.map((p) => (
+              <span key={p.name} className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2 pr-1 py-0.5">
+                <button onClick={() => applyPreset(p)} className="text-[11px] hover:underline" title="Apply preset">{p.name}</button>
+                <button onClick={() => deletePreset(p.name)} className="text-muted-foreground hover:text-rose-600" title="Delete preset">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <div className="flex-1" />
+            <Input
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              placeholder="Preset name…"
+              className="h-6 w-40 text-[11px]"
+            />
+            <Button size="sm" variant="outline" className="h-6 px-2" onClick={saveCurrentAsPreset} title="Save current filters/sort as a preset">
+              <Save className="w-3 h-3 mr-1" /> Save
+            </Button>
+          </div>
+
 
           {visible.length === 0 && !historyLoading ? (
             <div className="p-4 text-center text-xs text-muted-foreground">
