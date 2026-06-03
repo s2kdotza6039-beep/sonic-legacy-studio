@@ -108,7 +108,8 @@ export default function SecurityDailyDigestRunner() {
 
   const applyFilters = () => loadHistory(true);
   const clearFilters = () => {
-    setDateFrom(""); setDateTo(""); setStatusFilters(new Set()); setTopRuleFilter(""); setPage(0);
+    setDateFrom(""); setDateTo(""); setStatusFilters(new Set()); setChannelFilters(new Set());
+    setTopRuleFilter(""); setRuleFilter(""); setPage(0);
     setTimeout(() => loadHistory(true), 0);
   };
 
@@ -119,6 +120,51 @@ export default function SecurityDailyDigestRunner() {
       return next;
     });
   };
+  const toggleChannel = (c: ChannelKey) => {
+    setChannelFilters((prev) => {
+      const next = new Set(prev);
+      next.has(c) ? next.delete(c) : next.add(c);
+      return next;
+    });
+  };
+
+  const channelOf = (r: HistoryRow): ChannelKey => r.action === "daily_report_manual_run" ? "manual" : "scheduled";
+  const rulesIn = (r: HistoryRow): string[] => {
+    const td = r.metadata?.template_data as { top_meta_rules?: Array<{ rule_name?: string; name?: string }> } | undefined;
+    return (td?.top_meta_rules ?? []).map((x) => (x.rule_name ?? x.name ?? "").toString()).filter(Boolean);
+  };
+
+  const savePresets = (next: Preset[]) => {
+    setPresets(next);
+    try { localStorage.setItem(PRESETS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+  const saveCurrentAsPreset = () => {
+    const name = presetName.trim();
+    if (!name) { setResult("Enter a preset name first."); return; }
+    const preset: Preset = {
+      name,
+      statusFilters: Array.from(statusFilters),
+      channelFilters: Array.from(channelFilters),
+      topRuleFilter, ruleFilter, dateFrom, dateTo, sortKey,
+    };
+    const next = [...presets.filter((p) => p.name !== name), preset];
+    savePresets(next);
+    setPresetName("");
+    setResult(`Preset “${name}” saved.`);
+  };
+  const applyPreset = (p: Preset) => {
+    setStatusFilters(new Set(p.statusFilters));
+    setChannelFilters(new Set(p.channelFilters));
+    setTopRuleFilter(p.topRuleFilter);
+    setRuleFilter(p.ruleFilter);
+    setDateFrom(p.dateFrom);
+    setDateTo(p.dateTo);
+    setSortKey(p.sortKey);
+    setPage(0);
+    setTimeout(() => loadHistory(true), 0);
+  };
+  const deletePreset = (name: string) => savePresets(presets.filter((p) => p.name !== name));
+
 
   const loadPreview = async () => {
     setPreviewing(true);
