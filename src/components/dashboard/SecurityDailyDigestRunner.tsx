@@ -376,7 +376,7 @@ export default function SecurityDailyDigestRunner() {
               <span className="text-muted-foreground">→</span>
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-7 w-36 text-xs" />
               <Button size="sm" variant="outline" className="h-7 px-2" onClick={applyFilters}>Apply</Button>
-              {(dateFrom || dateTo || statusFilters.size > 0 || topRuleFilter) && (
+              {(dateFrom || dateTo || statusFilters.size > 0 || channelFilters.size > 0 || topRuleFilter || ruleFilter) && (
                 <Button size="sm" variant="ghost" className="h-7 px-2" onClick={clearFilters}>Clear</Button>
               )}
               <Button size="sm" variant="outline" className="h-7 px-2" onClick={exportCsv} disabled={exporting} title="Export current sort + filters to CSV">
