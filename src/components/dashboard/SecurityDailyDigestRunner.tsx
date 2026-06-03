@@ -80,6 +80,8 @@ export default function SecurityDailyDigestRunner() {
     try { return JSON.parse(localStorage.getItem(PRESETS_KEY) ?? "[]"); } catch { return []; }
   });
   const [presetName, setPresetName] = useState("");
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editNameInput, setEditNameInput] = useState("");
 
   const loadHistory = async (resetPage = false) => {
     setHistoryLoading(true);
