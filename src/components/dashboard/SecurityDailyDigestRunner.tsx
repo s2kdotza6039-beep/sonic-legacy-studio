@@ -166,6 +166,26 @@ export default function SecurityDailyDigestRunner() {
     setTimeout(() => loadHistory(true), 0);
   };
   const deletePreset = (name: string) => savePresets(presets.filter((p) => p.name !== name));
+  const startRename = (name: string) => { setEditingName(name); setEditNameInput(name); };
+  const cancelRename = () => { setEditingName(null); setEditNameInput(""); };
+  const commitRename = (oldName: string) => {
+    const trimmed = editNameInput.trim();
+    if (!trimmed) { setResult("Preset name cannot be empty."); return; }
+    if (trimmed !== oldName && presets.some((p) => p.name === trimmed)) { setResult(`A preset named “${trimmed}” already exists.`); return; }
+    savePresets(presets.map((p) => p.name === oldName ? { ...p, name: trimmed } : p));
+    setEditingName(null);
+    setEditNameInput("");
+  };
+  const updatePreset = (name: string) => {
+    const preset: Preset = {
+      name,
+      statusFilters: Array.from(statusFilters),
+      channelFilters: Array.from(channelFilters),
+      topRuleFilter, ruleFilter, dateFrom, dateTo, sortKey,
+    };
+    savePresets(presets.map((p) => p.name === name ? preset : p));
+    setResult(`Preset “${name}” updated with current filters.`);
+  };
 
 
   const loadPreview = async () => {
