@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight, Download, X, Bookmark, Save, Trash2 } from "lucide-react";
+import { Eye, Loader2, Send, Mail, History, RefreshCw, ChevronLeft, ChevronRight, Download, X, Bookmark, Save, Trash2, Pencil, Check } from "lucide-react";
 
 type ChannelKey = "manual" | "scheduled";
 type Preset = {
