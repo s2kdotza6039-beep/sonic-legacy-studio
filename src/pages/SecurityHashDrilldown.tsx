@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Hash, Loader2, ArrowLeft, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Hash, Loader2, ArrowLeft, CheckCircle2, AlertTriangle, RefreshCw, Download, Columns, Rows } from "lucide-react";
 
 type VerifyResult = {
   ok: boolean;
