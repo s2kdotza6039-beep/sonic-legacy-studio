@@ -229,7 +229,9 @@ export default function SecurityDailyDigestRunner() {
   const applyClientFilters = (rows: HistoryRow[]) => {
     let out = rows;
     if (statusFilters.size > 0) out = out.filter((r) => statusFilters.has(summarizeRow(r).status));
+    if (channelFilters.size > 0) out = out.filter((r) => channelFilters.has(channelOf(r)));
     if (topRuleFilter) out = out.filter((r) => topRuleFor(r) === topRuleFilter);
+    if (ruleFilter) out = out.filter((r) => rulesIn(r).includes(ruleFilter));
     return out;
   };
 
@@ -244,13 +246,20 @@ export default function SecurityDailyDigestRunner() {
     return sorted;
   };
 
-  const visible = useMemo(() => applyClientSort(applyClientFilters(history)), [history, statusFilters, topRuleFilter, sortKey]);
+  const visible = useMemo(() => applyClientSort(applyClientFilters(history)), [history, statusFilters, channelFilters, topRuleFilter, ruleFilter, sortKey]);
 
   const topRuleOptions = useMemo(() => {
     const set = new Set<string>();
     history.forEach((r) => { const t = topRuleFor(r); if (t) set.add(t); });
     return Array.from(set).sort();
   }, [history]);
+
+  const ruleOptions = useMemo(() => {
+    const set = new Set<string>();
+    history.forEach((r) => rulesIn(r).forEach((n) => set.add(n)));
+    return Array.from(set).sort();
+  }, [history]);
+
 
   const exportCsv = async () => {
     setExporting(true);
