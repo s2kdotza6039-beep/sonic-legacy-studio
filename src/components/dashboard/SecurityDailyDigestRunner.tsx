@@ -72,8 +72,14 @@ export default function SecurityDailyDigestRunner() {
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date_desc");
   const [statusFilters, setStatusFilters] = useState<Set<StatusKey>>(new Set());
+  const [channelFilters, setChannelFilters] = useState<Set<ChannelKey>>(new Set());
   const [topRuleFilter, setTopRuleFilter] = useState<string>("");
+  const [ruleFilter, setRuleFilter] = useState<string>("");
   const [exporting, setExporting] = useState(false);
+  const [presets, setPresets] = useState<Preset[]>(() => {
+    try { return JSON.parse(localStorage.getItem(PRESETS_KEY) ?? "[]"); } catch { return []; }
+  });
+  const [presetName, setPresetName] = useState("");
 
   const loadHistory = async (resetPage = false) => {
     setHistoryLoading(true);
