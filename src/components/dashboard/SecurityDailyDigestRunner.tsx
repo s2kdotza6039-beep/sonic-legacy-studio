@@ -422,9 +422,65 @@ export default function SecurityDailyDigestRunner() {
                 <X className="w-3 h-3" />
               </button>
             )}
+            <span className="text-muted-foreground ml-2">Channel:</span>
+            {(["manual", "scheduled"] as ChannelKey[]).map((c) => {
+              const on = channelFilters.has(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => toggleChannel(c)}
+                  className={`px-2 py-0.5 rounded-full border text-[11px] capitalize transition ${
+                    on ? "border-primary bg-primary text-primary-foreground"
+                       : "border-border bg-background hover:bg-secondary/60 text-muted-foreground"
+                  }`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+            <span className="text-muted-foreground ml-2">Rule:</span>
+            <select
+              value={ruleFilter}
+              onChange={(e) => setRuleFilter(e.target.value)}
+              className="h-6 px-2 text-[11px] bg-background border border-border rounded"
+              title="Filter by any rule present in the run"
+            >
+              <option value="">Any</option>
+              {ruleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {ruleFilter && (
+              <button onClick={() => setRuleFilter("")} className="px-1.5 py-0.5 rounded hover:bg-secondary/60 text-muted-foreground" title="Clear rule filter">
+                <X className="w-3 h-3" />
+              </button>
+            )}
             <div className="flex-1" />
             <span className="text-muted-foreground">{visible.length} of {history.length} on page</span>
           </div>
+
+          {/* Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b border-border bg-secondary/5 text-xs">
+            <span className="text-muted-foreground inline-flex items-center gap-1"><Bookmark className="w-3 h-3" /> Presets:</span>
+            {presets.length === 0 && <span className="text-muted-foreground italic">none saved</span>}
+            {presets.map((p) => (
+              <span key={p.name} className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2 pr-1 py-0.5">
+                <button onClick={() => applyPreset(p)} className="text-[11px] hover:underline" title="Apply preset">{p.name}</button>
+                <button onClick={() => deletePreset(p.name)} className="text-muted-foreground hover:text-rose-600" title="Delete preset">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <div className="flex-1" />
+            <Input
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              placeholder="Preset name…"
+              className="h-6 w-40 text-[11px]"
+            />
+            <Button size="sm" variant="outline" className="h-6 px-2" onClick={saveCurrentAsPreset} title="Save current filters/sort as a preset">
+              <Save className="w-3 h-3 mr-1" /> Save
+            </Button>
+          </div>
+
 
           {visible.length === 0 && !historyLoading ? (
             <div className="p-4 text-center text-xs text-muted-foreground">
