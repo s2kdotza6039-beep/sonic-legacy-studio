@@ -243,7 +243,33 @@ export default function SecurityHashDrilldown() {
                   </div>
                 )}
 
-                {compareEntries.length > 0 && (
+                {/* Summary panel */}
+                {totalFields > 0 && (
+                  <div className="border border-border rounded-md p-3 bg-secondary/10 space-y-2">
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      <div className="font-medium">Field summary</div>
+                      <span className="inline-flex items-center gap-1 text-emerald-600">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {matchedFields} match
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-amber-600">
+                        <AlertTriangle className="w-3.5 h-3.5" /> {driftedFields} differ
+                      </span>
+                      <span className="text-muted-foreground">of {totalFields} computed fields</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[11px]">
+                      {Object.entries(bySource).map(([src, c]) => (
+                        <div key={src} className="px-2 py-1 rounded border border-border bg-background">
+                          <span className="font-mono mr-1">{src}</span>
+                          <span className="text-emerald-600">{c.match} ✓</span>
+                          <span className="mx-1 text-muted-foreground">/</span>
+                          <span className={c.diff > 0 ? "text-amber-600" : "text-muted-foreground"}>{c.diff} ✗</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {compareEntries.length > 0 && viewMode === "table" && (
                   <div className="border border-border rounded-md overflow-hidden">
                     <table className="w-full text-xs">
                       <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-wider">
@@ -252,34 +278,68 @@ export default function SecurityHashDrilldown() {
                           <th className="text-left p-2">Stored (dry-run)</th>
                           <th className="text-left p-2">Current</th>
                           <th className="text-left p-2 w-20">Status</th>
+                          <th className="text-left p-2 w-32">Reason</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {compareEntries.map(({ field, prev, curr, nested }) => {
-                          const drift = differingSet.has(field) || isDrifted(prev, curr);
-                          return (
-                            <tr key={field} className={`border-t border-border ${drift ? "bg-amber-500/10" : ""}`}>
-                              <td className={`p-2 ${nested ? "pl-4 text-muted-foreground" : "font-medium"}`}>{field}</td>
-                              <td className="p-2 font-mono break-all">{fmt(prev)}</td>
-                              <td className={`p-2 font-mono break-all ${drift ? "text-amber-700 dark:text-amber-400 font-semibold" : ""}`}>{fmt(curr)}</td>
-                              <td className="p-2">
-                                {drift ? (
-                                  <span className="inline-flex items-center gap-1 text-amber-600 text-[10px] font-medium">
-                                    <AlertTriangle className="w-3 h-3" /> drifted
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-emerald-600 text-[10px] font-medium">
-                                    <CheckCircle2 className="w-3 h-3" /> same
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {entriesWithDrift.map(({ field, prev, curr, nested, drift, reason }) => (
+                          <tr key={field} className={`border-t border-border ${drift ? "bg-amber-500/10" : ""}`}>
+                            <td className={`p-2 ${nested ? "pl-4 text-muted-foreground" : "font-medium"}`}>{field}</td>
+                            <td className="p-2 font-mono break-all">{fmt(prev)}</td>
+                            <td className={`p-2 font-mono break-all ${drift ? "text-amber-700 dark:text-amber-400 font-semibold" : ""}`}>{fmt(curr)}</td>
+                            <td className="p-2">
+                              {drift ? (
+                                <span className="inline-flex items-center gap-1 text-amber-600 text-[10px] font-medium">
+                                  <AlertTriangle className="w-3 h-3" /> drifted
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-emerald-600 text-[10px] font-medium">
+                                  <CheckCircle2 className="w-3 h-3" /> same
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2 text-[10px] text-muted-foreground">{reason || "—"}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 )}
+
+                {compareEntries.length > 0 && viewMode === "side_by_side" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="border border-border rounded-md overflow-hidden">
+                      <div className="bg-secondary/40 px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                        Dry-run (stored)
+                      </div>
+                      <div className="divide-y divide-border">
+                        {entriesWithDrift.map(({ field, prev, drift, nested }) => (
+                          <div key={`l-${field}`} className={`px-3 py-1.5 text-xs ${drift ? "bg-amber-500/10" : ""}`}>
+                            <div className={`text-[10px] uppercase ${nested ? "text-muted-foreground" : "font-medium"}`}>{field}</div>
+                            <div className="font-mono break-all">{fmt(prev)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="border border-border rounded-md overflow-hidden">
+                      <div className="bg-secondary/40 px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                        Current (latest inputs)
+                      </div>
+                      <div className="divide-y divide-border">
+                        {entriesWithDrift.map(({ field, curr, drift, nested, reason }) => (
+                          <div key={`r-${field}`} className={`px-3 py-1.5 text-xs ${drift ? "bg-amber-500/10 border-l-2 border-amber-500" : ""}`}>
+                            <div className={`text-[10px] uppercase flex items-center justify-between gap-2 ${nested ? "text-muted-foreground" : "font-medium"}`}>
+                              <span>{field}</span>
+                              {drift && <span className="text-amber-600 normal-case text-[10px]">{reason}</span>}
+                            </div>
+                            <div className={`font-mono break-all ${drift ? "text-amber-700 dark:text-amber-400 font-semibold" : ""}`}>{fmt(curr)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
 
                 <div className="text-[10px] text-muted-foreground">Evaluated at {result.evaluated_at}</div>
               </>
