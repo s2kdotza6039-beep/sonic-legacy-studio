@@ -28,12 +28,33 @@ type AuditRow = {
 const fmt = (v: unknown) => v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v);
 const isDrifted = (prev: unknown, curr: unknown) => JSON.stringify(prev) !== JSON.stringify(curr);
 
+const diffReason = (prev: unknown, curr: unknown): string => {
+  if (JSON.stringify(prev) === JSON.stringify(curr)) return "";
+  if (prev == null && curr != null) return "added";
+  if (prev != null && curr == null) return "removed";
+  if (typeof prev !== typeof curr) return `type changed (${typeof prev} → ${typeof curr})`;
+  if (typeof prev === "number" && typeof curr === "number") {
+    const delta = curr - prev;
+    return `numeric delta ${delta >= 0 ? "+" : ""}${delta}`;
+  }
+  if (typeof prev === "object") return "structural diff";
+  return "value changed";
+};
+
+const csvCell = (v: unknown) => {
+  const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+type ViewMode = "table" | "side_by_side";
+
 export default function SecurityHashDrilldown() {
   const { auditId } = useParams<{ auditId: string }>();
   const [audit, setAudit] = useState<AuditRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
 
   const loadAndVerify = async () => {
     if (!auditId) return;
