@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/payfast.ts";
-import { mintStreamToken } from "../_shared/streamSign.ts";
+import { mintStreamToken, normalizeObjectKey, encodeObjectKeyForUrl } from "../_shared/streamSign.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -85,13 +85,14 @@ Deno.serve(async (req) => {
       granted === "standard" ? Number(track.pct_standard) :
       Number(track.pct_free);
 
+    const decodedKey = normalizeObjectKey(track.r2_object_key);
     const token = await mintStreamToken({
-      objectKey: track.r2_object_key,
+      objectKey: decodedKey,
       pct,
       ttlSeconds: 300,
     });
 
-    const signedUrl = `${R2_BASE}/${track.r2_object_key}?t=${encodeURIComponent(token)}`;
+    const signedUrl = `${R2_BASE}/${encodeObjectKeyForUrl(decodedKey)}?t=${encodeURIComponent(token)}`;
 
     if (asJson) return json({ url: signedUrl, granted, pct, expires_in: 300 });
     return new Response(null, {

@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical } from "lucide-react";
 import MusicAdmin from "@/components/dashboard/MusicAdmin";
 import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
 import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
@@ -13,6 +13,7 @@ import SecurityDailyDigestRunner from "@/components/dashboard/SecurityDailyDiges
 import SecurityHashVerifier from "@/components/dashboard/SecurityHashVerifier";
 import SecurityAuditTimeline from "@/components/dashboard/SecurityAuditTimeline";
 import SecurityScheduledExports from "@/components/dashboard/SecurityScheduledExports";
+import WorkerPlaybackTest from "@/components/dashboard/WorkerPlaybackTest";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -49,6 +50,7 @@ const TABS = [
   { key: "music", label: "Music Admin", icon: Headphones },
   { key: "payfast", label: "PayFast Log", icon: ReceiptText },
   { key: "playback", label: "Playback Log", icon: Activity },
+  { key: "workertest", label: "Worker Test", icon: FlaskConical },
   { key: "cloudclicks", label: "Cloud Clicks", icon: Cloud },
   { key: "security", label: "Security", icon: ShieldAlert },
 ] as const;
@@ -138,6 +140,7 @@ const Dashboard = () => {
             {tab === "music" && <MusicAdmin />}
             {tab === "payfast" && <PayFastAuditLog />}
             {tab === "playback" && <PlaybackAuditLog />}
+            {tab === "workertest" && <WorkerPlaybackTest />}
             {tab === "cloudclicks" && <ReleaseClicksPanel />}
             {tab === "security" && (
               <div className="space-y-4">
