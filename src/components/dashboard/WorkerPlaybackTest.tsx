@@ -49,6 +49,26 @@ function normalize(raw: string): string {
   }
 }
 
+function canonical(raw: string): string {
+  const d = normalize(raw);
+  return d.replace(/\s+/g, " ").replace(/\s+(\.\w+)?$/g, "$1").trim();
+}
+
+function hasTrailingSpace(raw: string): boolean {
+  const d = normalize(raw);
+  return /\s\.[A-Za-z0-9]+$/.test(d) || /\s$/.test(d);
+}
+
+type CheckOutcome = "pending" | "running" | "pass" | "fail";
+type Check = {
+  id: "expired" | "bad_sig" | "path_mismatch" | "replay";
+  label: string;
+  expectStatus: number;
+  expectKind: string;
+  outcome: CheckOutcome;
+  detail?: string;
+};
+
 const WorkerPlaybackTest = () => {
   const { toast } = useToast();
   const [tracks, setTracks] = useState<Track[]>([]);
