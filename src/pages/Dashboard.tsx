@@ -13,6 +13,7 @@ import SecurityDailyDigestRunner from "@/components/dashboard/SecurityDailyDiges
 import SecurityHashVerifier from "@/components/dashboard/SecurityHashVerifier";
 import SecurityAuditTimeline from "@/components/dashboard/SecurityAuditTimeline";
 import SecurityScheduledExports from "@/components/dashboard/SecurityScheduledExports";
+import WorkerPlaybackTest from "@/components/dashboard/WorkerPlaybackTest";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
