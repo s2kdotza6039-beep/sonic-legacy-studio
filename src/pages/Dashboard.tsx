@@ -50,6 +50,7 @@ const TABS = [
   { key: "music", label: "Music Admin", icon: Headphones },
   { key: "payfast", label: "PayFast Log", icon: ReceiptText },
   { key: "playback", label: "Playback Log", icon: Activity },
+  { key: "workertest", label: "Worker Test", icon: FlaskConical },
   { key: "cloudclicks", label: "Cloud Clicks", icon: Cloud },
   { key: "security", label: "Security", icon: ShieldAlert },
 ] as const;
