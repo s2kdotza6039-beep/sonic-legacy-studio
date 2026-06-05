@@ -28,5 +28,4 @@ Deno.serve(async (req) => {
   const track: any = t.tracks;
   const target = `${R2_BASE}/${encodeObjectKeyForUrl(normalizeObjectKey(track.r2_object_key))}`;
   return Response.redirect(target, 302);
-  return Response.redirect(target, 302);
 });
