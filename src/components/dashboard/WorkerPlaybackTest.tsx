@@ -159,6 +159,71 @@ const WorkerPlaybackTest = () => {
     }
   };
 
+  const mintTestUrl = async (mode: Check["id"]): Promise<string | null> => {
+    if (!trackId) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-track`);
+    url.searchParams.set("track_id", trackId);
+    url.searchParams.set("tier", tier);
+    url.searchParams.set("json", "1");
+    if (mode !== "replay") url.searchParams.set("test", mode);
+    const r = await fetch(url.toString(), {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+    return body.url as string;
+  };
+
+  const probe = async (u: string) => {
+    const r = await fetch(u, { method: "GET", headers: { Range: "bytes=0-1" } });
+    let text = "";
+    try { text = (await r.text()).slice(0, 200); } catch { /* ignore */ }
+    return { status: r.status, statusText: r.statusText, body: text };
+  };
+
+  const runChecks = async () => {
+    if (!trackId) return;
+    setRunningChecks(true);
+    const next: Check[] = checks.map((c) => ({ ...c, outcome: "running", detail: undefined }));
+    setChecks(next);
+
+    const updateCheck = (id: Check["id"], outcome: CheckOutcome, detail: string) => {
+      setChecks((prev) => prev.map((c) => c.id === id ? { ...c, outcome, detail } : c));
+    };
+
+    for (const c of next) {
+      try {
+        if (c.id === "replay") {
+          const url = await mintTestUrl("replay");
+          if (!url) throw new Error("mint failed");
+          const first = await probe(url);
+          const second = await probe(url);
+          if (first.status < 400 && second.status === c.expectStatus) {
+            updateCheck(c.id, "pass", `1st=${first.status}, 2nd=${second.status} ${second.statusText}`);
+          } else if (first.status < 400 && second.status < 400) {
+            updateCheck(c.id, "fail", `replay NOT blocked (both ${first.status}) — Worker KV binding likely missing`);
+          } else {
+            updateCheck(c.id, "fail", `unexpected — 1st=${first.status}, 2nd=${second.status}`);
+          }
+        } else {
+          const url = await mintTestUrl(c.id);
+          if (!url) throw new Error("mint failed");
+          const res = await probe(url);
+          if (res.status === c.expectStatus) {
+            updateCheck(c.id, "pass", `${res.status} ${res.statusText} — ${res.body}`);
+          } else {
+            updateCheck(c.id, "fail", `expected ${c.expectStatus}, got ${res.status} ${res.statusText} — ${res.body}`);
+          }
+        }
+      } catch (e) {
+        updateCheck(c.id, "fail", (e as Error).message);
+      }
+    }
+    setRunningChecks(false);
+    setTimeout(loadEvents, 1200);
+  };
+
   return (
     <Card className="bg-card border-border">
       <CardHeader>
