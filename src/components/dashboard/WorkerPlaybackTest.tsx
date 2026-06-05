@@ -80,6 +80,13 @@ const WorkerPlaybackTest = () => {
   const [headResult, setHeadResult] = useState<string | null>(null);
   const [events, setEvents] = useState<PlaybackEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [checks, setChecks] = useState<Check[]>([
+    { id: "expired", label: "Expired token rejected", expectStatus: 401, expectKind: "worker_denied_expired", outcome: "pending" },
+    { id: "bad_sig", label: "Tampered signature rejected", expectStatus: 401, expectKind: "worker_denied_signature", outcome: "pending" },
+    { id: "path_mismatch", label: "Path mismatch rejected", expectStatus: 403, expectKind: "worker_denied_path", outcome: "pending" },
+    { id: "replay", label: "Signed URL reuse blocked", expectStatus: 401, expectKind: "worker_denied_replay", outcome: "pending" },
+  ]);
+  const [runningChecks, setRunningChecks] = useState(false);
 
   useEffect(() => {
     (async () => {
