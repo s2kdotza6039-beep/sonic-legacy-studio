@@ -22,13 +22,36 @@ async function hmac(payloadB64: string): Promise<string> {
   return b64url(new Uint8Array(sig));
 }
 
+// Decode a stored R2 key to the form the Worker compares against.
+// The Worker does decodeURIComponent(url.pathname) before checking payload.p,
+// so we must sign the DECODED key — never the raw stored value that may
+// contain %20 / other percent-encoding from historical uploads.
+export function normalizeObjectKey(raw: string): string {
+  if (!raw) return raw;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+// Re-encode a decoded key for use in a URL pathname. Preserves '/' so
+// nested keys still address the right object, but escapes spaces, etc.
+export function encodeObjectKeyForUrl(decodedKey: string): string {
+  return decodedKey
+    .split("/")
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+}
+
 export async function mintStreamToken(args: {
   objectKey: string;
   pct: number;
   ttlSeconds?: number;
 }): Promise<string> {
+  const decoded = normalizeObjectKey(args.objectKey);
   const payload = {
-    p: args.objectKey,
+    p: decoded,
     e: Date.now() + (args.ttlSeconds ?? 300) * 1000,
     pct: Math.min(1, Math.max(0, args.pct)),
   };
