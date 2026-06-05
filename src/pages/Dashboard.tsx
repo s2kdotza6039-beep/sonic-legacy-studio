@@ -140,6 +140,7 @@ const Dashboard = () => {
             {tab === "music" && <MusicAdmin />}
             {tab === "payfast" && <PayFastAuditLog />}
             {tab === "playback" && <PlaybackAuditLog />}
+            {tab === "workertest" && <WorkerPlaybackTest />}
             {tab === "cloudclicks" && <ReleaseClicksPanel />}
             {tab === "security" && (
               <div className="space-y-4">
