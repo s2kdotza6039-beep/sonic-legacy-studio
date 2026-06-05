@@ -27,10 +27,15 @@ Deno.serve(async (req) => {
     const tier = (url.searchParams.get("tier") ?? "free") as Tier;
     const ref = url.searchParams.get("ref") ?? null;
     const asJson = url.searchParams.get("json") === "1";
+    // Founder-only test modes for the Worker Test admin tab.
+    const testMode = url.searchParams.get("test") ?? null; // expired | bad_sig | path_mismatch
 
     if (!track_id) return json({ error: "track_id required" }, 400);
     if (!["free", "standard", "gold", "cristal"].includes(tier)) {
       return json({ error: "invalid tier" }, 400);
+    }
+    if (testMode && !["expired", "bad_sig", "path_mismatch"].includes(testMode)) {
+      return json({ error: "invalid test mode" }, 400);
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
