@@ -1,0 +1,22 @@
+name = "s2k-stream-gate"
+main = "src/worker.ts"
+compatibility_date = "2024-09-01"
+
+# Bind your R2 bucket.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "newsingle-s2kdotza"
+
+# KV namespace for replay protection. Create with:
+#   wrangler kv namespace create REPLAY
+# then paste the id below.
+[[kv_namespaces]]
+binding = "REPLAY"
+id = "REPLACE_WITH_KV_ID"
+
+# Non-secret vars (set secrets with `wrangler secret put ...`):
+#   R2_SIGNING_SECRET     — shared HMAC secret with Supabase
+#   SUPABASE_LOG_URL      — https://<project>.functions.supabase.co/log-worker-playback
+[vars]
+REPLAY_TTL_SECONDS = "600"
+RATE_LIMIT_PER_MIN = "120"

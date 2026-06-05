@@ -27,10 +27,15 @@ Deno.serve(async (req) => {
     const tier = (url.searchParams.get("tier") ?? "free") as Tier;
     const ref = url.searchParams.get("ref") ?? null;
     const asJson = url.searchParams.get("json") === "1";
+    // Founder-only test modes for the Worker Test admin tab.
+    const testMode = url.searchParams.get("test") ?? null; // expired | bad_sig | path_mismatch
 
     if (!track_id) return json({ error: "track_id required" }, 400);
     if (!["free", "standard", "gold", "cristal"].includes(tier)) {
       return json({ error: "invalid tier" }, 400);
+    }
+    if (testMode && !["expired", "bad_sig", "path_mismatch"].includes(testMode)) {
+      return json({ error: "invalid test mode" }, 400);
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -86,15 +91,28 @@ Deno.serve(async (req) => {
       Number(track.pct_free);
 
     const decodedKey = normalizeObjectKey(track.r2_object_key);
-    const token = await mintStreamToken({
-      objectKey: decodedKey,
-      pct,
-      ttlSeconds: 300,
-    });
+
+    if (testMode && !isFounder) return json({ error: "test mode requires founder" }, 403);
+
+    let token: string;
+    if (testMode === "expired") {
+      token = await mintStreamToken({ objectKey: decodedKey, pct, ttlSeconds: -60 });
+    } else if (testMode === "path_mismatch") {
+      token = await mintStreamToken({ objectKey: decodedKey, pct, ttlSeconds: 300, overridePath: `__mismatch__/${decodedKey}` });
+    } else {
+      token = await mintStreamToken({ objectKey: decodedKey, pct, ttlSeconds: 300 });
+      if (testMode === "bad_sig") {
+        // Flip the last char of the signature to force a verify failure.
+        const [p, s] = token.split(".");
+        const last = s.slice(-1);
+        const flipped = last === "A" ? "B" : "A";
+        token = `${p}.${s.slice(0, -1)}${flipped}`;
+      }
+    }
 
     const signedUrl = `${R2_BASE}/${encodeObjectKeyForUrl(decodedKey)}?t=${encodeURIComponent(token)}`;
 
-    if (asJson) return json({ url: signedUrl, granted, pct, expires_in: 300 });
+    if (asJson) return json({ url: signedUrl, granted, pct, expires_in: testMode === "expired" ? -60 : 300, test: testMode });
     return new Response(null, {
       status: 302,
       headers: { ...corsHeaders(), Location: signedUrl },

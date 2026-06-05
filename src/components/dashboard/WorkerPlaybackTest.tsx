@@ -49,6 +49,26 @@ function normalize(raw: string): string {
   }
 }
 
+function canonical(raw: string): string {
+  const d = normalize(raw);
+  return d.replace(/\s+/g, " ").replace(/\s+(\.\w+)?$/g, "$1").trim();
+}
+
+function hasTrailingSpace(raw: string): boolean {
+  const d = normalize(raw);
+  return /\s\.[A-Za-z0-9]+$/.test(d) || /\s$/.test(d);
+}
+
+type CheckOutcome = "pending" | "running" | "pass" | "fail";
+type Check = {
+  id: "expired" | "bad_sig" | "path_mismatch" | "replay";
+  label: string;
+  expectStatus: number;
+  expectKind: string;
+  outcome: CheckOutcome;
+  detail?: string;
+};
+
 const WorkerPlaybackTest = () => {
   const { toast } = useToast();
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -60,6 +80,13 @@ const WorkerPlaybackTest = () => {
   const [headResult, setHeadResult] = useState<string | null>(null);
   const [events, setEvents] = useState<PlaybackEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [checks, setChecks] = useState<Check[]>([
+    { id: "expired", label: "Expired token rejected", expectStatus: 401, expectKind: "worker_denied_expired", outcome: "pending" },
+    { id: "bad_sig", label: "Tampered signature rejected", expectStatus: 401, expectKind: "worker_denied_signature", outcome: "pending" },
+    { id: "path_mismatch", label: "Path mismatch rejected", expectStatus: 403, expectKind: "worker_denied_path", outcome: "pending" },
+    { id: "replay", label: "Signed URL reuse blocked", expectStatus: 401, expectKind: "worker_denied_replay", outcome: "pending" },
+  ]);
+  const [runningChecks, setRunningChecks] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -132,6 +159,71 @@ const WorkerPlaybackTest = () => {
     }
   };
 
+  const mintTestUrl = async (mode: Check["id"]): Promise<string | null> => {
+    if (!trackId) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-track`);
+    url.searchParams.set("track_id", trackId);
+    url.searchParams.set("tier", tier);
+    url.searchParams.set("json", "1");
+    if (mode !== "replay") url.searchParams.set("test", mode);
+    const r = await fetch(url.toString(), {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+    return body.url as string;
+  };
+
+  const probe = async (u: string) => {
+    const r = await fetch(u, { method: "GET", headers: { Range: "bytes=0-1" } });
+    let text = "";
+    try { text = (await r.text()).slice(0, 200); } catch { /* ignore */ }
+    return { status: r.status, statusText: r.statusText, body: text };
+  };
+
+  const runChecks = async () => {
+    if (!trackId) return;
+    setRunningChecks(true);
+    const next: Check[] = checks.map((c) => ({ ...c, outcome: "running", detail: undefined }));
+    setChecks(next);
+
+    const updateCheck = (id: Check["id"], outcome: CheckOutcome, detail: string) => {
+      setChecks((prev) => prev.map((c) => c.id === id ? { ...c, outcome, detail } : c));
+    };
+
+    for (const c of next) {
+      try {
+        if (c.id === "replay") {
+          const url = await mintTestUrl("replay");
+          if (!url) throw new Error("mint failed");
+          const first = await probe(url);
+          const second = await probe(url);
+          if (first.status < 400 && second.status === c.expectStatus) {
+            updateCheck(c.id, "pass", `1st=${first.status}, 2nd=${second.status} ${second.statusText}`);
+          } else if (first.status < 400 && second.status < 400) {
+            updateCheck(c.id, "fail", `replay NOT blocked (both ${first.status}) — Worker KV binding likely missing`);
+          } else {
+            updateCheck(c.id, "fail", `unexpected — 1st=${first.status}, 2nd=${second.status}`);
+          }
+        } else {
+          const url = await mintTestUrl(c.id);
+          if (!url) throw new Error("mint failed");
+          const res = await probe(url);
+          if (res.status === c.expectStatus) {
+            updateCheck(c.id, "pass", `${res.status} ${res.statusText} — ${res.body}`);
+          } else {
+            updateCheck(c.id, "fail", `expected ${c.expectStatus}, got ${res.status} ${res.statusText} — ${res.body}`);
+          }
+        }
+      } catch (e) {
+        updateCheck(c.id, "fail", (e as Error).message);
+      }
+    }
+    setRunningChecks(false);
+    setTimeout(loadEvents, 1200);
+  };
+
   return (
     <Card className="bg-card border-border">
       <CardHeader>
@@ -174,11 +266,43 @@ const WorkerPlaybackTest = () => {
           <div className="text-xs space-y-1 border border-border p-3 bg-secondary/30">
             <div><span className="text-muted-foreground">Stored key:</span> <code>{selectedTrack.r2_object_key}</code></div>
             <div><span className="text-muted-foreground">Decoded (worker compares):</span> <code>{decodedKey}</code></div>
-            {selectedTrack.r2_object_key !== decodedKey && (
-              <Badge variant="outline" className="text-amber-500 border-amber-500/50">percent-encoded — normalized before sign</Badge>
-            )}
+            <div><span className="text-muted-foreground">Canonical (analytics):</span> <code>{canonical(selectedTrack.r2_object_key)}</code></div>
+            <div className="flex gap-2 flex-wrap pt-1">
+              {selectedTrack.r2_object_key !== decodedKey && (
+                <Badge variant="outline" className="text-amber-500 border-amber-500/50">percent-encoded — normalized before sign</Badge>
+              )}
+              {hasTrailingSpace(selectedTrack.r2_object_key) && (
+                <Badge variant="outline" className="text-destructive border-destructive/50">trailing-space anomaly — rename R2 object then update DB</Badge>
+              )}
+            </div>
           </div>
         )}
+
+        <div className="border border-border p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">Automated worker checks</div>
+            <Button size="sm" onClick={runChecks} disabled={runningChecks || !trackId}>
+              {runningChecks ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Run all
+            </Button>
+          </div>
+          <div className="space-y-1">
+            {checks.map((c) => (
+              <div key={c.id} className="flex items-start gap-2 text-xs">
+                <Badge variant="outline" className={
+                  c.outcome === "pass" ? "border-green-500/60 text-green-500" :
+                  c.outcome === "fail" ? "border-destructive/60 text-destructive" :
+                  c.outcome === "running" ? "border-primary/60 text-primary" : ""
+                }>{c.outcome}</Badge>
+                <div className="flex-1">
+                  <div>{c.label} <span className="text-muted-foreground">→ expect {c.expectStatus} {c.expectKind}</span></div>
+                  {c.detail && <div className="font-mono text-[10px] text-muted-foreground mt-0.5">{c.detail}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] text-muted-foreground">Replay check expects KV-backed Worker (Phase 2). If first probe also fails, the Worker isn't deployed yet.</div>
+        </div>
+
 
         {signedUrl && (
           <div className="space-y-2">
