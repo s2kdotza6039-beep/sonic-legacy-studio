@@ -266,11 +266,43 @@ const WorkerPlaybackTest = () => {
           <div className="text-xs space-y-1 border border-border p-3 bg-secondary/30">
             <div><span className="text-muted-foreground">Stored key:</span> <code>{selectedTrack.r2_object_key}</code></div>
             <div><span className="text-muted-foreground">Decoded (worker compares):</span> <code>{decodedKey}</code></div>
-            {selectedTrack.r2_object_key !== decodedKey && (
-              <Badge variant="outline" className="text-amber-500 border-amber-500/50">percent-encoded — normalized before sign</Badge>
-            )}
+            <div><span className="text-muted-foreground">Canonical (analytics):</span> <code>{canonical(selectedTrack.r2_object_key)}</code></div>
+            <div className="flex gap-2 flex-wrap pt-1">
+              {selectedTrack.r2_object_key !== decodedKey && (
+                <Badge variant="outline" className="text-amber-500 border-amber-500/50">percent-encoded — normalized before sign</Badge>
+              )}
+              {hasTrailingSpace(selectedTrack.r2_object_key) && (
+                <Badge variant="outline" className="text-destructive border-destructive/50">trailing-space anomaly — rename R2 object then update DB</Badge>
+              )}
+            </div>
           </div>
         )}
+
+        <div className="border border-border p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">Automated worker checks</div>
+            <Button size="sm" onClick={runChecks} disabled={runningChecks || !trackId}>
+              {runningChecks ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />} Run all
+            </Button>
+          </div>
+          <div className="space-y-1">
+            {checks.map((c) => (
+              <div key={c.id} className="flex items-start gap-2 text-xs">
+                <Badge variant="outline" className={
+                  c.outcome === "pass" ? "border-green-500/60 text-green-500" :
+                  c.outcome === "fail" ? "border-destructive/60 text-destructive" :
+                  c.outcome === "running" ? "border-primary/60 text-primary" : ""
+                }>{c.outcome}</Badge>
+                <div className="flex-1">
+                  <div>{c.label} <span className="text-muted-foreground">→ expect {c.expectStatus} {c.expectKind}</span></div>
+                  {c.detail && <div className="font-mono text-[10px] text-muted-foreground mt-0.5">{c.detail}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] text-muted-foreground">Replay check expects KV-backed Worker (Phase 2). If first probe also fails, the Worker isn't deployed yet.</div>
+        </div>
+
 
         {signedUrl && (
           <div className="space-y-2">
