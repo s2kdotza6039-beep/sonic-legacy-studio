@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
 
   // deno-lint-ignore no-explicit-any
   const track: any = t.tracks;
-  const target = `${R2_BASE}/${track.r2_object_key}`;
+  const target = `${R2_BASE}/${encodeObjectKeyForUrl(normalizeObjectKey(track.r2_object_key))}`;
+  return Response.redirect(target, 302);
   return Response.redirect(target, 302);
 });
