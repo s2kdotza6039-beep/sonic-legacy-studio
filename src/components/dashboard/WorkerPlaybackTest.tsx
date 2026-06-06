@@ -471,7 +471,12 @@ const WorkerPlaybackTest = () => {
                 <Badge variant="outline" className="text-amber-500 border-amber-500/50">percent-encoded — normalized before sign</Badge>
               )}
               {hasTrailingSpace(selectedTrack.r2_object_key) && (
-                <Badge variant="outline" className="text-destructive border-destructive/50">trailing-space anomaly — rename R2 object then update DB</Badge>
+                <>
+                  <Badge variant="outline" className="text-destructive border-destructive/50">trailing-space anomaly — auto-rename available</Badge>
+                  <Button size="sm" variant="outline" onClick={fixTrailingSpace} disabled={renaming}>
+                    {renaming ? <Loader2 size={12} className="animate-spin" /> : <Wrench size={12} />} Rename R2 object + update DB
+                  </Button>
+                </>
               )}
             </div>
           </div>
