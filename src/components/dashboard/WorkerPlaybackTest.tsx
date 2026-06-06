@@ -3,8 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlayCircle, RefreshCw, FlaskConical } from "lucide-react";
+import { Loader2, PlayCircle, RefreshCw, FlaskConical, FileDown, Wrench, ClipboardCheck } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 
 type Tier = "free" | "standard" | "gold" | "cristal";
 type Track = { id: string; title: string; artist_name: string | null; r2_object_key: string };
@@ -61,13 +65,26 @@ function hasTrailingSpace(raw: string): boolean {
 
 type CheckOutcome = "pending" | "running" | "pass" | "fail";
 type Check = {
-  id: "expired" | "bad_sig" | "path_mismatch" | "replay";
+  id: "expired" | "bad_sig" | "path_mismatch" | "replay" | "rate_limit";
   label: string;
   expectStatus: number;
   expectKind: string;
   outcome: CheckOutcome;
   detail?: string;
 };
+
+const DEPLOY_STEPS: { id: string; label: string }[] = [
+  { id: "login", label: "Ran npx wrangler login (workstation authenticated)" },
+  { id: "kv", label: "Created REPLAY KV namespace and pasted id into wrangler.toml" },
+  { id: "secret_hmac", label: "wrangler secret put R2_SIGNING_SECRET (same value as Supabase secret)" },
+  { id: "secret_log", label: "wrangler secret put SUPABASE_LOG_URL (log-worker-playback URL)" },
+  { id: "deploy", label: "npx wrangler deploy completed without errors" },
+  { id: "route", label: "Route newsingle.s2kdotza.com/* bound to s2k-stream-gate in Cloudflare Triggers" },
+  { id: "probe", label: "Probed a signed URL above — got 206 + worker_granted in events" },
+  { id: "checks", label: "Automated worker checks (below) all green, including rate_limit" },
+];
+const DEPLOY_KEY = "s2k.phase2.deploy.checklist";
+
 
 const WorkerPlaybackTest = () => {
   const { toast } = useToast();
