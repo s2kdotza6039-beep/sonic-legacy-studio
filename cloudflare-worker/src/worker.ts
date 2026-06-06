@@ -95,14 +95,48 @@ async function logEvent(env: Env, req: Request, kind: LogKind, metadata: Record<
   }
 }
 
+async function handleAdminRename(req: Request, env: Env): Promise<Response> {
+  if (req.method !== "POST") return new Response("method", { status: 405 });
+  const sig = req.headers.get("x-admin-sig") ?? "";
+  if (!sig) return new Response("missing sig", { status: 401 });
+  const raw = await req.text();
+  const expected = await hmacBody(raw, env.R2_SIGNING_SECRET);
+  if (expected !== sig) return new Response("bad sig", { status: 401 });
+  let body: { from?: string; to?: string };
+  try { body = JSON.parse(raw); } catch { return new Response("bad json", { status: 400 }); }
+  const from = (body.from ?? "").trim();
+  const to = (body.to ?? "").trim();
+  if (!from || !to || from === to) return new Response("from/to required", { status: 400 });
+  const src = await env.BUCKET.get(from);
+  if (!src) return new Response("source not found", { status: 404 });
+  const existing = await env.BUCKET.head(to);
+  if (existing) return new Response("destination exists", { status: 409 });
+  await env.BUCKET.put(to, src.body, {
+    httpMetadata: src.httpMetadata,
+    customMetadata: src.customMetadata,
+  });
+  await env.BUCKET.delete(from);
+  return new Response(JSON.stringify({ ok: true, from, to, bytes: src.size }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+
+    if (url.pathname === "/__admin/rename") {
+      return handleAdminRename(req, env);
+    }
+
     const rawPath = url.pathname.replace(/^\/+/, "");
     if (!rawPath) return new Response("missing path", { status: 400 });
 
     let decodedPath: string;
     try { decodedPath = decodeURIComponent(rawPath); } catch { decodedPath = rawPath; }
+
+
 
     const t = url.searchParams.get("t");
     if (!t) {
