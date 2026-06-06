@@ -213,6 +213,53 @@ const WorkerPlaybackTest = () => {
     return { status: r.status, statusText: r.statusText, body: text };
   };
 
+  // Rate-limit stress test: rapid-fire requests against a fresh signed URL
+  // until the per-IP minute bucket trips, then assert a worker_denied_rate_limit
+  // row appears in playback_events for this run.
+  const runRateLimitCheck = async (updateCheck: (id: Check["id"], o: CheckOutcome, d: string) => void) => {
+    const stressLimit = 160; // > RATE_LIMIT_PER_MIN default of 120
+    const concurrency = 20;
+    const startedAt = new Date();
+    let url: string;
+    try { url = (await mintTestUrl("replay"))!; } catch (e) { updateCheck("rate_limit", "fail", (e as Error).message); return; }
+    let first429 = -1;
+    let total429 = 0;
+    let fired = 0;
+    while (fired < stressLimit && first429 < 0) {
+      const batch = Array.from({ length: concurrency }, (_, i) => fired + i)
+        .filter((n) => n < stressLimit)
+        .map(async (n) => {
+          try {
+            const r = await fetch(url, { method: "GET", headers: { Range: "bytes=0-1" } });
+            if (r.status === 429) {
+              total429++;
+              if (first429 < 0) first429 = n + 1;
+            }
+          } catch { /* ignore */ }
+        });
+      await Promise.all(batch);
+      fired += concurrency;
+    }
+    if (first429 < 0) {
+      updateCheck("rate_limit", "fail", `fired ${fired} requests, never saw 429 — RATE_LIMIT_PER_MIN may be too high or Worker not deployed`);
+      return;
+    }
+    // Confirm a denial row was logged.
+    await new Promise((r) => setTimeout(r, 1500));
+    const { data } = await supabase
+      .from("playback_events")
+      .select("id,created_at,metadata")
+      .eq("event_kind", "worker_denied_rate_limit")
+      .gte("created_at", startedAt.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (!data || data.length === 0) {
+      updateCheck("rate_limit", "fail", `first 429 at request #${first429}, but no worker_denied_rate_limit row written within 1.5s`);
+      return;
+    }
+    updateCheck("rate_limit", "pass", `first 429 at #${first429} (${total429} total) — logged ${new Date(data[0].created_at).toLocaleTimeString()}`);
+  };
+
   const runChecks = async () => {
     if (!trackId) return;
     setRunningChecks(true);
@@ -225,7 +272,9 @@ const WorkerPlaybackTest = () => {
 
     for (const c of next) {
       try {
-        if (c.id === "replay") {
+        if (c.id === "rate_limit") {
+          await runRateLimitCheck(updateCheck);
+        } else if (c.id === "replay") {
           const url = await mintTestUrl("replay");
           if (!url) throw new Error("mint failed");
           const first = await probe(url);
@@ -254,6 +303,97 @@ const WorkerPlaybackTest = () => {
     setRunningChecks(false);
     setTimeout(loadEvents, 1200);
   };
+
+  const fixTrailingSpace = async () => {
+    if (!selectedTrack) return;
+    setRenaming(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("r2-rename-track", {
+        body: { track_id: selectedTrack.id },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast({
+        title: "R2 object renamed",
+        description: `${(data as any).from} → ${(data as any).to}`,
+      });
+      // Refresh tracks
+      const { data: rows } = await supabase
+        .from("tracks").select("id,title,artist_name,r2_object_key")
+        .eq("is_active", true).order("title");
+      setTracks(rows ?? []);
+      loadEvents();
+    } catch (e) {
+      toast({ title: "Rename failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const downloadAuditPdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      await loadEvents();
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const now = new Date();
+      doc.setFontSize(18);
+      doc.text("S2K Phase 2 — Worker Audit Report", 40, 50);
+      doc.setFontSize(10);
+      doc.setTextColor(120);
+      doc.text(`Generated ${now.toLocaleString()}`, 40, 68);
+      doc.text(`Track tested: ${selectedTrack?.title ?? "—"} (${selectedTrack?.artist_name ?? "—"})`, 40, 82);
+      doc.text(`Tier: ${tier}`, 40, 96);
+      doc.setTextColor(0);
+
+      doc.setFontSize(12);
+      doc.text("Deploy checklist", 40, 122);
+      autoTable(doc, {
+        startY: 130,
+        styles: { fontSize: 9 },
+        head: [["Step", "Status"]],
+        body: DEPLOY_STEPS.map((s) => [s.label, deployChecks[s.id] ? "✓ done" : "pending"]),
+      });
+
+      const afterDeploy = (doc as any).lastAutoTable.finalY + 20;
+      doc.setFontSize(12);
+      doc.text("Automated worker checks", 40, afterDeploy);
+      autoTable(doc, {
+        startY: afterDeploy + 8,
+        styles: { fontSize: 9 },
+        head: [["Check", "Expected", "Outcome", "Detail"]],
+        body: checks.map((c) => [c.label, `${c.expectStatus} ${c.expectKind}`, c.outcome, c.detail ?? "—"]),
+        columnStyles: { 3: { cellWidth: 220 } },
+      });
+
+      const afterChecks = (doc as any).lastAutoTable.finalY + 20;
+      doc.setFontSize(12);
+      doc.text(`Recent playback_events (last ${events.length})`, 40, afterChecks);
+      autoTable(doc, {
+        startY: afterChecks + 8,
+        styles: { fontSize: 8 },
+        head: [["When", "Kind", "Tier", "Reason / metadata"]],
+        body: events.slice(0, 60).map((ev) => {
+          const reason = ev.metadata && typeof ev.metadata === "object"
+            ? ((ev.metadata as any).reason ?? JSON.stringify(ev.metadata))
+            : "";
+          return [
+            new Date(ev.created_at).toLocaleString(),
+            ev.event_kind,
+            ev.tier ?? "—",
+            String(reason).slice(0, 120),
+          ];
+        }),
+        columnStyles: { 3: { cellWidth: 230 } },
+      });
+
+      doc.save(`s2k-phase2-worker-audit-${now.toISOString().slice(0,19).replace(/[:T]/g, "-")}.pdf`);
+    } catch (e) {
+      toast({ title: "PDF failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
 
   return (
     <Card className="bg-card border-border">
