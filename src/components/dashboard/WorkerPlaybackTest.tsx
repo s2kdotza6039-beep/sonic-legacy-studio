@@ -403,6 +403,34 @@ const WorkerPlaybackTest = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="border border-border p-3 space-y-2 bg-secondary/20">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <ClipboardCheck size={14} className="text-primary" /> Phase 2 deploy checklist
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={allDeployDone ? "border-green-500/60 text-green-500" : "border-amber-500/60 text-amber-500"}>
+                {allDeployDone ? "ready to mark Phase 2 complete" : `${DEPLOY_STEPS.filter(s=>deployChecks[s.id]).length}/${DEPLOY_STEPS.length} done`}
+              </Badge>
+              <Button size="sm" variant="outline" onClick={downloadAuditPdf} disabled={generatingPdf}>
+                {generatingPdf ? <Loader2 size={12} className="animate-spin" /> : <FileDown size={12} />} Audit PDF
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1.5 pt-1">
+            {DEPLOY_STEPS.map((s) => (
+              <label key={s.id} className="flex items-start gap-2 text-xs cursor-pointer">
+                <Checkbox checked={!!deployChecks[s.id]} onCheckedChange={() => toggleDeploy(s.id)} className="mt-0.5" />
+                <span className={deployChecks[s.id] ? "text-muted-foreground line-through" : ""}>{s.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="text-[10px] text-muted-foreground pt-1">
+            Do NOT mark Phase 2 complete until every box is ticked and all automated checks below are green.
+          </div>
+        </div>
+
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className="text-xs uppercase tracking-widest text-muted-foreground">Track</label>
