@@ -102,8 +102,22 @@ const WorkerPlaybackTest = () => {
     { id: "bad_sig", label: "Tampered signature rejected", expectStatus: 401, expectKind: "worker_denied_signature", outcome: "pending" },
     { id: "path_mismatch", label: "Path mismatch rejected", expectStatus: 403, expectKind: "worker_denied_path", outcome: "pending" },
     { id: "replay", label: "Signed URL reuse blocked", expectStatus: 401, expectKind: "worker_denied_replay", outcome: "pending" },
+    { id: "rate_limit", label: "Per-IP minute bucket trips at limit", expectStatus: 429, expectKind: "worker_denied_rate_limit", outcome: "pending" },
   ]);
   const [runningChecks, setRunningChecks] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [deployChecks, setDeployChecks] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(DEPLOY_KEY) ?? "{}"); } catch { return {}; }
+  });
+  const toggleDeploy = (id: string) => {
+    setDeployChecks((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem(DEPLOY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+  const allDeployDone = DEPLOY_STEPS.every((s) => deployChecks[s.id]);
 
   useEffect(() => {
     (async () => {
