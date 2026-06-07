@@ -108,16 +108,50 @@ const WorkerPlaybackTest = () => {
   ]);
   const [runningChecks, setRunningChecks] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<any>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [deployChecks, setDeployChecks] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem(DEPLOY_KEY) ?? "{}"); } catch { return {}; }
   });
+  const [routeCheck, setRouteCheck] = useState<{ status: "idle" | "running" | "pass" | "fail"; detail?: string }>({ status: "idle" });
+  const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
+  const [eventFilter, setEventFilter] = useState<"all" | "rate_limit" | "denied" | "run">("all");
+  const [pdfInclude, setPdfInclude] = useState({ checklist: true, checks: true, events: true, rateLimit: true });
   const toggleDeploy = (id: string) => {
     setDeployChecks((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       try { localStorage.setItem(DEPLOY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+  };
+  const resetDeploy = () => {
+    setDeployChecks({});
+    try { localStorage.removeItem(DEPLOY_KEY); } catch { /* ignore */ }
+    setRouteCheck({ status: "idle" });
+    toast({ title: "Deploy checklist reset", description: "Re-run wrangler deploy verification when ready." });
+  };
+  const checkRouteBinding = async () => {
+    setRouteCheck({ status: "running" });
+    try {
+      // Hit the worker host with no token. Our worker should respond with
+      // 401 "missing token" via the worker, NOT a 404 / R2 default error.
+      const r = await fetch(`${WORKER_HOST}/__route_probe.bin`, { method: "GET", cache: "no-store" });
+      const cfRay = r.headers.get("cf-ray");
+      const body = (await r.text()).slice(0, 120);
+      const looksLikeWorker = r.status === 401 && /missing token|bad token|bad signature/i.test(body);
+      if (looksLikeWorker && cfRay) {
+        setRouteCheck({ status: "pass", detail: `${r.status} from worker (cf-ray=${cfRay}) — route bound correctly.` });
+      } else if (r.status === 401 && /missing token/i.test(body)) {
+        setRouteCheck({ status: "pass", detail: `${r.status} ${body} — worker responded but cf-ray missing.` });
+      } else {
+        setRouteCheck({
+          status: "fail",
+          detail: `Got ${r.status} ${r.statusText} — body: "${body}". Expected 401 "missing token" from s2k-stream-gate. Verify the route newsingle.s2kdotza.com/* is bound to the worker in Cloudflare → Workers → Triggers.`,
+        });
+      }
+    } catch (e) {
+      setRouteCheck({ status: "fail", detail: `network error: ${(e as Error).message} — DNS or worker may not be reachable.` });
+    }
   };
   const allDeployDone = DEPLOY_STEPS.every((s) => deployChecks[s.id]);
 
