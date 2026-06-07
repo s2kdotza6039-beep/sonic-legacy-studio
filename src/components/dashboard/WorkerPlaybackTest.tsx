@@ -521,12 +521,27 @@ const WorkerPlaybackTest = () => {
               {hasTrailingSpace(selectedTrack.r2_object_key) && (
                 <>
                   <Badge variant="outline" className="text-destructive border-destructive/50">trailing-space anomaly — auto-rename available</Badge>
-                  <Button size="sm" variant="outline" onClick={fixTrailingSpace} disabled={renaming}>
+                  <Button size="sm" variant="outline" onClick={() => fixTrailingSpace(true)} disabled={renaming}>
+                    {renaming ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Dry run
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => fixTrailingSpace(false)} disabled={renaming}>
                     {renaming ? <Loader2 size={12} className="animate-spin" /> : <Wrench size={12} />} Rename R2 object + update DB
                   </Button>
                 </>
               )}
             </div>
+            {dryRunResult && (
+              <div className="mt-2 border border-amber-500/40 bg-amber-500/5 p-2 text-[10px] font-mono space-y-0.5">
+                <div className="text-amber-500 uppercase tracking-widest text-[9px]">Dry-run preview (no changes applied)</div>
+                <div>from: <code>{String(dryRunResult.from)}</code></div>
+                <div>to: <code>{String(dryRunResult.to)}</code></div>
+                {dryRunResult.current_db_key && <div>current db key: <code>{String(dryRunResult.current_db_key)}</code></div>}
+                {dryRunResult.proposed_db_key && <div>proposed db key: <code>{String(dryRunResult.proposed_db_key)}</code></div>}
+                {dryRunResult.worker && (
+                  <div>worker: <code>{typeof dryRunResult.worker === "string" ? dryRunResult.worker : JSON.stringify(dryRunResult.worker)}</code></div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
