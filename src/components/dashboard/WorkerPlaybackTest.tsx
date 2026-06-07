@@ -456,10 +456,16 @@ const WorkerPlaybackTest = () => {
             <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <ClipboardCheck size={14} className="text-primary" /> Phase 2 deploy checklist
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className={allDeployDone ? "border-green-500/60 text-green-500" : "border-amber-500/60 text-amber-500"}>
                 {allDeployDone ? "ready to mark Phase 2 complete" : `${DEPLOY_STEPS.filter(s=>deployChecks[s.id]).length}/${DEPLOY_STEPS.length} done`}
               </Badge>
+              <Button size="sm" variant="outline" onClick={checkRouteBinding} disabled={routeCheck.status === "running"}>
+                {routeCheck.status === "running" ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />} Verify route binding
+              </Button>
+              <Button size="sm" variant="outline" onClick={resetDeploy}>
+                <RotateCcw size={12} /> Reset checklist
+              </Button>
               <Button size="sm" variant="outline" onClick={downloadAuditPdf} disabled={generatingPdf}>
                 {generatingPdf ? <Loader2 size={12} className="animate-spin" /> : <FileDown size={12} />} Audit PDF
               </Button>
@@ -470,6 +476,30 @@ const WorkerPlaybackTest = () => {
               <label key={s.id} className="flex items-start gap-2 text-xs cursor-pointer">
                 <Checkbox checked={!!deployChecks[s.id]} onCheckedChange={() => toggleDeploy(s.id)} className="mt-0.5" />
                 <span className={deployChecks[s.id] ? "text-muted-foreground line-through" : ""}>{s.label}</span>
+              </label>
+            ))}
+          </div>
+          {routeCheck.status !== "idle" && (
+            <div className={`text-[10px] font-mono p-2 border ${
+              routeCheck.status === "pass" ? "border-green-500/40 bg-green-500/5 text-green-500" :
+              routeCheck.status === "fail" ? "border-destructive/40 bg-destructive/5 text-destructive" :
+              "border-border bg-secondary/30 text-muted-foreground"
+            }`}>
+              <span className="uppercase tracking-widest mr-2">route check: {routeCheck.status}</span>
+              {routeCheck.detail}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border/50 mt-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Audit PDF includes:</span>
+            {([
+              ["checklist", "Checklist"],
+              ["checks", "Automated checks"],
+              ["events", "Last 60 playback_events"],
+              ["rateLimit", "Rate-limit results"],
+            ] as const).map(([k, label]) => (
+              <label key={k} className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                <Checkbox checked={(pdfInclude as any)[k]} onCheckedChange={() => setPdfInclude((p) => ({ ...p, [k]: !(p as any)[k] }))} />
+                {label}
               </label>
             ))}
           </div>
