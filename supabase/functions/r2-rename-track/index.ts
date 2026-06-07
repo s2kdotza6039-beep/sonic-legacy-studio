@@ -26,9 +26,10 @@ Deno.serve(async (req) => {
   const guard = await requireFounder(req);
   if (guard) return guard;
 
-  let body: { track_id?: string; to?: string };
+  let body: { track_id?: string; to?: string; dry_run?: boolean };
   try { body = await req.json(); } catch { return json({ error: "bad json" }, 400); }
   const track_id = body.track_id;
+  const dryRun = body.dry_run === true;
   if (!track_id) return json({ error: "track_id required" }, 400);
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -39,10 +40,10 @@ Deno.serve(async (req) => {
   const decodedFrom = normalizeObjectKey(track.r2_object_key);
   const decodedTo = (body.to && body.to.trim()) || canonicalObjectKey(track.r2_object_key);
   if (decodedFrom === decodedTo) {
-    return json({ ok: true, noop: true, from: decodedFrom, to: decodedTo });
+    return json({ ok: true, noop: true, dry_run: dryRun, from: decodedFrom, to: decodedTo, current_db_key: track.r2_object_key });
   }
 
-  const renameBody = JSON.stringify({ from: decodedFrom, to: decodedTo });
+  const renameBody = JSON.stringify({ from: decodedFrom, to: decodedTo, dry_run: dryRun });
   const sig = await signLogBody(renameBody);
   const workerRes = await fetch(`${WORKER_BASE}/__admin/rename`, {
     method: "POST",
@@ -57,6 +58,20 @@ Deno.serve(async (req) => {
       detail: workerText.slice(0, 500),
       worker_url: `${WORKER_BASE}/__admin/rename`,
     }, 502);
+  }
+
+  if (dryRun) {
+    let workerJson: unknown = null;
+    try { workerJson = JSON.parse(workerText); } catch { /* ignore */ }
+    return json({
+      ok: true,
+      dry_run: true,
+      from: decodedFrom,
+      to: decodedTo,
+      current_db_key: track.r2_object_key,
+      proposed_db_key: decodedTo,
+      worker: workerJson ?? workerText.slice(0, 200),
+    });
   }
 
   // Store the rewritten key WITHOUT percent-encoding — stream-track normalises

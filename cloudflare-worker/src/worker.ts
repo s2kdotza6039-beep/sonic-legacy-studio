@@ -102,11 +102,29 @@ async function handleAdminRename(req: Request, env: Env): Promise<Response> {
   const raw = await req.text();
   const expected = await hmacBody(raw, env.R2_SIGNING_SECRET);
   if (expected !== sig) return new Response("bad sig", { status: 401 });
-  let body: { from?: string; to?: string };
+  let body: { from?: string; to?: string; dry_run?: boolean };
   try { body = JSON.parse(raw); } catch { return new Response("bad json", { status: 400 }); }
   const from = (body.from ?? "").trim();
   const to = (body.to ?? "").trim();
+  const dryRun = body.dry_run === true;
   if (!from || !to || from === to) return new Response("from/to required", { status: 400 });
+
+  if (dryRun) {
+    const srcHead = await env.BUCKET.head(from);
+    const dstHead = await env.BUCKET.head(to);
+    return new Response(JSON.stringify({
+      ok: true,
+      dry_run: true,
+      from,
+      to,
+      source_exists: !!srcHead,
+      source_bytes: srcHead?.size ?? null,
+      destination_exists: !!dstHead,
+      destination_bytes: dstHead?.size ?? null,
+      would_succeed: !!srcHead && !dstHead,
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
   const src = await env.BUCKET.get(from);
   if (!src) return new Response("source not found", { status: 404 });
   const existing = await env.BUCKET.head(to);

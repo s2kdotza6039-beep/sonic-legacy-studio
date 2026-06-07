@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlayCircle, RefreshCw, FlaskConical, FileDown, Wrench, ClipboardCheck } from "lucide-react";
+import { Loader2, PlayCircle, RefreshCw, FlaskConical, FileDown, Wrench, ClipboardCheck, RotateCcw, Globe, Eye } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+const WORKER_HOST = "https://newsingle.s2kdotza.com";
 
 
 type Tier = "free" | "standard" | "gold" | "cristal";
@@ -106,16 +108,50 @@ const WorkerPlaybackTest = () => {
   ]);
   const [runningChecks, setRunningChecks] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<any>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [deployChecks, setDeployChecks] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem(DEPLOY_KEY) ?? "{}"); } catch { return {}; }
   });
+  const [routeCheck, setRouteCheck] = useState<{ status: "idle" | "running" | "pass" | "fail"; detail?: string }>({ status: "idle" });
+  const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
+  const [eventFilter, setEventFilter] = useState<"all" | "rate_limit" | "denied" | "run">("all");
+  const [pdfInclude, setPdfInclude] = useState({ checklist: true, checks: true, events: true, rateLimit: true });
   const toggleDeploy = (id: string) => {
     setDeployChecks((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       try { localStorage.setItem(DEPLOY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+  };
+  const resetDeploy = () => {
+    setDeployChecks({});
+    try { localStorage.removeItem(DEPLOY_KEY); } catch { /* ignore */ }
+    setRouteCheck({ status: "idle" });
+    toast({ title: "Deploy checklist reset", description: "Re-run wrangler deploy verification when ready." });
+  };
+  const checkRouteBinding = async () => {
+    setRouteCheck({ status: "running" });
+    try {
+      // Hit the worker host with no token. Our worker should respond with
+      // 401 "missing token" via the worker, NOT a 404 / R2 default error.
+      const r = await fetch(`${WORKER_HOST}/__route_probe.bin`, { method: "GET", cache: "no-store" });
+      const cfRay = r.headers.get("cf-ray");
+      const body = (await r.text()).slice(0, 120);
+      const looksLikeWorker = r.status === 401 && /missing token|bad token|bad signature/i.test(body);
+      if (looksLikeWorker && cfRay) {
+        setRouteCheck({ status: "pass", detail: `${r.status} from worker (cf-ray=${cfRay}) — route bound correctly.` });
+      } else if (r.status === 401 && /missing token/i.test(body)) {
+        setRouteCheck({ status: "pass", detail: `${r.status} ${body} — worker responded but cf-ray missing.` });
+      } else {
+        setRouteCheck({
+          status: "fail",
+          detail: `Got ${r.status} ${r.statusText} — body: "${body}". Expected 401 "missing token" from s2k-stream-gate. Verify the route newsingle.s2kdotza.com/* is bound to the worker in Cloudflare → Workers → Triggers.`,
+        });
+      }
+    } catch (e) {
+      setRouteCheck({ status: "fail", detail: `network error: ${(e as Error).message} — DNS or worker may not be reachable.` });
+    }
   };
   const allDeployDone = DEPLOY_STEPS.every((s) => deployChecks[s.id]);
 
@@ -263,6 +299,8 @@ const WorkerPlaybackTest = () => {
   const runChecks = async () => {
     if (!trackId) return;
     setRunningChecks(true);
+    setRunStartedAt(new Date().toISOString());
+    setEventFilter("run");
     const next: Check[] = checks.map((c) => ({ ...c, outcome: "running", detail: undefined }));
     setChecks(next);
 
@@ -304,27 +342,37 @@ const WorkerPlaybackTest = () => {
     setTimeout(loadEvents, 1200);
   };
 
-  const fixTrailingSpace = async () => {
+  const fixTrailingSpace = async (dryRun = false) => {
     if (!selectedTrack) return;
     setRenaming(true);
+    if (dryRun) setDryRunResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("r2-rename-track", {
-        body: { track_id: selectedTrack.id },
+        body: { track_id: selectedTrack.id, dry_run: dryRun },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast({
-        title: "R2 object renamed",
-        description: `${(data as any).from} → ${(data as any).to}`,
-      });
-      // Refresh tracks
-      const { data: rows } = await supabase
-        .from("tracks").select("id,title,artist_name,r2_object_key")
-        .eq("is_active", true).order("title");
-      setTracks(rows ?? []);
-      loadEvents();
+      if (dryRun) {
+        setDryRunResult(data);
+        toast({
+          title: "Dry run complete",
+          description: (data as any).noop ? "Already canonical — no rename needed." : `Would rename ${(data as any).from} → ${(data as any).to}`,
+        });
+      } else {
+        setDryRunResult(null);
+        toast({
+          title: "R2 object renamed",
+          description: `${(data as any).from} → ${(data as any).to}`,
+        });
+        // Refresh tracks
+        const { data: rows } = await supabase
+          .from("tracks").select("id,title,artist_name,r2_object_key")
+          .eq("is_active", true).order("title");
+        setTracks(rows ?? []);
+        loadEvents();
+      }
     } catch (e) {
-      toast({ title: "Rename failed", description: (e as Error).message, variant: "destructive" });
+      toast({ title: dryRun ? "Dry run failed" : "Rename failed", description: (e as Error).message, variant: "destructive" });
     } finally {
       setRenaming(false);
     }
@@ -345,46 +393,75 @@ const WorkerPlaybackTest = () => {
       doc.text(`Tier: ${tier}`, 40, 96);
       doc.setTextColor(0);
 
-      doc.setFontSize(12);
-      doc.text("Deploy checklist", 40, 122);
-      autoTable(doc, {
-        startY: 130,
-        styles: { fontSize: 9 },
-        head: [["Step", "Status"]],
-        body: DEPLOY_STEPS.map((s) => [s.label, deployChecks[s.id] ? "✓ done" : "pending"]),
-      });
+      let cursorY = 122;
+      const rateLimitCheck = checks.find((c) => c.id === "rate_limit");
+      const nonRateChecks = checks.filter((c) => c.id !== "rate_limit");
 
-      const afterDeploy = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.text("Automated worker checks", 40, afterDeploy);
-      autoTable(doc, {
-        startY: afterDeploy + 8,
-        styles: { fontSize: 9 },
-        head: [["Check", "Expected", "Outcome", "Detail"]],
-        body: checks.map((c) => [c.label, `${c.expectStatus} ${c.expectKind}`, c.outcome, c.detail ?? "—"]),
-        columnStyles: { 3: { cellWidth: 220 } },
-      });
+      if (pdfInclude.checklist) {
+        doc.setFontSize(12);
+        doc.text("Deploy checklist", 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 9 },
+          head: [["Step", "Status"]],
+          body: DEPLOY_STEPS.map((s) => [s.label, deployChecks[s.id] ? "✓ done" : "pending"]),
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 20;
+        if (routeCheck.status !== "idle") {
+          doc.setFontSize(9);
+          doc.text(`Route binding check: ${routeCheck.status.toUpperCase()} — ${routeCheck.detail ?? ""}`.slice(0, 180), 40, cursorY);
+          cursorY += 16;
+        }
+      }
 
-      const afterChecks = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.text(`Recent playback_events (last ${events.length})`, 40, afterChecks);
-      autoTable(doc, {
-        startY: afterChecks + 8,
-        styles: { fontSize: 8 },
-        head: [["When", "Kind", "Tier", "Reason / metadata"]],
-        body: events.slice(0, 60).map((ev) => {
-          const reason = ev.metadata && typeof ev.metadata === "object"
-            ? ((ev.metadata as any).reason ?? JSON.stringify(ev.metadata))
-            : "";
-          return [
-            new Date(ev.created_at).toLocaleString(),
-            ev.event_kind,
-            ev.tier ?? "—",
-            String(reason).slice(0, 120),
-          ];
-        }),
-        columnStyles: { 3: { cellWidth: 230 } },
-      });
+      if (pdfInclude.checks) {
+        doc.setFontSize(12);
+        doc.text("Automated worker checks", 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 9 },
+          head: [["Check", "Expected", "Outcome", "Detail"]],
+          body: nonRateChecks.map((c) => [c.label, `${c.expectStatus} ${c.expectKind}`, c.outcome, c.detail ?? "—"]),
+          columnStyles: { 3: { cellWidth: 220 } },
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      if (pdfInclude.rateLimit && rateLimitCheck) {
+        doc.setFontSize(12);
+        doc.text("Rate-limit stress test", 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 9 },
+          head: [["Check", "Expected", "Outcome", "Detail"]],
+          body: [[rateLimitCheck.label, `${rateLimitCheck.expectStatus} ${rateLimitCheck.expectKind}`, rateLimitCheck.outcome, rateLimitCheck.detail ?? "—"]],
+          columnStyles: { 3: { cellWidth: 220 } },
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      if (pdfInclude.events) {
+        const eventsForPdf = events.slice(0, 60);
+        doc.setFontSize(12);
+        doc.text(`Recent playback_events (last ${eventsForPdf.length})`, 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 8 },
+          head: [["When", "Kind", "Tier", "cf-ray", "Reason / metadata"]],
+          body: eventsForPdf.map((ev) => {
+            const md = (ev.metadata && typeof ev.metadata === "object") ? (ev.metadata as any) : {};
+            const reason = md.reason ?? JSON.stringify(md);
+            return [
+              new Date(ev.created_at).toLocaleString(),
+              ev.event_kind,
+              ev.tier ?? "—",
+              String(md.ray ?? "—"),
+              String(reason).slice(0, 120),
+            ];
+          }),
+          columnStyles: { 4: { cellWidth: 200 } },
+        });
+      }
 
       doc.save(`s2k-phase2-worker-audit-${now.toISOString().slice(0,19).replace(/[:T]/g, "-")}.pdf`);
     } catch (e) {
@@ -408,10 +485,16 @@ const WorkerPlaybackTest = () => {
             <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <ClipboardCheck size={14} className="text-primary" /> Phase 2 deploy checklist
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className={allDeployDone ? "border-green-500/60 text-green-500" : "border-amber-500/60 text-amber-500"}>
                 {allDeployDone ? "ready to mark Phase 2 complete" : `${DEPLOY_STEPS.filter(s=>deployChecks[s.id]).length}/${DEPLOY_STEPS.length} done`}
               </Badge>
+              <Button size="sm" variant="outline" onClick={checkRouteBinding} disabled={routeCheck.status === "running"}>
+                {routeCheck.status === "running" ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />} Verify route binding
+              </Button>
+              <Button size="sm" variant="outline" onClick={resetDeploy}>
+                <RotateCcw size={12} /> Reset checklist
+              </Button>
               <Button size="sm" variant="outline" onClick={downloadAuditPdf} disabled={generatingPdf}>
                 {generatingPdf ? <Loader2 size={12} className="animate-spin" /> : <FileDown size={12} />} Audit PDF
               </Button>
@@ -422,6 +505,30 @@ const WorkerPlaybackTest = () => {
               <label key={s.id} className="flex items-start gap-2 text-xs cursor-pointer">
                 <Checkbox checked={!!deployChecks[s.id]} onCheckedChange={() => toggleDeploy(s.id)} className="mt-0.5" />
                 <span className={deployChecks[s.id] ? "text-muted-foreground line-through" : ""}>{s.label}</span>
+              </label>
+            ))}
+          </div>
+          {routeCheck.status !== "idle" && (
+            <div className={`text-[10px] font-mono p-2 border ${
+              routeCheck.status === "pass" ? "border-green-500/40 bg-green-500/5 text-green-500" :
+              routeCheck.status === "fail" ? "border-destructive/40 bg-destructive/5 text-destructive" :
+              "border-border bg-secondary/30 text-muted-foreground"
+            }`}>
+              <span className="uppercase tracking-widest mr-2">route check: {routeCheck.status}</span>
+              {routeCheck.detail}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border/50 mt-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Audit PDF includes:</span>
+            {([
+              ["checklist", "Checklist"],
+              ["checks", "Automated checks"],
+              ["events", "Last 60 playback_events"],
+              ["rateLimit", "Rate-limit results"],
+            ] as const).map(([k, label]) => (
+              <label key={k} className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                <Checkbox checked={(pdfInclude as any)[k]} onCheckedChange={() => setPdfInclude((p) => ({ ...p, [k]: !(p as any)[k] }))} />
+                {label}
               </label>
             ))}
           </div>
@@ -473,12 +580,27 @@ const WorkerPlaybackTest = () => {
               {hasTrailingSpace(selectedTrack.r2_object_key) && (
                 <>
                   <Badge variant="outline" className="text-destructive border-destructive/50">trailing-space anomaly — auto-rename available</Badge>
-                  <Button size="sm" variant="outline" onClick={fixTrailingSpace} disabled={renaming}>
+                  <Button size="sm" variant="outline" onClick={() => fixTrailingSpace(true)} disabled={renaming}>
+                    {renaming ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Dry run
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => fixTrailingSpace(false)} disabled={renaming}>
                     {renaming ? <Loader2 size={12} className="animate-spin" /> : <Wrench size={12} />} Rename R2 object + update DB
                   </Button>
                 </>
               )}
             </div>
+            {dryRunResult && (
+              <div className="mt-2 border border-amber-500/40 bg-amber-500/5 p-2 text-[10px] font-mono space-y-0.5">
+                <div className="text-amber-500 uppercase tracking-widest text-[9px]">Dry-run preview (no changes applied)</div>
+                <div>from: <code>{String(dryRunResult.from)}</code></div>
+                <div>to: <code>{String(dryRunResult.to)}</code></div>
+                {dryRunResult.current_db_key && <div>current db key: <code>{String(dryRunResult.current_db_key)}</code></div>}
+                {dryRunResult.proposed_db_key && <div>proposed db key: <code>{String(dryRunResult.proposed_db_key)}</code></div>}
+                {dryRunResult.worker && (
+                  <div>worker: <code>{typeof dryRunResult.worker === "string" ? dryRunResult.worker : JSON.stringify(dryRunResult.worker)}</code></div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -528,11 +650,23 @@ const WorkerPlaybackTest = () => {
         )}
 
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div className="text-xs uppercase tracking-widest text-muted-foreground">Recent playback_events</div>
-            <Button size="sm" variant="ghost" onClick={loadEvents} disabled={refreshing}>
-              {refreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Refresh
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={eventFilter}
+                onChange={(e) => setEventFilter(e.target.value as typeof eventFilter)}
+                className="bg-background border border-border px-2 py-1 text-[11px]"
+              >
+                <option value="all">All events</option>
+                <option value="denied">All worker_denied_*</option>
+                <option value="rate_limit">worker_denied_rate_limit only</option>
+                <option value="run" disabled={!runStartedAt}>This test run{runStartedAt ? ` (since ${new Date(runStartedAt).toLocaleTimeString()})` : ""}</option>
+              </select>
+              <Button size="sm" variant="ghost" onClick={loadEvents} disabled={refreshing}>
+                {refreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Refresh
+              </Button>
+            </div>
           </div>
           <div className="border border-border max-h-80 overflow-auto">
             <table className="w-full text-xs">
@@ -541,32 +675,42 @@ const WorkerPlaybackTest = () => {
                   <th className="text-left p-2">When</th>
                   <th className="text-left p-2">Kind</th>
                   <th className="text-left p-2">Tier</th>
+                  <th className="text-left p-2">Request ID (cf-ray)</th>
                   <th className="text-left p-2">Mismatch / Reason</th>
                 </tr>
               </thead>
               <tbody>
-                {events.length === 0 && (
-                  <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">No events yet.</td></tr>
-                )}
-                {events.map((ev) => {
-                  const isWorker = WORKER_KINDS.has(ev.event_kind);
-                  const isDenied = ev.event_kind.startsWith("worker_denied_");
-                  const reason = ev.metadata && typeof ev.metadata === "object"
-                    ? ((ev.metadata as any).reason ?? (ev.metadata as any).mismatch ?? JSON.stringify(ev.metadata))
-                    : "";
-                  return (
-                    <tr key={ev.id} className="border-t border-border">
-                      <td className="p-2 whitespace-nowrap text-muted-foreground">{new Date(ev.created_at).toLocaleTimeString()}</td>
-                      <td className="p-2">
-                        <Badge variant="outline" className={isDenied ? "border-destructive/50 text-destructive" : isWorker ? "border-primary/50 text-primary" : ""}>
-                          {ev.event_kind}
-                        </Badge>
-                      </td>
-                      <td className="p-2">{ev.tier ?? "—"}</td>
-                      <td className="p-2 font-mono text-[10px] max-w-md truncate" title={String(reason)}>{String(reason || "—")}</td>
-                    </tr>
-                  );
-                })}
+                {(() => {
+                  const filtered = events.filter((ev) => {
+                    if (eventFilter === "rate_limit") return ev.event_kind === "worker_denied_rate_limit";
+                    if (eventFilter === "denied") return ev.event_kind.startsWith("worker_denied_");
+                    if (eventFilter === "run" && runStartedAt) return ev.created_at >= runStartedAt;
+                    return true;
+                  });
+                  if (filtered.length === 0) {
+                    return <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">No events match this filter.</td></tr>;
+                  }
+                  return filtered.map((ev) => {
+                    const isWorker = WORKER_KINDS.has(ev.event_kind);
+                    const isDenied = ev.event_kind.startsWith("worker_denied_");
+                    const md = (ev.metadata && typeof ev.metadata === "object") ? (ev.metadata as any) : {};
+                    const reason = md.reason ?? md.mismatch ?? JSON.stringify(md);
+                    const ray = md.ray ?? "—";
+                    return (
+                      <tr key={ev.id} className="border-t border-border">
+                        <td className="p-2 whitespace-nowrap text-muted-foreground">{new Date(ev.created_at).toLocaleString()}</td>
+                        <td className="p-2">
+                          <Badge variant="outline" className={isDenied ? "border-destructive/50 text-destructive" : isWorker ? "border-primary/50 text-primary" : ""}>
+                            {ev.event_kind}
+                          </Badge>
+                        </td>
+                        <td className="p-2">{ev.tier ?? "—"}</td>
+                        <td className="p-2 font-mono text-[10px] text-muted-foreground">{String(ray)}</td>
+                        <td className="p-2 font-mono text-[10px] max-w-md truncate" title={String(reason)}>{String(reason || "—")}</td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>
