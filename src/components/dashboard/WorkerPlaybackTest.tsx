@@ -393,46 +393,75 @@ const WorkerPlaybackTest = () => {
       doc.text(`Tier: ${tier}`, 40, 96);
       doc.setTextColor(0);
 
-      doc.setFontSize(12);
-      doc.text("Deploy checklist", 40, 122);
-      autoTable(doc, {
-        startY: 130,
-        styles: { fontSize: 9 },
-        head: [["Step", "Status"]],
-        body: DEPLOY_STEPS.map((s) => [s.label, deployChecks[s.id] ? "✓ done" : "pending"]),
-      });
+      let cursorY = 122;
+      const rateLimitCheck = checks.find((c) => c.id === "rate_limit");
+      const nonRateChecks = checks.filter((c) => c.id !== "rate_limit");
 
-      const afterDeploy = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.text("Automated worker checks", 40, afterDeploy);
-      autoTable(doc, {
-        startY: afterDeploy + 8,
-        styles: { fontSize: 9 },
-        head: [["Check", "Expected", "Outcome", "Detail"]],
-        body: checks.map((c) => [c.label, `${c.expectStatus} ${c.expectKind}`, c.outcome, c.detail ?? "—"]),
-        columnStyles: { 3: { cellWidth: 220 } },
-      });
+      if (pdfInclude.checklist) {
+        doc.setFontSize(12);
+        doc.text("Deploy checklist", 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 9 },
+          head: [["Step", "Status"]],
+          body: DEPLOY_STEPS.map((s) => [s.label, deployChecks[s.id] ? "✓ done" : "pending"]),
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 20;
+        if (routeCheck.status !== "idle") {
+          doc.setFontSize(9);
+          doc.text(`Route binding check: ${routeCheck.status.toUpperCase()} — ${routeCheck.detail ?? ""}`.slice(0, 180), 40, cursorY);
+          cursorY += 16;
+        }
+      }
 
-      const afterChecks = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.text(`Recent playback_events (last ${events.length})`, 40, afterChecks);
-      autoTable(doc, {
-        startY: afterChecks + 8,
-        styles: { fontSize: 8 },
-        head: [["When", "Kind", "Tier", "Reason / metadata"]],
-        body: events.slice(0, 60).map((ev) => {
-          const reason = ev.metadata && typeof ev.metadata === "object"
-            ? ((ev.metadata as any).reason ?? JSON.stringify(ev.metadata))
-            : "";
-          return [
-            new Date(ev.created_at).toLocaleString(),
-            ev.event_kind,
-            ev.tier ?? "—",
-            String(reason).slice(0, 120),
-          ];
-        }),
-        columnStyles: { 3: { cellWidth: 230 } },
-      });
+      if (pdfInclude.checks) {
+        doc.setFontSize(12);
+        doc.text("Automated worker checks", 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 9 },
+          head: [["Check", "Expected", "Outcome", "Detail"]],
+          body: nonRateChecks.map((c) => [c.label, `${c.expectStatus} ${c.expectKind}`, c.outcome, c.detail ?? "—"]),
+          columnStyles: { 3: { cellWidth: 220 } },
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      if (pdfInclude.rateLimit && rateLimitCheck) {
+        doc.setFontSize(12);
+        doc.text("Rate-limit stress test", 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 9 },
+          head: [["Check", "Expected", "Outcome", "Detail"]],
+          body: [[rateLimitCheck.label, `${rateLimitCheck.expectStatus} ${rateLimitCheck.expectKind}`, rateLimitCheck.outcome, rateLimitCheck.detail ?? "—"]],
+          columnStyles: { 3: { cellWidth: 220 } },
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      if (pdfInclude.events) {
+        const eventsForPdf = events.slice(0, 60);
+        doc.setFontSize(12);
+        doc.text(`Recent playback_events (last ${eventsForPdf.length})`, 40, cursorY);
+        autoTable(doc, {
+          startY: cursorY + 8,
+          styles: { fontSize: 8 },
+          head: [["When", "Kind", "Tier", "cf-ray", "Reason / metadata"]],
+          body: eventsForPdf.map((ev) => {
+            const md = (ev.metadata && typeof ev.metadata === "object") ? (ev.metadata as any) : {};
+            const reason = md.reason ?? JSON.stringify(md);
+            return [
+              new Date(ev.created_at).toLocaleString(),
+              ev.event_kind,
+              ev.tier ?? "—",
+              String(md.ray ?? "—"),
+              String(reason).slice(0, 120),
+            ];
+          }),
+          columnStyles: { 4: { cellWidth: 200 } },
+        });
+      }
 
       doc.save(`s2k-phase2-worker-audit-${now.toISOString().slice(0,19).replace(/[:T]/g, "-")}.pdf`);
     } catch (e) {
