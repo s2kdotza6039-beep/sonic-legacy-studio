@@ -621,11 +621,23 @@ const WorkerPlaybackTest = () => {
         )}
 
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div className="text-xs uppercase tracking-widest text-muted-foreground">Recent playback_events</div>
-            <Button size="sm" variant="ghost" onClick={loadEvents} disabled={refreshing}>
-              {refreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Refresh
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={eventFilter}
+                onChange={(e) => setEventFilter(e.target.value as typeof eventFilter)}
+                className="bg-background border border-border px-2 py-1 text-[11px]"
+              >
+                <option value="all">All events</option>
+                <option value="denied">All worker_denied_*</option>
+                <option value="rate_limit">worker_denied_rate_limit only</option>
+                <option value="run" disabled={!runStartedAt}>This test run{runStartedAt ? ` (since ${new Date(runStartedAt).toLocaleTimeString()})` : ""}</option>
+              </select>
+              <Button size="sm" variant="ghost" onClick={loadEvents} disabled={refreshing}>
+                {refreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Refresh
+              </Button>
+            </div>
           </div>
           <div className="border border-border max-h-80 overflow-auto">
             <table className="w-full text-xs">
@@ -634,32 +646,42 @@ const WorkerPlaybackTest = () => {
                   <th className="text-left p-2">When</th>
                   <th className="text-left p-2">Kind</th>
                   <th className="text-left p-2">Tier</th>
+                  <th className="text-left p-2">Request ID (cf-ray)</th>
                   <th className="text-left p-2">Mismatch / Reason</th>
                 </tr>
               </thead>
               <tbody>
-                {events.length === 0 && (
-                  <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">No events yet.</td></tr>
-                )}
-                {events.map((ev) => {
-                  const isWorker = WORKER_KINDS.has(ev.event_kind);
-                  const isDenied = ev.event_kind.startsWith("worker_denied_");
-                  const reason = ev.metadata && typeof ev.metadata === "object"
-                    ? ((ev.metadata as any).reason ?? (ev.metadata as any).mismatch ?? JSON.stringify(ev.metadata))
-                    : "";
-                  return (
-                    <tr key={ev.id} className="border-t border-border">
-                      <td className="p-2 whitespace-nowrap text-muted-foreground">{new Date(ev.created_at).toLocaleTimeString()}</td>
-                      <td className="p-2">
-                        <Badge variant="outline" className={isDenied ? "border-destructive/50 text-destructive" : isWorker ? "border-primary/50 text-primary" : ""}>
-                          {ev.event_kind}
-                        </Badge>
-                      </td>
-                      <td className="p-2">{ev.tier ?? "—"}</td>
-                      <td className="p-2 font-mono text-[10px] max-w-md truncate" title={String(reason)}>{String(reason || "—")}</td>
-                    </tr>
-                  );
-                })}
+                {(() => {
+                  const filtered = events.filter((ev) => {
+                    if (eventFilter === "rate_limit") return ev.event_kind === "worker_denied_rate_limit";
+                    if (eventFilter === "denied") return ev.event_kind.startsWith("worker_denied_");
+                    if (eventFilter === "run" && runStartedAt) return ev.created_at >= runStartedAt;
+                    return true;
+                  });
+                  if (filtered.length === 0) {
+                    return <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">No events match this filter.</td></tr>;
+                  }
+                  return filtered.map((ev) => {
+                    const isWorker = WORKER_KINDS.has(ev.event_kind);
+                    const isDenied = ev.event_kind.startsWith("worker_denied_");
+                    const md = (ev.metadata && typeof ev.metadata === "object") ? (ev.metadata as any) : {};
+                    const reason = md.reason ?? md.mismatch ?? JSON.stringify(md);
+                    const ray = md.ray ?? "—";
+                    return (
+                      <tr key={ev.id} className="border-t border-border">
+                        <td className="p-2 whitespace-nowrap text-muted-foreground">{new Date(ev.created_at).toLocaleString()}</td>
+                        <td className="p-2">
+                          <Badge variant="outline" className={isDenied ? "border-destructive/50 text-destructive" : isWorker ? "border-primary/50 text-primary" : ""}>
+                            {ev.event_kind}
+                          </Badge>
+                        </td>
+                        <td className="p-2">{ev.tier ?? "—"}</td>
+                        <td className="p-2 font-mono text-[10px] text-muted-foreground">{String(ray)}</td>
+                        <td className="p-2 font-mono text-[10px] max-w-md truncate" title={String(reason)}>{String(reason || "—")}</td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>
