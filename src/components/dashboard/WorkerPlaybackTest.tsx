@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlayCircle, RefreshCw, FlaskConical, FileDown, Wrench, ClipboardCheck } from "lucide-react";
+import { Loader2, PlayCircle, RefreshCw, FlaskConical, FileDown, Wrench, ClipboardCheck, RotateCcw, Globe, Eye } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+const WORKER_HOST = "https://newsingle.s2kdotza.com";
 
 
 type Tier = "free" | "standard" | "gold" | "cristal";
