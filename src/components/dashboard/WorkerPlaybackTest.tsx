@@ -299,6 +299,8 @@ const WorkerPlaybackTest = () => {
   const runChecks = async () => {
     if (!trackId) return;
     setRunningChecks(true);
+    setRunStartedAt(new Date().toISOString());
+    setEventFilter("run");
     const next: Check[] = checks.map((c) => ({ ...c, outcome: "running", detail: undefined }));
     setChecks(next);
 
@@ -340,27 +342,37 @@ const WorkerPlaybackTest = () => {
     setTimeout(loadEvents, 1200);
   };
 
-  const fixTrailingSpace = async () => {
+  const fixTrailingSpace = async (dryRun = false) => {
     if (!selectedTrack) return;
     setRenaming(true);
+    if (dryRun) setDryRunResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("r2-rename-track", {
-        body: { track_id: selectedTrack.id },
+        body: { track_id: selectedTrack.id, dry_run: dryRun },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast({
-        title: "R2 object renamed",
-        description: `${(data as any).from} → ${(data as any).to}`,
-      });
-      // Refresh tracks
-      const { data: rows } = await supabase
-        .from("tracks").select("id,title,artist_name,r2_object_key")
-        .eq("is_active", true).order("title");
-      setTracks(rows ?? []);
-      loadEvents();
+      if (dryRun) {
+        setDryRunResult(data);
+        toast({
+          title: "Dry run complete",
+          description: (data as any).noop ? "Already canonical — no rename needed." : `Would rename ${(data as any).from} → ${(data as any).to}`,
+        });
+      } else {
+        setDryRunResult(null);
+        toast({
+          title: "R2 object renamed",
+          description: `${(data as any).from} → ${(data as any).to}`,
+        });
+        // Refresh tracks
+        const { data: rows } = await supabase
+          .from("tracks").select("id,title,artist_name,r2_object_key")
+          .eq("is_active", true).order("title");
+        setTracks(rows ?? []);
+        loadEvents();
+      }
     } catch (e) {
-      toast({ title: "Rename failed", description: (e as Error).message, variant: "destructive" });
+      toast({ title: dryRun ? "Dry run failed" : "Rename failed", description: (e as Error).message, variant: "destructive" });
     } finally {
       setRenaming(false);
     }
