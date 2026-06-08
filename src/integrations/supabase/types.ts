@@ -1387,6 +1387,33 @@ export type Database = {
           },
         ]
       }
+      phase2_deploy_state: {
+        Row: {
+          checked: boolean
+          last_run_at: string | null
+          notes: string | null
+          step_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          checked?: boolean
+          last_run_at?: string | null
+          notes?: string | null
+          step_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          checked?: boolean
+          last_run_at?: string | null
+          notes?: string | null
+          step_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       playback_events: {
         Row: {
           allowed_seconds: number | null
