@@ -653,7 +653,7 @@ const WorkerPlaybackTest = () => {
       sourceMissing,
       srcSize, dstSize, delta,
       beforeName, afterName,
-      wouldSucceed: dryRunWorker?.would_succeed ?? !collision && !sourceMissing,
+      wouldSucceed: dryRunWorker?.would_succeed ?? (!collision && !sourceMissing),
       objectCountBefore: sourceMissing ? 0 : 1,
       objectCountAfter: collision || sourceMissing ? (collision ? 1 : 0) : 1,
     };
