@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlayCircle, RefreshCw, FlaskConical, FileDown, Wrench, ClipboardCheck, RotateCcw, Globe, Eye } from "lucide-react";
+import { Loader2, PlayCircle, RefreshCw, FlaskConical, FileDown, Wrench, ClipboardCheck, RotateCcw, Globe, Eye, ShieldCheck } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const WORKER_HOST = "https://newsingle.s2kdotza.com";
+const EXPECTED_ROUTE_PATTERN = "newsingle.s2kdotza.com/*";
 
 
 type Tier = "free" | "standard" | "gold" | "cristal";
@@ -35,7 +36,7 @@ const WORKER_KINDS = new Set([
   "worker_denied_rate_limit",
 ]);
 
-function decodePayload(token: string): unknown {
+function decodePayload(token: string): any {
   try {
     const [p] = token.split(".");
     if (!p) return null;
@@ -48,11 +49,7 @@ function decodePayload(token: string): unknown {
 }
 
 function normalize(raw: string): string {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
+  try { return decodeURIComponent(raw); } catch { return raw; }
 }
 
 function canonical(raw: string): string {
@@ -81,12 +78,18 @@ const DEPLOY_STEPS: { id: string; label: string }[] = [
   { id: "secret_hmac", label: "wrangler secret put R2_SIGNING_SECRET (same value as Supabase secret)" },
   { id: "secret_log", label: "wrangler secret put SUPABASE_LOG_URL (log-worker-playback URL)" },
   { id: "deploy", label: "npx wrangler deploy completed without errors" },
-  { id: "route", label: "Route newsingle.s2kdotza.com/* bound to s2k-stream-gate in Cloudflare Triggers" },
+  { id: "route", label: `Route ${EXPECTED_ROUTE_PATTERN} bound to s2k-stream-gate in Cloudflare Triggers` },
   { id: "probe", label: "Probed a signed URL above — got 206 + worker_granted in events" },
   { id: "checks", label: "Automated worker checks (below) all green, including rate_limit" },
 ];
-const DEPLOY_KEY = "s2k.phase2.deploy.checklist";
 
+type DeployRow = { step_id: string; checked: boolean; last_run_at: string | null };
+type ConsistencyResult = {
+  status: "idle" | "running" | "pass" | "fail";
+  sampled: number;
+  mismatches: { track_id: string; title: string; stored: string; token_p: string; reason: string }[];
+  ranAt?: string;
+};
 
 const WorkerPlaybackTest = () => {
   const { toast } = useToast();
@@ -110,51 +113,105 @@ const WorkerPlaybackTest = () => {
   const [renaming, setRenaming] = useState(false);
   const [dryRunResult, setDryRunResult] = useState<any>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [deployChecks, setDeployChecks] = useState<Record<string, boolean>>(() => {
-    try { return JSON.parse(localStorage.getItem(DEPLOY_KEY) ?? "{}"); } catch { return {}; }
-  });
-  const [routeCheck, setRouteCheck] = useState<{ status: "idle" | "running" | "pass" | "fail"; detail?: string }>({ status: "idle" });
+  const [deployRows, setDeployRows] = useState<Record<string, DeployRow>>({});
+  const [deployLoading, setDeployLoading] = useState(true);
+  const [routeCheck, setRouteCheck] = useState<{
+    status: "idle" | "running" | "pass" | "fail";
+    detail?: string;
+    expected?: { host: string; route: string; probeUrl: string };
+    actual?: { status: number; statusText: string; bodySnippet: string; cfRay: string | null; server: string | null };
+    curlSnippet?: string;
+  }>({ status: "idle" });
   const [runStartedAt, setRunStartedAt] = useState<string | null>(null);
   const [eventFilter, setEventFilter] = useState<"all" | "rate_limit" | "denied" | "run">("all");
   const [pdfInclude, setPdfInclude] = useState({ checklist: true, checks: true, events: true, rateLimit: true });
+  const [consistency, setConsistency] = useState<ConsistencyResult>({ status: "idle", sampled: 0, mismatches: [] });
+
+  // ---- Deploy checklist persistence (DB) ----
+  const loadDeployState = async () => {
+    setDeployLoading(true);
+    const { data } = await supabase
+      .from("phase2_deploy_state")
+      .select("step_id,checked,last_run_at");
+    const map: Record<string, DeployRow> = {};
+    (data ?? []).forEach((r: any) => { map[r.step_id] = r; });
+    setDeployRows(map);
+    setDeployLoading(false);
+  };
+  useEffect(() => { loadDeployState(); }, []);
+
+  const persistStep = async (stepId: string, patch: Partial<DeployRow>) => {
+    const now = new Date().toISOString();
+    const existing = deployRows[stepId];
+    const next: DeployRow = {
+      step_id: stepId,
+      checked: patch.checked ?? existing?.checked ?? false,
+      last_run_at: patch.last_run_at ?? existing?.last_run_at ?? null,
+    };
+    setDeployRows((prev) => ({ ...prev, [stepId]: next }));
+    const { error } = await supabase
+      .from("phase2_deploy_state")
+      .upsert({ ...next, updated_at: now }, { onConflict: "step_id" });
+    if (error) {
+      toast({ title: "Could not save checklist", description: error.message, variant: "destructive" });
+    }
+  };
+
   const toggleDeploy = (id: string) => {
-    setDeployChecks((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      try { localStorage.setItem(DEPLOY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
+    const wasChecked = !!deployRows[id]?.checked;
+    persistStep(id, {
+      checked: !wasChecked,
+      last_run_at: !wasChecked ? new Date().toISOString() : deployRows[id]?.last_run_at ?? null,
     });
   };
-  const resetDeploy = () => {
-    setDeployChecks({});
-    try { localStorage.removeItem(DEPLOY_KEY); } catch { /* ignore */ }
+
+  const resetDeploy = async () => {
+    const { error } = await supabase.from("phase2_deploy_state").delete().neq("step_id", "");
+    if (error) {
+      toast({ title: "Reset failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setDeployRows({});
     setRouteCheck({ status: "idle" });
     toast({ title: "Deploy checklist reset", description: "Re-run wrangler deploy verification when ready." });
   };
+
+  const allDeployDone = DEPLOY_STEPS.every((s) => deployRows[s.id]?.checked);
+
+  // ---- Route binding probe (enhanced) ----
   const checkRouteBinding = async () => {
-    setRouteCheck({ status: "running" });
+    const probeUrl = `${WORKER_HOST}/__route_probe.bin`;
+    const expected = { host: WORKER_HOST, route: EXPECTED_ROUTE_PATTERN, probeUrl };
+    const curlSnippet = `curl -i '${probeUrl}'   # expect: HTTP/2 401 + body "missing token" + cf-ray header`;
+    setRouteCheck({ status: "running", expected, curlSnippet });
     try {
-      // Hit the worker host with no token. Our worker should respond with
-      // 401 "missing token" via the worker, NOT a 404 / R2 default error.
-      const r = await fetch(`${WORKER_HOST}/__route_probe.bin`, { method: "GET", cache: "no-store" });
+      const r = await fetch(probeUrl, { method: "GET", cache: "no-store" });
       const cfRay = r.headers.get("cf-ray");
-      const body = (await r.text()).slice(0, 120);
+      const server = r.headers.get("server");
+      const body = (await r.text()).slice(0, 160);
+      const actual = { status: r.status, statusText: r.statusText, bodySnippet: body, cfRay, server };
       const looksLikeWorker = r.status === 401 && /missing token|bad token|bad signature/i.test(body);
       if (looksLikeWorker && cfRay) {
-        setRouteCheck({ status: "pass", detail: `${r.status} from worker (cf-ray=${cfRay}) — route bound correctly.` });
-      } else if (r.status === 401 && /missing token/i.test(body)) {
-        setRouteCheck({ status: "pass", detail: `${r.status} ${body} — worker responded but cf-ray missing.` });
+        setRouteCheck({ status: "pass", expected, actual, curlSnippet, detail: `Worker responded as expected (cf-ray=${cfRay}).` });
+        await persistStep("route", { checked: true, last_run_at: new Date().toISOString() });
+      } else if (looksLikeWorker) {
+        setRouteCheck({ status: "pass", expected, actual, curlSnippet, detail: "Worker responded but no cf-ray header — still considered bound." });
       } else {
         setRouteCheck({
           status: "fail",
-          detail: `Got ${r.status} ${r.statusText} — body: "${body}". Expected 401 "missing token" from s2k-stream-gate. Verify the route newsingle.s2kdotza.com/* is bound to the worker in Cloudflare → Workers → Triggers.`,
+          expected, actual, curlSnippet,
+          detail: `Expected 401 "missing token" from s2k-stream-gate. Got ${r.status} ${r.statusText}. Verify route ${EXPECTED_ROUTE_PATTERN} is bound in Cloudflare → Workers → Triggers.`,
         });
       }
     } catch (e) {
-      setRouteCheck({ status: "fail", detail: `network error: ${(e as Error).message} — DNS or worker may not be reachable.` });
+      setRouteCheck({
+        status: "fail", expected, curlSnippet,
+        detail: `Network error: ${(e as Error).message} — DNS or worker may not be reachable.`,
+      });
     }
   };
-  const allDeployDone = DEPLOY_STEPS.every((s) => deployChecks[s.id]);
 
+  // ---- Track + events loading ----
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -169,9 +226,7 @@ const WorkerPlaybackTest = () => {
 
   const selectedTrack = useMemo(() => tracks.find((t) => t.id === trackId), [tracks, trackId]);
   const decodedKey = selectedTrack ? normalize(selectedTrack.r2_object_key) : "";
-  const tokenPayload = signedUrl
-    ? decodePayload(new URL(signedUrl).searchParams.get("t") ?? "")
-    : null;
+  const tokenPayload = signedUrl ? decodePayload(new URL(signedUrl).searchParams.get("t") ?? "") : null;
 
   const loadEvents = async () => {
     setRefreshing(true);
@@ -183,9 +238,9 @@ const WorkerPlaybackTest = () => {
     setEvents((data ?? []) as PlaybackEvent[]);
     setRefreshing(false);
   };
-
   useEffect(() => { loadEvents(); }, []);
 
+  // ---- Mint helpers ----
   const mintUrl = async () => {
     if (!trackId) return;
     setLoading(true);
@@ -249,11 +304,8 @@ const WorkerPlaybackTest = () => {
     return { status: r.status, statusText: r.statusText, body: text };
   };
 
-  // Rate-limit stress test: rapid-fire requests against a fresh signed URL
-  // until the per-IP minute bucket trips, then assert a worker_denied_rate_limit
-  // row appears in playback_events for this run.
   const runRateLimitCheck = async (updateCheck: (id: Check["id"], o: CheckOutcome, d: string) => void) => {
-    const stressLimit = 160; // > RATE_LIMIT_PER_MIN default of 120
+    const stressLimit = 160;
     const concurrency = 20;
     const startedAt = new Date();
     let url: string;
@@ -280,7 +332,6 @@ const WorkerPlaybackTest = () => {
       updateCheck("rate_limit", "fail", `fired ${fired} requests, never saw 429 — RATE_LIMIT_PER_MIN may be too high or Worker not deployed`);
       return;
     }
-    // Confirm a denial row was logged.
     await new Promise((r) => setTimeout(r, 1500));
     const { data } = await supabase
       .from("playback_events")
@@ -303,11 +354,9 @@ const WorkerPlaybackTest = () => {
     setEventFilter("run");
     const next: Check[] = checks.map((c) => ({ ...c, outcome: "running", detail: undefined }));
     setChecks(next);
-
     const updateCheck = (id: Check["id"], outcome: CheckOutcome, detail: string) => {
       setChecks((prev) => prev.map((c) => c.id === id ? { ...c, outcome, detail } : c));
     };
-
     for (const c of next) {
       try {
         if (c.id === "rate_limit") {
@@ -339,9 +388,59 @@ const WorkerPlaybackTest = () => {
       }
     }
     setRunningChecks(false);
+    await persistStep("checks", { last_run_at: new Date().toISOString() });
     setTimeout(loadEvents, 1200);
   };
 
+  // ---- Post-deploy consistency check (token p vs decoded key) ----
+  const runConsistencyCheck = async () => {
+    setConsistency({ status: "running", sampled: 0, mismatches: [] });
+    const sample = tracks.slice(0, Math.min(20, tracks.length));
+    const mismatches: ConsistencyResult["mismatches"] = [];
+    const { data: { session } } = await supabase.auth.getSession();
+    for (const t of sample) {
+      try {
+        const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-track`);
+        url.searchParams.set("track_id", t.id);
+        url.searchParams.set("tier", "free");
+        url.searchParams.set("json", "1");
+        const r = await fetch(url.toString(), {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
+        const body = await r.json();
+        if (!r.ok) {
+          mismatches.push({ track_id: t.id, title: t.title, stored: t.r2_object_key, token_p: "", reason: `mint failed: ${body.error ?? r.status}` });
+          continue;
+        }
+        const tok = new URL(body.url).searchParams.get("t") ?? "";
+        const payload = decodePayload(tok);
+        const tokenP = String(payload?.p ?? "");
+        const decoded = normalize(t.r2_object_key);
+        if (tokenP !== decoded) {
+          mismatches.push({
+            track_id: t.id, title: t.title, stored: t.r2_object_key, token_p: tokenP,
+            reason: `token.p !== normalize(stored). diff length stored=${decoded.length} token=${tokenP.length}`,
+          });
+        }
+      } catch (e) {
+        mismatches.push({ track_id: t.id, title: t.title, stored: t.r2_object_key, token_p: "", reason: (e as Error).message });
+      }
+    }
+    const result: ConsistencyResult = {
+      status: mismatches.length === 0 ? "pass" : "fail",
+      sampled: sample.length,
+      mismatches,
+      ranAt: new Date().toISOString(),
+    };
+    setConsistency(result);
+    toast({
+      title: result.status === "pass" ? "Consistency check passed" : "Consistency check failed",
+      description: `Sampled ${sample.length} tracks · ${mismatches.length} mismatches`,
+      variant: result.status === "pass" ? "default" : "destructive",
+    });
+  };
+
+  // ---- R2 rename ----
   const fixTrailingSpace = async (dryRun = false) => {
     if (!selectedTrack) return;
     setRenaming(true);
@@ -354,17 +453,21 @@ const WorkerPlaybackTest = () => {
       if ((data as any)?.error) throw new Error((data as any).error);
       if (dryRun) {
         setDryRunResult(data);
-        toast({
-          title: "Dry run complete",
-          description: (data as any).noop ? "Already canonical — no rename needed." : `Would rename ${(data as any).from} → ${(data as any).to}`,
-        });
+        const w = (data as any).worker ?? {};
+        const detail = (data as any).noop
+          ? "Already canonical — no rename needed."
+          : `Would rename ${(data as any).from} → ${(data as any).to}` +
+            (w.would_succeed === false
+              ? w.destination_exists
+                ? " · BLOCKED: destination already exists"
+                : !w.source_exists
+                  ? " · BLOCKED: source missing"
+                  : ""
+              : "");
+        toast({ title: "Dry run complete", description: detail });
       } else {
         setDryRunResult(null);
-        toast({
-          title: "R2 object renamed",
-          description: `${(data as any).from} → ${(data as any).to}`,
-        });
-        // Refresh tracks
+        toast({ title: "R2 object renamed", description: `${(data as any).from} → ${(data as any).to}` });
         const { data: rows } = await supabase
           .from("tracks").select("id,title,artist_name,r2_object_key")
           .eq("is_active", true).order("title");
@@ -378,6 +481,63 @@ const WorkerPlaybackTest = () => {
     }
   };
 
+  // ---- Event filtering helper ----
+  const filteredEvents = useMemo(() => events.filter((ev) => {
+    if (eventFilter === "rate_limit") return ev.event_kind === "worker_denied_rate_limit";
+    if (eventFilter === "denied") return ev.event_kind.startsWith("worker_denied_");
+    if (eventFilter === "run" && runStartedAt) return ev.created_at >= runStartedAt;
+    return true;
+  }), [events, eventFilter, runStartedAt]);
+
+  // ---- Export events ----
+  const downloadEvents = (format: "json" | "csv") => {
+    if (filteredEvents.length === 0) {
+      toast({ title: "Nothing to export", description: "No events match the current filter.", variant: "destructive" });
+      return;
+    }
+    const rows = filteredEvents.map((ev) => {
+      const md = (ev.metadata && typeof ev.metadata === "object") ? (ev.metadata as any) : {};
+      return {
+        id: ev.id,
+        created_at: ev.created_at,
+        event_kind: ev.event_kind,
+        tier: ev.tier ?? "",
+        track_id: ev.track_id ?? "",
+        cf_ray: md.ray ?? "",
+        ip: md.ip ?? "",
+        reason: md.reason ?? md.mismatch ?? "",
+        path: md.path ?? "",
+        metadata: md,
+      };
+    });
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    let blob: Blob;
+    let filename: string;
+    if (format === "json") {
+      blob = new Blob([JSON.stringify({
+        exported_at: new Date().toISOString(),
+        filter: eventFilter,
+        run_started_at: runStartedAt,
+        count: rows.length,
+        events: rows,
+      }, null, 2)], { type: "application/json" });
+      filename = `playback-events-${eventFilter}-${stamp}.json`;
+    } else {
+      const headers = ["id", "created_at", "event_kind", "tier", "track_id", "cf_ray", "ip", "reason", "path"];
+      const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const lines = [headers.join(",")];
+      rows.forEach((r) => lines.push(headers.map((h) => esc((r as any)[h])).join(",")));
+      blob = new Blob([lines.join("\n")], { type: "text/csv" });
+      filename = `playback-events-${eventFilter}-${stamp}.csv`;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // ---- Audit PDF ----
   const downloadAuditPdf = async () => {
     setGeneratingPdf(true);
     try {
@@ -403,13 +563,20 @@ const WorkerPlaybackTest = () => {
         autoTable(doc, {
           startY: cursorY + 8,
           styles: { fontSize: 9 },
-          head: [["Step", "Status"]],
-          body: DEPLOY_STEPS.map((s) => [s.label, deployChecks[s.id] ? "✓ done" : "pending"]),
+          head: [["Step", "Status", "Last run"]],
+          body: DEPLOY_STEPS.map((s) => {
+            const row = deployRows[s.id];
+            return [
+              s.label,
+              row?.checked ? "✓ done" : "pending",
+              row?.last_run_at ? new Date(row.last_run_at).toLocaleString() : "—",
+            ];
+          }),
         });
         cursorY = (doc as any).lastAutoTable.finalY + 20;
         if (routeCheck.status !== "idle") {
           doc.setFontSize(9);
-          doc.text(`Route binding check: ${routeCheck.status.toUpperCase()} — ${routeCheck.detail ?? ""}`.slice(0, 180), 40, cursorY);
+          doc.text(`Route binding: ${routeCheck.status.toUpperCase()} — ${routeCheck.detail ?? ""}`.slice(0, 180), 40, cursorY);
           cursorY += 16;
         }
       }
@@ -463,7 +630,7 @@ const WorkerPlaybackTest = () => {
         });
       }
 
-      doc.save(`s2k-phase2-worker-audit-${now.toISOString().slice(0,19).replace(/[:T]/g, "-")}.pdf`);
+      doc.save(`s2k-phase2-worker-audit-${now.toISOString().slice(0, 19).replace(/[:T]/g, "-")}.pdf`);
     } catch (e) {
       toast({ title: "PDF failed", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -471,6 +638,26 @@ const WorkerPlaybackTest = () => {
     }
   };
 
+  const dryRunWorker = dryRunResult?.worker ?? null;
+  const dryRunDiff = dryRunResult ? (() => {
+    const srcSize = dryRunWorker?.source_bytes ?? null;
+    const dstSize = dryRunWorker?.destination_bytes ?? null;
+    const collision = dryRunWorker?.destination_exists === true;
+    const sourceMissing = dryRunWorker?.source_exists === false;
+    const delta = (srcSize !== null && dstSize !== null) ? srcSize - dstSize : null;
+    const beforeName = String(dryRunResult.from ?? "");
+    const afterName = String(dryRunResult.to ?? "");
+    return {
+      noop: !!dryRunResult.noop,
+      collision,
+      sourceMissing,
+      srcSize, dstSize, delta,
+      beforeName, afterName,
+      wouldSucceed: dryRunWorker?.would_succeed ?? !collision && !sourceMissing,
+      objectCountBefore: sourceMissing ? 0 : 1,
+      objectCountAfter: collision || sourceMissing ? (collision ? 1 : 0) : 1,
+    };
+  })() : null;
 
   return (
     <Card className="bg-card border-border">
@@ -484,10 +671,11 @@ const WorkerPlaybackTest = () => {
           <div className="flex items-center justify-between">
             <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
               <ClipboardCheck size={14} className="text-primary" /> Phase 2 deploy checklist
+              {deployLoading && <Loader2 size={10} className="animate-spin" />}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className={allDeployDone ? "border-green-500/60 text-green-500" : "border-amber-500/60 text-amber-500"}>
-                {allDeployDone ? "ready to mark Phase 2 complete" : `${DEPLOY_STEPS.filter(s=>deployChecks[s.id]).length}/${DEPLOY_STEPS.length} done`}
+                {allDeployDone ? "ready to mark Phase 2 complete" : `${DEPLOY_STEPS.filter((s) => deployRows[s.id]?.checked).length}/${DEPLOY_STEPS.length} done`}
               </Badge>
               <Button size="sm" variant="outline" onClick={checkRouteBinding} disabled={routeCheck.status === "running"}>
                 {routeCheck.status === "running" ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />} Verify route binding
@@ -501,21 +689,43 @@ const WorkerPlaybackTest = () => {
             </div>
           </div>
           <div className="space-y-1.5 pt-1">
-            {DEPLOY_STEPS.map((s) => (
-              <label key={s.id} className="flex items-start gap-2 text-xs cursor-pointer">
-                <Checkbox checked={!!deployChecks[s.id]} onCheckedChange={() => toggleDeploy(s.id)} className="mt-0.5" />
-                <span className={deployChecks[s.id] ? "text-muted-foreground line-through" : ""}>{s.label}</span>
-              </label>
-            ))}
+            {DEPLOY_STEPS.map((s) => {
+              const row = deployRows[s.id];
+              return (
+                <label key={s.id} className="flex items-start gap-2 text-xs cursor-pointer">
+                  <Checkbox checked={!!row?.checked} onCheckedChange={() => toggleDeploy(s.id)} className="mt-0.5" />
+                  <span className={`flex-1 ${row?.checked ? "text-muted-foreground line-through" : ""}`}>{s.label}</span>
+                  {row?.last_run_at && (
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      {new Date(row.last_run_at).toLocaleString()}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
           {routeCheck.status !== "idle" && (
-            <div className={`text-[10px] font-mono p-2 border ${
+            <div className={`text-[10px] font-mono p-2 border space-y-1 ${
               routeCheck.status === "pass" ? "border-green-500/40 bg-green-500/5 text-green-500" :
               routeCheck.status === "fail" ? "border-destructive/40 bg-destructive/5 text-destructive" :
               "border-border bg-secondary/30 text-muted-foreground"
             }`}>
-              <span className="uppercase tracking-widest mr-2">route check: {routeCheck.status}</span>
-              {routeCheck.detail}
+              <div><span className="uppercase tracking-widest mr-2">route check: {routeCheck.status}</span>{routeCheck.detail}</div>
+              {routeCheck.expected && (
+                <div className="text-foreground/70">
+                  <div>expected route: <code>{routeCheck.expected.route}</code> → worker <code>s2k-stream-gate</code></div>
+                  <div>probe URL: <code>{routeCheck.expected.probeUrl}</code></div>
+                </div>
+              )}
+              {routeCheck.actual && (
+                <div className="text-foreground/70">
+                  <div>actual: HTTP <code>{routeCheck.actual.status} {routeCheck.actual.statusText}</code> · cf-ray=<code>{routeCheck.actual.cfRay ?? "—"}</code> · server=<code>{routeCheck.actual.server ?? "—"}</code></div>
+                  <div className="break-all">body: <code>{routeCheck.actual.bodySnippet}</code></div>
+                </div>
+              )}
+              {routeCheck.curlSnippet && (
+                <div className="text-foreground/80 select-all break-all">repro: <code>{routeCheck.curlSnippet}</code></div>
+              )}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border/50 mt-2">
@@ -537,27 +747,61 @@ const WorkerPlaybackTest = () => {
           </div>
         </div>
 
+        {/* Post-deploy consistency check */}
+        <div className="border border-border p-3 space-y-2 bg-secondary/20">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <ShieldCheck size={14} className="text-primary" /> Post-deploy consistency check
+            </div>
+            <div className="flex items-center gap-2">
+              {consistency.status !== "idle" && (
+                <Badge variant="outline" className={
+                  consistency.status === "pass" ? "border-green-500/60 text-green-500" :
+                  consistency.status === "fail" ? "border-destructive/60 text-destructive" :
+                  "border-primary/60 text-primary"
+                }>
+                  {consistency.status} · {consistency.sampled} sampled · {consistency.mismatches.length} mismatch{consistency.mismatches.length === 1 ? "" : "es"}
+                </Badge>
+              )}
+              <Button size="sm" variant="outline" onClick={runConsistencyCheck} disabled={consistency.status === "running" || tracks.length === 0}>
+                {consistency.status === "running" ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Check sample tracks
+              </Button>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Mints a free-tier token for up to 20 tracks and verifies <code>token.p === decodeURIComponent(r2_object_key)</code> — the exact bytes the Worker compares against.
+          </p>
+          {consistency.mismatches.length > 0 && (
+            <div className="border border-destructive/40 bg-destructive/5 p-2 max-h-48 overflow-auto">
+              <table className="w-full text-[10px] font-mono">
+                <thead className="text-destructive uppercase tracking-widest">
+                  <tr><th className="text-left">Track</th><th className="text-left">Stored</th><th className="text-left">Token.p</th><th className="text-left">Reason</th></tr>
+                </thead>
+                <tbody>
+                  {consistency.mismatches.map((m) => (
+                    <tr key={m.track_id} className="border-t border-border/40">
+                      <td className="pr-2">{m.title}</td>
+                      <td className="pr-2 break-all">{m.stored}</td>
+                      <td className="pr-2 break-all">{m.token_p || "—"}</td>
+                      <td className="pr-2">{m.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className="text-xs uppercase tracking-widest text-muted-foreground">Track</label>
-            <select
-              value={trackId}
-              onChange={(e) => setTrackId(e.target.value)}
-              className="w-full mt-1 bg-background border border-border px-3 py-2 text-sm"
-            >
-              {tracks.map((t) => (
-                <option key={t.id} value={t.id}>{t.title} — {t.artist_name ?? "—"}</option>
-              ))}
+            <select value={trackId} onChange={(e) => setTrackId(e.target.value)} className="w-full mt-1 bg-background border border-border px-3 py-2 text-sm">
+              {tracks.map((t) => <option key={t.id} value={t.id}>{t.title} — {t.artist_name ?? "—"}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs uppercase tracking-widest text-muted-foreground">Tier</label>
-            <select
-              value={tier}
-              onChange={(e) => setTier(e.target.value as Tier)}
-              className="w-full mt-1 bg-background border border-border px-3 py-2 text-sm"
-            >
+            <select value={tier} onChange={(e) => setTier(e.target.value as Tier)} className="w-full mt-1 bg-background border border-border px-3 py-2 text-sm">
               {TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
@@ -583,22 +827,63 @@ const WorkerPlaybackTest = () => {
                   <Button size="sm" variant="outline" onClick={() => fixTrailingSpace(true)} disabled={renaming}>
                     {renaming ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Dry run
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => fixTrailingSpace(false)} disabled={renaming}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => fixTrailingSpace(false)}
+                    disabled={renaming || (dryRunDiff ? dryRunDiff.collision || dryRunDiff.sourceMissing : false)}
+                    title={dryRunDiff?.collision ? "Destination already exists — dry run blocked the rename" : dryRunDiff?.sourceMissing ? "Source object missing — cannot rename" : ""}
+                  >
                     {renaming ? <Loader2 size={12} className="animate-spin" /> : <Wrench size={12} />} Rename R2 object + update DB
                   </Button>
                 </>
               )}
             </div>
-            {dryRunResult && (
-              <div className="mt-2 border border-amber-500/40 bg-amber-500/5 p-2 text-[10px] font-mono space-y-0.5">
-                <div className="text-amber-500 uppercase tracking-widest text-[9px]">Dry-run preview (no changes applied)</div>
-                <div>from: <code>{String(dryRunResult.from)}</code></div>
-                <div>to: <code>{String(dryRunResult.to)}</code></div>
+            {dryRunResult && dryRunDiff && (
+              <div className="mt-2 border border-amber-500/40 bg-amber-500/5 p-2 text-[10px] font-mono space-y-1">
+                <div className="text-amber-500 uppercase tracking-widest text-[9px]">Dry-run diff (no changes applied)</div>
+                {dryRunDiff.noop ? (
+                  <div>Already canonical — no rename needed.</div>
+                ) : (
+                  <>
+                    <table className="w-full">
+                      <thead className="text-muted-foreground">
+                        <tr><th className="text-left"> </th><th className="text-left">Before (from)</th><th className="text-left">After (to)</th><th className="text-left">Δ</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>object key</td>
+                          <td className="break-all">{dryRunDiff.beforeName}</td>
+                          <td className="break-all">{dryRunDiff.afterName}</td>
+                          <td>{dryRunDiff.beforeName.length} → {dryRunDiff.afterName.length} ({dryRunDiff.afterName.length - dryRunDiff.beforeName.length >= 0 ? "+" : ""}{dryRunDiff.afterName.length - dryRunDiff.beforeName.length})</td>
+                        </tr>
+                        <tr>
+                          <td>r2 object count</td>
+                          <td>{dryRunDiff.objectCountBefore}</td>
+                          <td>{dryRunDiff.collision ? 2 : 1} (post-put, pre-delete)</td>
+                          <td>net 0 after delete</td>
+                        </tr>
+                        <tr>
+                          <td>bytes</td>
+                          <td>{dryRunDiff.srcSize ?? "—"}</td>
+                          <td>{dryRunDiff.dstSize ?? (dryRunDiff.srcSize ?? "—")}</td>
+                          <td>{dryRunDiff.delta === null ? "—" : `${dryRunDiff.delta >= 0 ? "+" : ""}${dryRunDiff.delta}`}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    {dryRunDiff.collision && (
+                      <div className="text-destructive">⚠ Naming collision: destination object already exists in R2. Resolve before running the rename.</div>
+                    )}
+                    {dryRunDiff.sourceMissing && (
+                      <div className="text-destructive">⚠ Source object not found in R2. Cannot proceed.</div>
+                    )}
+                    {!dryRunDiff.collision && !dryRunDiff.sourceMissing && (
+                      <div className="text-green-500">✓ Safe to rename — no collision, source present.</div>
+                    )}
+                  </>
+                )}
                 {dryRunResult.current_db_key && <div>current db key: <code>{String(dryRunResult.current_db_key)}</code></div>}
                 {dryRunResult.proposed_db_key && <div>proposed db key: <code>{String(dryRunResult.proposed_db_key)}</code></div>}
-                {dryRunResult.worker && (
-                  <div>worker: <code>{typeof dryRunResult.worker === "string" ? dryRunResult.worker : JSON.stringify(dryRunResult.worker)}</code></div>
-                )}
               </div>
             )}
           </div>
@@ -629,7 +914,6 @@ const WorkerPlaybackTest = () => {
           <div className="text-[10px] text-muted-foreground">Replay check expects KV-backed Worker (Phase 2). If first probe also fails, the Worker isn't deployed yet.</div>
         </div>
 
-
         {signedUrl && (
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground uppercase tracking-widest">Signed URL</div>
@@ -651,7 +935,9 @@ const WorkerPlaybackTest = () => {
 
         <div>
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">Recent playback_events</div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">
+              Recent playback_events ({filteredEvents.length} shown)
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={eventFilter}
@@ -663,6 +949,12 @@ const WorkerPlaybackTest = () => {
                 <option value="rate_limit">worker_denied_rate_limit only</option>
                 <option value="run" disabled={!runStartedAt}>This test run{runStartedAt ? ` (since ${new Date(runStartedAt).toLocaleTimeString()})` : ""}</option>
               </select>
+              <Button size="sm" variant="outline" onClick={() => downloadEvents("json")} disabled={filteredEvents.length === 0}>
+                <FileDown size={12} /> JSON
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => downloadEvents("csv")} disabled={filteredEvents.length === 0}>
+                <FileDown size={12} /> CSV
+              </Button>
               <Button size="sm" variant="ghost" onClick={loadEvents} disabled={refreshing}>
                 {refreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Refresh
               </Button>
@@ -680,37 +972,28 @@ const WorkerPlaybackTest = () => {
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const filtered = events.filter((ev) => {
-                    if (eventFilter === "rate_limit") return ev.event_kind === "worker_denied_rate_limit";
-                    if (eventFilter === "denied") return ev.event_kind.startsWith("worker_denied_");
-                    if (eventFilter === "run" && runStartedAt) return ev.created_at >= runStartedAt;
-                    return true;
-                  });
-                  if (filtered.length === 0) {
-                    return <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">No events match this filter.</td></tr>;
-                  }
-                  return filtered.map((ev) => {
-                    const isWorker = WORKER_KINDS.has(ev.event_kind);
-                    const isDenied = ev.event_kind.startsWith("worker_denied_");
-                    const md = (ev.metadata && typeof ev.metadata === "object") ? (ev.metadata as any) : {};
-                    const reason = md.reason ?? md.mismatch ?? JSON.stringify(md);
-                    const ray = md.ray ?? "—";
-                    return (
-                      <tr key={ev.id} className="border-t border-border">
-                        <td className="p-2 whitespace-nowrap text-muted-foreground">{new Date(ev.created_at).toLocaleString()}</td>
-                        <td className="p-2">
-                          <Badge variant="outline" className={isDenied ? "border-destructive/50 text-destructive" : isWorker ? "border-primary/50 text-primary" : ""}>
-                            {ev.event_kind}
-                          </Badge>
-                        </td>
-                        <td className="p-2">{ev.tier ?? "—"}</td>
-                        <td className="p-2 font-mono text-[10px] text-muted-foreground">{String(ray)}</td>
-                        <td className="p-2 font-mono text-[10px] max-w-md truncate" title={String(reason)}>{String(reason || "—")}</td>
-                      </tr>
-                    );
-                  });
-                })()}
+                {filteredEvents.length === 0 ? (
+                  <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">No events match this filter.</td></tr>
+                ) : filteredEvents.map((ev) => {
+                  const isWorker = WORKER_KINDS.has(ev.event_kind);
+                  const isDenied = ev.event_kind.startsWith("worker_denied_");
+                  const md = (ev.metadata && typeof ev.metadata === "object") ? (ev.metadata as any) : {};
+                  const reason = md.reason ?? md.mismatch ?? JSON.stringify(md);
+                  const ray = md.ray ?? "—";
+                  return (
+                    <tr key={ev.id} className="border-t border-border">
+                      <td className="p-2 whitespace-nowrap text-muted-foreground">{new Date(ev.created_at).toLocaleString()}</td>
+                      <td className="p-2">
+                        <Badge variant="outline" className={isDenied ? "border-destructive/50 text-destructive" : isWorker ? "border-primary/50 text-primary" : ""}>
+                          {ev.event_kind}
+                        </Badge>
+                      </td>
+                      <td className="p-2">{ev.tier ?? "—"}</td>
+                      <td className="p-2 font-mono text-[10px] text-muted-foreground">{String(ray)}</td>
+                      <td className="p-2 font-mono text-[10px] max-w-md truncate" title={String(reason)}>{String(reason || "—")}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
