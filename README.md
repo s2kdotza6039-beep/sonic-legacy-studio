@@ -1,8 +1,8 @@
-# Welcome to your Lovable project
+# Welcome to the Sonic Legacy Studio project
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**GitHub repository**: https://github.com/s2kdotza6039-beep/sonic-legacy-studio
 
 ## How can I edit this code?
 
@@ -10,9 +10,9 @@ There are several ways of editing your application.
 
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Simply visit the GitHub repository at https://github.com/s2kdotza6039-beep/sonic-legacy-studio and start prompting.
 
-Changes made via Lovable will be committed automatically to this repo.
+Changes made via GitHub will be committed automatically to this repo.
 
 **Use your preferred IDE**
 
@@ -24,10 +24,10 @@ Follow these steps:
 
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+git clone https://github.com/s2kdotza6039-beep/sonic-legacy-studio.git
 
 # Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+cd sonic-legacy-studio
 
 # Step 3: Install the necessary dependencies.
 npm i
@@ -62,7 +62,7 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Deployment is managed through your project’s GitHub repository and chosen hosting provider. If you are using Lovable, open the project dashboard for deployment settings.
 
 ## Can I connect a custom domain to my Lovable project?
 

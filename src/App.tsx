@@ -24,6 +24,9 @@ import Royalties from "./pages/Royalties";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Assistant from "./pages/Assistant";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsConditions from "./pages/TermsConditions";
+import Popia from "./pages/Popia";
 import FloatingAssistant from "./components/FloatingAssistant";
 import Unsubscribe from "./pages/Unsubscribe";
 import SandboxPayments from "./pages/SandboxPayments";
@@ -52,6 +55,9 @@ const App = () => (
             <Route path="/news" element={<News />} />
             <Route path="/careers" element={<Careers />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-and-conditions" element={<TermsConditions />} />
+            <Route path="/popia" element={<Popia />} />
             <Route path="/watch" element={<Watch />} />
             <Route path="/listen" element={<Listen />} />
             <Route path="/events" element={<Events />} />

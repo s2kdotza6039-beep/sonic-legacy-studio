@@ -50,9 +50,10 @@ const Footer = () => (
       <div className="mt-16 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
         <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} s2kDOTza Entertainment. All rights reserved.</p>
         <div className="flex gap-6">
-          <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</a>
-          <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms of Service</a>
-          <Link to="/dashboard" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">Team Login</Link>
+          <Link to="/privacy-policy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link>
+          <Link to="/terms-and-conditions" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms and Conditions</Link>
+          <Link to="/popia" className="text-xs text-muted-foreground hover:text-foreground transition-colors">POPIA Compliance</Link>
+          <Link to="/login" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">Team Login</Link>
         </div>
       </div>
     </div>
