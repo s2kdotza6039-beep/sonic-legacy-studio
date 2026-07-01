@@ -26,6 +26,28 @@ serve(async (req) => {
     // Gather business context
     const contextParts: string[] = [];
 
+    // ── FOUNDER KNOWLEDGE VAULT ──────────────────────────────────────────────
+    const { data: knowledge } = await supabase
+      .from("founder_knowledge")
+      .select("title, content, category, priority, tags")
+      .eq("is_active_context", true)
+      .order("priority", { ascending: false })
+      .limit(20);
+
+    if (knowledge?.length) {
+      const grouped: Record<string, string[]> = {};
+      for (const k of knowledge) {
+        const cat = (k.category || "general").toUpperCase();
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(`• ${k.title}:\n  ${k.content.slice(0, 500)}${k.content.length > 500 ? "…" : ""}`);
+      }
+      const knowledgeText = Object.entries(grouped)
+        .map(([cat, entries]) => `[${cat}]\n${entries.join("\n")}`)
+        .join("\n\n");
+      contextParts.push(`FOUNDER KNOWLEDGE VAULT (what you know about this business):\n${knowledgeText}`);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const { data: reminders } = await supabase
       .from("reminders").select("*").eq("is_done", false)
       .order("due_at", { ascending: true }).limit(10);

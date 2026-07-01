@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical, Brain } from "lucide-react";
 import MusicAdmin from "@/components/dashboard/MusicAdmin";
 import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
 import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
@@ -30,6 +30,7 @@ import ContractVault from "@/components/dashboard/ContractVault";
 import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
 import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
+import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
 import { Target } from "lucide-react";
@@ -39,6 +40,7 @@ const TABS = [
   { key: "command", label: "AI Command", icon: ShieldCheck },
   { key: "ceo", label: "CEO Diary", icon: BookOpen },
   { key: "notepad", label: "Notepad", icon: NotebookPen },
+  { key: "knowledge", label: "Knowledge Vault", icon: Brain },
   { key: "artists", label: "Artists", icon: Users },
   { key: "scorecard", label: "Scorecard", icon: Star },
   { key: "ideas", label: "Ideas", icon: Lightbulb },
@@ -129,6 +131,7 @@ const Dashboard = () => {
             {tab === "command" && <AICommandCentre />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}
+            {tab === "knowledge" && <KnowledgeVault />}
             {tab === "artists" && <ArtistPipeline />}
             {tab === "scorecard" && <ArtistScorecard />}
             {tab === "ideas" && <IdeasBoard />}
