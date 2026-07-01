@@ -32,19 +32,26 @@ serve(async (req) => {
       .select("title, content, category, priority, tags")
       .eq("is_active_context", true)
       .order("priority", { ascending: false })
-      .limit(20);
+      .limit(12);
 
     if (knowledge?.length) {
-      const grouped: Record<string, string[]> = {};
-      for (const k of knowledge) {
-        const cat = (k.category || "general").toUpperCase();
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(`• ${k.title}:\n  ${k.content.slice(0, 500)}${k.content.length > 500 ? "…" : ""}`);
-      }
-      const knowledgeText = Object.entries(grouped)
-        .map(([cat, entries]) => `[${cat}]\n${entries.join("\n")}`)
+      const compactEntries = knowledge
+        .map((entry: any) => ({
+          ...entry,
+          content: String(entry.content || "").replace(/\s+/g, " ").trim(),
+        }))
+        .filter((entry: any) => entry.content.length > 0)
+        .slice(0, 12);
+
+      const knowledgeText = compactEntries
+        .map((entry: any) => {
+          const category = (entry.category || "general").toUpperCase();
+          const excerpt = entry.content.length > 700 ? `${entry.content.slice(0, 700)}…` : entry.content;
+          return `Category: ${category}\nTitle: ${entry.title}\nContent: ${excerpt}`;
+        })
         .join("\n\n");
-      contextParts.push(`FOUNDER KNOWLEDGE VAULT (what you know about this business):\n${knowledgeText}`);
+
+      contextParts.push(`FOUNDER KNOWLEDGE CONTEXT\n\n${knowledgeText}`);
     }
     // ─────────────────────────────────────────────────────────────────────────
 

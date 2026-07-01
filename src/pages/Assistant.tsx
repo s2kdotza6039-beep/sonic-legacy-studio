@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, Brain } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -180,6 +180,37 @@ const Assistant = () => {
     }
   };
 
+  const rememberThis = async () => {
+    const content = input.trim();
+    if (!content) {
+      toast({ title: "Nothing to remember", description: "Type a note or selected text first.", variant: "destructive" });
+      return;
+    }
+
+    const title = window.prompt("Knowledge title:", content.slice(0, 40));
+    if (!title?.trim()) return;
+
+    const category = window.prompt("Category (business, artist, procedure, style, launch, personal, general):", "general")?.trim().toLowerCase() || "general";
+    const priority = Number(window.prompt("Priority (0-10):", "5") || 5);
+    const isActive = window.confirm("Enable this as active AI context?");
+
+    const { error } = await supabase.from("founder_knowledge").insert({
+      title: title.trim(),
+      content,
+      category,
+      priority: Number.isFinite(priority) ? priority : 5,
+      is_active_context: isActive,
+      tags: [],
+    });
+
+    if (error) {
+      toast({ title: "Failed to remember", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Knowledge saved", description: "This is now available to the assistant." });
+      setInput("");
+    }
+  };
+
   return (
     <Layout>
       <div className="min-h-[calc(100vh-200px)] flex">
@@ -293,6 +324,9 @@ const Assistant = () => {
                 className="resize-none min-h-[44px] max-h-[120px] text-sm"
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               />
+              <Button onClick={rememberThis} disabled={!input.trim()} size="icon" variant="outline" className="shrink-0 h-[44px] w-[44px]" title="Remember this">
+                <Brain size={16} />
+              </Button>
               <Button onClick={send} disabled={isLoading || !input.trim()} size="icon" className="shrink-0 h-[44px] w-[44px]">
                 <Send size={16} />
               </Button>

@@ -30,8 +30,10 @@ import ContractVault from "@/components/dashboard/ContractVault";
 import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
 import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
+import FounderKnowledgeVault from "@/components/dashboard/FounderKnowledgeVault";
 import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
+import AIOfficeDashboard from "@/components/dashboard/AIOfficeDashboard";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
 import { Target } from "lucide-react";
 
@@ -41,6 +43,7 @@ const TABS = [
   { key: "ceo", label: "CEO Diary", icon: BookOpen },
   { key: "notepad", label: "Notepad", icon: NotebookPen },
   { key: "knowledge", label: "Knowledge Vault", icon: Brain },
+  { key: "ai-office", label: "AI Office", icon: Brain },
   { key: "artists", label: "Artists", icon: Users },
   { key: "scorecard", label: "Scorecard", icon: Star },
   { key: "ideas", label: "Ideas", icon: Lightbulb },
@@ -131,7 +134,8 @@ const Dashboard = () => {
             {tab === "command" && <AICommandCentre />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}
-            {tab === "knowledge" && <KnowledgeVault />}
+            {tab === "knowledge" && <FounderKnowledgeVault />}
+            {tab === "ai-office" && <AIOfficeDashboard />}
             {tab === "artists" && <ArtistPipeline />}
             {tab === "scorecard" && <ArtistScorecard />}
             {tab === "ideas" && <IdeasBoard />}

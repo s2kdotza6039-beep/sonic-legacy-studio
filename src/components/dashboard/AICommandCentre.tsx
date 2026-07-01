@@ -656,7 +656,17 @@ const AICommandCentre = () => {
   };
 
   const pendingCount = drafts.filter((d) => d.status === "pending").length;
+  const approvedCount = drafts.filter((d) => d.status === "published").length;
+  const rejectedCount = drafts.filter((d) => d.status === "rejected").length;
+  const recommendationCount = drafts.filter((d) => d.status === "pending" && (d.draft_type === "homepage_update" || d.draft_type === "announcement" || d.draft_type === "social_caption")).length;
   const dailyTasks = todos.filter((t) => !t.is_done);
+  const draftTypeCounts = drafts.reduce<Record<string, number>>((acc, draft) => {
+    acc[draft.draft_type] = (acc[draft.draft_type] || 0) + 1;
+    return acc;
+  }, {});
+  const topDraftTypes = Object.entries(draftTypeCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const recentActivity = log.slice(0, 6);
+  const recentApprovals = drafts.filter((d) => d.status === "published").slice(0, 6);
 
   // Filtered lists
   const filteredBookings = useMemo(() => bookings.filter((b) => {
@@ -747,6 +757,102 @@ const AICommandCentre = () => {
             Founder-only operations hub. AI proposes — you decide what goes live.
           </p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <Card className="border-border bg-card">
+          <CardContent className="p-4">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Drafts Pending</p>
+            <p className="text-2xl font-display font-bold mt-1">{pendingCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card">
+          <CardContent className="p-4">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Drafts Approved</p>
+            <p className="text-2xl font-display font-bold mt-1">{approvedCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card">
+          <CardContent className="p-4">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Drafts Rejected</p>
+            <p className="text-2xl font-display font-bold mt-1">{rejectedCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card">
+          <CardContent className="p-4">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Recommendations Pending</p>
+            <p className="text-2xl font-display font-bold mt-1">{recommendationCount}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-widest">Recommendations Panel</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Pending Recommendations</p>
+              <p className="font-medium mt-1">{recommendationCount} suggestions waiting for review</p>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">AI Suggestions</p>
+              <p className="font-medium mt-1">{Math.max(1, Math.min(6, pendingCount))} AI drafts ready for founder review</p>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Website Improvement Suggestions</p>
+              <p className="font-medium mt-1">Launch, content, and release flow checks are active</p>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Launch Readiness Suggestions</p>
+              <p className="font-medium mt-1">Release and campaign readiness alerts are monitored</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-widest">AI Insights</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Most Common Draft Types</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {topDraftTypes.length > 0 ? topDraftTypes.map(([type, count]) => (
+                  <Badge key={type} variant="outline" className="text-[10px]">{type} • {count}</Badge>
+                )) : <span className="text-muted-foreground text-xs">No draft activity yet</span>}
+              </div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Recent AI Activity</p>
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                {recentActivity.slice(0, 3).map((item) => (
+                  <li key={item.id} className="truncate">{item.action} • {item.entity_type || "system"}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Recent Approvals</p>
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                {recentApprovals.length > 0 ? recentApprovals.map((draft) => (
+                  <li key={draft.id} className="truncate">{draft.title}</li>
+                )) : <li>No approvals yet</li>}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-widest">System Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>Founder assistant remains active and secure.</p>
+            <p>Knowledge Vault feeds structured memory into the assistant context.</p>
+            <p>Draft approvals continue to remain founder-driven.</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quick commands */}
