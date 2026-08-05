@@ -108,18 +108,27 @@ const Dashboard = () => {
         {/* Metrics */}
         <MetricsPanel />
 
-        {/* Tabs */}
-        <div className="flex gap-2 mt-8 mb-6 border-b border-border pb-0 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-xs uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
-                tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <t.icon size={14} /> {t.label}
-            </button>
+        {/* Desks */}
+        <div className="mt-8 mb-6 space-y-4 border-b border-border pb-4">
+          {DESKS.map((desk) => (
+            <div key={desk}>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground/70 mb-2">{desk}</p>
+              <div className="flex flex-wrap gap-2">
+                {TABS.filter((t) => t.desk === desk).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-widest border transition-colors whitespace-nowrap ${
+                      tab === t.key
+                        ? "border-primary text-primary bg-primary/10"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <t.icon size={14} /> {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -132,6 +141,7 @@ const Dashboard = () => {
                 <RevenuePipeline />
               </div>
             )}
+            {tab === "briefing" && <DailyBriefing />}
             {tab === "command" && <AICommandCentre />}
             {tab === "vault" && <KnowledgeVault />}
             {tab === "ceo" && <CeoDiary />}
