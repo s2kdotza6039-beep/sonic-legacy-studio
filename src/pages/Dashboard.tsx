@@ -111,28 +111,44 @@ const Dashboard = () => {
         <MetricsPanel />
 
         {/* Desks */}
-        <div className="mt-8 mb-6 space-y-4 border-b border-border pb-4">
-          {DESKS.map((desk) => (
-            <div key={desk}>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground/70 mb-2">{desk}</p>
-              <div className="flex flex-wrap gap-2">
-                {TABS.filter((t) => t.desk === desk).map((t) => (
-                  <button
-                    key={t.key}
-                    onClick={() => setTab(t.key)}
-                    className={`flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-widest border transition-colors whitespace-nowrap ${
-                      tab === t.key
-                        ? "border-primary text-primary bg-primary/10"
-                        : "border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <t.icon size={14} /> {t.label}
-                  </button>
-                ))}
+        <div className="mt-8 mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {DESKS.map((desk) => {
+            const deskTabs = TABS.filter((t) => t.desk === desk);
+            const isActiveDesk = deskTabs.some((t) => t.key === tab);
+            return (
+              <div
+                key={desk}
+                className={`rounded-2xl border p-4 transition-all duration-300 ${
+                  isActiveDesk
+                    ? "border-primary/50 bg-primary/[0.04] shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_8px_30px_-12px_hsl(var(--primary)/0.45)]"
+                    : "border-border bg-card/40 hover:border-border/80"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isActiveDesk ? "bg-primary" : "bg-primary/40"}`} />
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">{desk}</p>
+                  <span className="flex-1 h-px bg-border/70" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {deskTabs.map((t) => (
+                    <button
+                      key={t.key}
+                      onClick={() => setTab(t.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${
+                        tab === t.key
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                          : "border border-border/70 text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/5"
+                      }`}
+                    >
+                      <t.icon size={12} /> {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
 
         {/* Tab Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
