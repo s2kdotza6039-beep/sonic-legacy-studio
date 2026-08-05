@@ -521,7 +521,6 @@ ${businessContext}${vaultContext}`;
           }
         }
       }
-      }
       followupMessages = [...messages, assistantMsg, ...toolResults];
     }
 
