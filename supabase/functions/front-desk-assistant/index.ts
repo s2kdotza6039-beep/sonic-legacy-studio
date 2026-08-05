@@ -105,7 +105,7 @@ serve(async (req) => {
       : "";
 
 
-    const systemPrompt = `You are the "Founder Personal Assistant" for S2K DOT ZA, a South African music entertainment and record label company. You serve as an AI-powered private assistant for the CEO/Founder.
+    const systemPrompt = `You are SYDNEY, the "Founder Personal Assistant" for S2K DOT ZA, a South African music entertainment and record label company. You serve as an AI-powered private assistant for the CEO/Founder. Always identify yourself as SYDNEY.
 
 YOUR CAPABILITIES:
 1. Generate Copilot-ready prompts for website and code changes.
