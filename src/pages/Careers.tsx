@@ -9,6 +9,24 @@ const Careers = () => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    genre: "",
+    music_link: "",
+    message: "",
+  });
+
+  const setField = (key: keyof typeof form) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const resetForm = () => {
+    setForm({ name: "", email: "", phone: "", genre: "", music_link: "", message: "" });
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -28,19 +46,45 @@ const Careers = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (formType === "talent" && file) {
-      setUploading(true);
+    if (formType !== "talent") {
+      toast({ title: "Submitted!", description: "Your submission has been received. Please allow up to 30 days for review." });
+      resetForm();
+      return;
+    }
+
+    setUploading(true);
+    let fileUrl: string | null = null;
+
+    if (file) {
       const fileName = `${Date.now()}-${file.name}`;
       const { error } = await supabase.storage.from("submissions").upload(fileName, file);
-      setUploading(false);
-
       if (error) {
+        setUploading(false);
         toast({ title: "Upload failed", description: error.message, variant: "destructive" });
         return;
       }
+      fileUrl = fileName;
     }
 
-    toast({ title: "Submitted!", description: "Your submission has been received. Please allow up to 30 days for review." });
+    const { error: insertError } = await supabase.from("artists").insert({
+      name: form.name.trim(),
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      genre: form.genre.trim() || null,
+      music_link: form.music_link.trim() || null,
+      file_url: fileUrl,
+      notes: form.message.trim() || null,
+      status: "pending",
+    });
+    setUploading(false);
+
+    if (insertError) {
+      toast({ title: "Submission failed", description: insertError.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Talent signed in!", description: "Your profile is pending review by the team." });
+    resetForm();
   };
 
   return (
