@@ -215,7 +215,7 @@ const FloatingAssistant = () => {
             <div className="flex items-center gap-2">
               <GripVertical size={14} className="text-muted-foreground" />
               <Bot size={16} className="text-primary" />
-              <span className="text-sm font-bold">Personal Assistant</span>
+              <span className="text-sm font-bold">SYDNEY · Personal Assistant</span>
             </div>
             <div className="flex items-center gap-1">
               <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow(true)} className="p-1 hover:text-primary"><Maximize2 size={14} /></button>
