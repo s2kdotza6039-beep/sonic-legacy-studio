@@ -38,6 +38,7 @@ import { Target } from "lucide-react";
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "command", label: "AI Command", icon: ShieldCheck },
+  { key: "vault", label: "Knowledge Vault", icon: BookLock },
   { key: "ceo", label: "CEO Diary", icon: BookOpen },
   { key: "notepad", label: "Notepad", icon: NotebookPen },
   { key: "artists", label: "Artists", icon: Users },
