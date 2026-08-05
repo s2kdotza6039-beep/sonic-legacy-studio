@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
   Clock,
@@ -10,6 +12,8 @@ import {
   Radio,
   AlertTriangle,
   Sparkles,
+  Check,
+  Clock3,
 } from "lucide-react";
 
 type Draft = { id: string; draft_type: string; title: string; status: string; command: string | null; created_at: string };
@@ -21,6 +25,7 @@ type Release = { id: string; title: string; artist_name: string | null; release_
 
 const DailyBriefing = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -28,6 +33,7 @@ const DailyBriefing = () => {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -39,7 +45,7 @@ const DailyBriefing = () => {
       supabase.from("artists").select("*").limit(20),
       supabase.from("releases").select("*").order("created_at", { ascending: false }).limit(8),
     ]);
-    if (d.data) setDrafts(d.data as Draft[]);
+    if (d.data) setDrafts((d.data as Draft[]).filter((x) => x.status === "pending"));
     if (t.data) setTodos(t.data as Todo[]);
     if (r.data) setReminders(r.data as Reminder[]);
     if (de.data) setDeals(de.data as Deal[]);
@@ -50,7 +56,42 @@ const DailyBriefing = () => {
 
   useEffect(() => {
     void fetchAll();
+    const channel = supabase.channel("daily-briefing");
+    ["ai_drafts", "ceo_todos", "reminders", "deals", "artists", "releases"].forEach((table) => {
+      channel.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+        void fetchAll();
+      });
+    });
+    channel.subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  const approveDraft = async (id: string) => {
+    setBusyId(id);
+    const { error } = await supabase.rpc("approve_ai_draft", { _draft_id: id });
+    setBusyId(null);
+    if (error) {
+      toast({ title: "Approval failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Approved & published" });
+    void fetchAll();
+  };
+
+  const deferDraft = async (id: string) => {
+    setBusyId(id);
+    const { error } = await supabase.from("ai_drafts").update({ status: "deferred" }).eq("id", id);
+    setBusyId(null);
+    if (error) {
+      toast({ title: "Could not defer", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Deferred", description: "Removed from today's queue." });
+    void fetchAll();
+  };
+
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -107,12 +148,21 @@ const DailyBriefing = () => {
                 <li key={d.id} className="flex items-start justify-between gap-3 border-b border-border/50 pb-2 last:border-0">
                   <div className="min-w-0">
                     <p className="text-sm truncate">{d.title}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{d.draft_type}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {d.draft_type} ·{" "}
+                      {new Date(d.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}
+                    </p>
                   </div>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {new Date(d.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" className="h-7 px-2 text-[10px] gap-1" disabled={busyId === d.id} onClick={() => approveDraft(d.id)}>
+                      <Check size={11} /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-[10px] gap-1" disabled={busyId === d.id} onClick={() => deferDraft(d.id)}>
+                      <Clock3 size={11} /> Defer
+                    </Button>
+                  </div>
                 </li>
+
               ))}
             </ul>
           )}

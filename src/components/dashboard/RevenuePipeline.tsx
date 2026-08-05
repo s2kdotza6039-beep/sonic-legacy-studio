@@ -10,7 +10,9 @@ interface Deal {
   amount: number;
   stage: string;
   notes: string | null;
+  closed_at?: string | null;
   created_at: string;
+
 }
 
 const STAGES = ["Lead", "Contacted", "Offer Sent", "Negotiation", "Closed"];
@@ -27,6 +29,8 @@ const RevenuePipeline = () => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ client_name: "", deal_title: "", amount: "", notes: "" });
+  const [view, setView] = useState<"active" | "history">("active");
+
   const { toast } = useToast();
 
   const fetchDeals = async () => {
@@ -64,14 +68,40 @@ const RevenuePipeline = () => {
   const totalPipeline = deals.filter((d) => d.stage !== "Closed").reduce((s, d) => s + Number(d.amount), 0);
   const totalClosed = deals.filter((d) => d.stage === "Closed").reduce((s, d) => s + Number(d.amount), 0);
 
+  const isHistory = (d: Deal) => {
+    if (d.stage !== "Closed") return false;
+    const ts = new Date(d.closed_at || d.created_at).getTime();
+    return Date.now() - ts > 24 * 60 * 60 * 1000;
+  };
+  const historyDeals = deals.filter(isHistory);
+  const activeDeals = deals.filter((d) => !isHistory(d));
+  const shownDeals = view === "active" ? activeDeals : historyDeals;
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <h3 className="font-display font-bold text-lg">Revenue Pipeline</h3>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs uppercase tracking-widest text-primary hover:text-primary/80 transition-colors">
-          {showForm ? <X size={14} /> : <Plus size={14} />} {showForm ? "Cancel" : "Add Deal"}
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 border border-border rounded-full p-0.5">
+            <button
+              onClick={() => setView("active")}
+              className={`px-3 py-1 text-[10px] uppercase tracking-widest rounded-full transition-colors ${view === "active" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Active ({activeDeals.length})
+            </button>
+            <button
+              onClick={() => setView("history")}
+              className={`px-3 py-1 text-[10px] uppercase tracking-widest rounded-full transition-colors ${view === "history" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              History ({historyDeals.length})
+            </button>
+          </div>
+          <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs uppercase tracking-widest text-primary hover:text-primary/80 transition-colors">
+            {showForm ? <X size={14} /> : <Plus size={14} />} {showForm ? "Cancel" : "Add Deal"}
+          </button>
+        </div>
       </div>
+
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -98,8 +128,11 @@ const RevenuePipeline = () => {
       )}
 
       <div className="space-y-2">
-        {deals.length === 0 && <p className="text-sm text-muted-foreground">No deals yet.</p>}
-        {deals.map((d) => (
+        {shownDeals.length === 0 && (
+          <p className="text-sm text-muted-foreground">{view === "active" ? "No active deals yet." : "No archived deals yet."}</p>
+        )}
+        {shownDeals.map((d) => (
+
           <div key={d.id} className="border border-border bg-card p-4 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
               <span className="font-semibold text-sm">{d.deal_title}</span>
