@@ -33,28 +33,32 @@ import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
 import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
+import DailyBriefing from "@/components/dashboard/DailyBriefing";
 import { Target } from "lucide-react";
 
+const DESKS = ["Decide", "Foundation", "Grow", "Create", "Protect"] as const;
+
 const TABS = [
-  { key: "overview", label: "Overview", icon: LayoutDashboard },
-  { key: "command", label: "AI Command", icon: ShieldCheck },
-  { key: "vault", label: "Knowledge Vault", icon: BookLock },
-  { key: "ceo", label: "CEO Diary", icon: BookOpen },
-  { key: "notepad", label: "Notepad", icon: NotebookPen },
-  { key: "artists", label: "Artists", icon: Users },
-  { key: "scorecard", label: "Scorecard", icon: Star },
-  { key: "ideas", label: "Ideas", icon: Lightbulb },
-  { key: "content", label: "Content", icon: Film },
-  { key: "releases", label: "Releases", icon: Disc3 },
-  { key: "revenue", label: "Revenue", icon: DollarSign },
-  { key: "contracts", label: "Contracts", icon: FileText },
-  { key: "betting", label: "AI Betting", icon: Target },
-  { key: "music", label: "Music Admin", icon: Headphones },
-  { key: "payfast", label: "PayFast Log", icon: ReceiptText },
-  { key: "playback", label: "Playback Log", icon: Activity },
-  { key: "workertest", label: "Worker Test", icon: FlaskConical },
-  { key: "cloudclicks", label: "Cloud Clicks", icon: Cloud },
-  { key: "security", label: "Security", icon: ShieldAlert },
+  { key: "overview", label: "Overview", icon: LayoutDashboard, desk: "Decide" },
+  { key: "briefing", label: "Daily Briefing", icon: Sparkles, desk: "Decide" },
+  { key: "command", label: "AI Command", icon: ShieldCheck, desk: "Decide" },
+  { key: "vault", label: "Knowledge Vault", icon: BookLock, desk: "Foundation" },
+  { key: "ceo", label: "CEO Diary", icon: BookOpen, desk: "Foundation" },
+  { key: "notepad", label: "Notepad", icon: NotebookPen, desk: "Foundation" },
+  { key: "contracts", label: "Contracts", icon: FileText, desk: "Foundation" },
+  { key: "artists", label: "Artists", icon: Users, desk: "Grow" },
+  { key: "scorecard", label: "Scorecard", icon: Star, desk: "Grow" },
+  { key: "revenue", label: "Revenue", icon: DollarSign, desk: "Grow" },
+  { key: "betting", label: "AI Betting", icon: Target, desk: "Grow" },
+  { key: "cloudclicks", label: "Cloud Clicks", icon: Cloud, desk: "Grow" },
+  { key: "content", label: "Content", icon: Film, desk: "Create" },
+  { key: "releases", label: "Releases", icon: Disc3, desk: "Create" },
+  { key: "ideas", label: "Ideas", icon: Lightbulb, desk: "Create" },
+  { key: "music", label: "Music Admin", icon: Headphones, desk: "Create" },
+  { key: "payfast", label: "PayFast Log", icon: ReceiptText, desk: "Protect" },
+  { key: "playback", label: "Playback Log", icon: Activity, desk: "Protect" },
+  { key: "workertest", label: "Worker Test", icon: FlaskConical, desk: "Protect" },
+  { key: "security", label: "Security", icon: ShieldAlert, desk: "Protect" },
 ] as const;
 
 
