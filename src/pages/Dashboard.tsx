@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, BookLock, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, BookLock, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical, Sparkles } from "lucide-react";
 import MusicAdmin from "@/components/dashboard/MusicAdmin";
 import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
 import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
@@ -33,28 +33,32 @@ import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
 import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
+import DailyBriefing from "@/components/dashboard/DailyBriefing";
 import { Target } from "lucide-react";
 
+const DESKS = ["Decide", "Foundation", "Grow", "Create", "Protect"] as const;
+
 const TABS = [
-  { key: "overview", label: "Overview", icon: LayoutDashboard },
-  { key: "command", label: "AI Command", icon: ShieldCheck },
-  { key: "vault", label: "Knowledge Vault", icon: BookLock },
-  { key: "ceo", label: "CEO Diary", icon: BookOpen },
-  { key: "notepad", label: "Notepad", icon: NotebookPen },
-  { key: "artists", label: "Artists", icon: Users },
-  { key: "scorecard", label: "Scorecard", icon: Star },
-  { key: "ideas", label: "Ideas", icon: Lightbulb },
-  { key: "content", label: "Content", icon: Film },
-  { key: "releases", label: "Releases", icon: Disc3 },
-  { key: "revenue", label: "Revenue", icon: DollarSign },
-  { key: "contracts", label: "Contracts", icon: FileText },
-  { key: "betting", label: "AI Betting", icon: Target },
-  { key: "music", label: "Music Admin", icon: Headphones },
-  { key: "payfast", label: "PayFast Log", icon: ReceiptText },
-  { key: "playback", label: "Playback Log", icon: Activity },
-  { key: "workertest", label: "Worker Test", icon: FlaskConical },
-  { key: "cloudclicks", label: "Cloud Clicks", icon: Cloud },
-  { key: "security", label: "Security", icon: ShieldAlert },
+  { key: "overview", label: "Overview", icon: LayoutDashboard, desk: "Decide" },
+  { key: "briefing", label: "Daily Briefing", icon: Sparkles, desk: "Decide" },
+  { key: "command", label: "AI Command", icon: ShieldCheck, desk: "Decide" },
+  { key: "vault", label: "Knowledge Vault", icon: BookLock, desk: "Foundation" },
+  { key: "ceo", label: "CEO Diary", icon: BookOpen, desk: "Foundation" },
+  { key: "notepad", label: "Notepad", icon: NotebookPen, desk: "Foundation" },
+  { key: "contracts", label: "Contracts", icon: FileText, desk: "Foundation" },
+  { key: "artists", label: "Artists", icon: Users, desk: "Grow" },
+  { key: "scorecard", label: "Scorecard", icon: Star, desk: "Grow" },
+  { key: "revenue", label: "Revenue", icon: DollarSign, desk: "Grow" },
+  { key: "betting", label: "AI Betting", icon: Target, desk: "Grow" },
+  { key: "cloudclicks", label: "Cloud Clicks", icon: Cloud, desk: "Grow" },
+  { key: "content", label: "Content", icon: Film, desk: "Create" },
+  { key: "releases", label: "Releases", icon: Disc3, desk: "Create" },
+  { key: "ideas", label: "Ideas", icon: Lightbulb, desk: "Create" },
+  { key: "music", label: "Music Admin", icon: Headphones, desk: "Create" },
+  { key: "payfast", label: "PayFast Log", icon: ReceiptText, desk: "Protect" },
+  { key: "playback", label: "Playback Log", icon: Activity, desk: "Protect" },
+  { key: "workertest", label: "Worker Test", icon: FlaskConical, desk: "Protect" },
+  { key: "security", label: "Security", icon: ShieldAlert, desk: "Protect" },
 ] as const;
 
 
@@ -104,18 +108,27 @@ const Dashboard = () => {
         {/* Metrics */}
         <MetricsPanel />
 
-        {/* Tabs */}
-        <div className="flex gap-2 mt-8 mb-6 border-b border-border pb-0 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-xs uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
-                tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <t.icon size={14} /> {t.label}
-            </button>
+        {/* Desks */}
+        <div className="mt-8 mb-6 space-y-4 border-b border-border pb-4">
+          {DESKS.map((desk) => (
+            <div key={desk}>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground/70 mb-2">{desk}</p>
+              <div className="flex flex-wrap gap-2">
+                {TABS.filter((t) => t.desk === desk).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-widest border transition-colors whitespace-nowrap ${
+                      tab === t.key
+                        ? "border-primary text-primary bg-primary/10"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <t.icon size={14} /> {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -128,6 +141,7 @@ const Dashboard = () => {
                 <RevenuePipeline />
               </div>
             )}
+            {tab === "briefing" && <DailyBriefing />}
             {tab === "command" && <AICommandCentre />}
             {tab === "vault" && <KnowledgeVault />}
             {tab === "ceo" && <CeoDiary />}
