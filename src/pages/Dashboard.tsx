@@ -129,6 +129,7 @@ const Dashboard = () => {
               </div>
             )}
             {tab === "command" && <AICommandCentre />}
+            {tab === "vault" && <KnowledgeVault />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}
             {tab === "artists" && <ArtistPipeline />}
