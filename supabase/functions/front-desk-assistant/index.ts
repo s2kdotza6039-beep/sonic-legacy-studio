@@ -87,6 +87,17 @@ serve(async (req) => {
       contextParts.push(`CONTRACTS:\n${contracts.map(c => `- ${c.title} (${c.contract_type}, ${c.status}): ${c.party_name || 'N/A'}, R${c.value || 0}${c.end_date ? `, ends: ${c.end_date}` : ''}`).join("\n")}`);
     }
 
+    const { data: upcomingEvents } = await supabase
+      .from("events")
+      .select("title, artist_name, venue, city, country, start_date, ticket_url")
+      .eq("status", "published")
+      .gte("start_date", new Date().toISOString())
+      .order("start_date", { ascending: true })
+      .limit(15);
+    if (upcomingEvents?.length) {
+      contextParts.push(`UPCOMING EVENTS & SHOWS:\n${upcomingEvents.map(e => `- ${e.title}${e.artist_name ? ` — ${e.artist_name}` : ''} @ ${e.venue || 'TBD'}, ${e.city || ''}${e.country ? `, ${e.country}` : ''} on ${e.start_date}${e.ticket_url ? ` (tickets: ${e.ticket_url})` : ''}`).join("\n")}`);
+    }
+
     const businessContext = contextParts.length > 0
       ? `\n\nCURRENT BUSINESS CONTEXT (live data from the database):\n${contextParts.join("\n\n")}`
       : "";
