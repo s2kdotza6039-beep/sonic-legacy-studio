@@ -29,6 +29,8 @@ const RevenuePipeline = () => {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ client_name: "", deal_title: "", amount: "", notes: "" });
+  const [view, setView] = useState<"active" | "history">("active");
+
   const { toast } = useToast();
 
   const fetchDeals = async () => {
