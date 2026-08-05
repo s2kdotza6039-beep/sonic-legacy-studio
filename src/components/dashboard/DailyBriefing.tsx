@@ -148,12 +148,21 @@ const DailyBriefing = () => {
                 <li key={d.id} className="flex items-start justify-between gap-3 border-b border-border/50 pb-2 last:border-0">
                   <div className="min-w-0">
                     <p className="text-sm truncate">{d.title}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{d.draft_type}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {d.draft_type} ·{" "}
+                      {new Date(d.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}
+                    </p>
                   </div>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {new Date(d.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" className="h-7 px-2 text-[10px] gap-1" disabled={busyId === d.id} onClick={() => approveDraft(d.id)}>
+                      <Check size={11} /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-[10px] gap-1" disabled={busyId === d.id} onClick={() => deferDraft(d.id)}>
+                      <Clock3 size={11} /> Defer
+                    </Button>
+                  </div>
                 </li>
+
               ))}
             </ul>
           )}
