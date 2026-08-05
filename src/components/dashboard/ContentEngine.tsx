@@ -86,6 +86,17 @@ const ContentEngine = () => {
         </button>
       </div>
 
+      {/* Engagement metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        {metrics.map((m) => (
+          <div key={m.label} className="border border-border bg-card p-3">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{m.label}</p>
+            <p className="text-xl font-display font-bold text-primary">{m.value}</p>
+            {m.sub && <p className="text-[10px] text-muted-foreground">{m.sub}</p>}
+          </div>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="flex gap-2 mb-4">
         {["all", "WINNER", "TEST", "untagged"].map((t) => (
