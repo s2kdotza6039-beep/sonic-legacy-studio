@@ -302,7 +302,10 @@ const ContractVault = () => {
             {contracts.length === 0 && (
               <p className="p-8 text-center text-muted-foreground text-sm">No contracts yet. Add one to get started.</p>
             )}
-            {contracts.map(contract => (
+            {contracts.length > 0 && visibleContracts.length === 0 && (
+              <p className="p-8 text-center text-muted-foreground text-sm">No contracts match your filters.</p>
+            )}
+            {visibleContracts.map(contract => (
               <div key={contract.id} className="p-4 hover:bg-secondary/20 transition-colors">
                 <div className="flex items-start gap-3">
                   <FileText size={18} className="text-primary mt-0.5 shrink-0" />
