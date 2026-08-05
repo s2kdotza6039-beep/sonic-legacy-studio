@@ -85,9 +85,10 @@ const Dashboard = () => {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <Lock size={20} className="text-primary" />
-                <p className="text-sm uppercase tracking-widest text-primary">Command Center</p>
+                <p className="text-sm uppercase tracking-widest text-primary">S2KDOTZA · Private</p>
               </div>
-              <h1 className="text-3xl md:text-5xl font-display font-bold">Team Dashboard</h1>
+              <h1 className="text-3xl md:text-5xl font-display font-bold">The Workspace</h1>
+
             </div>
             <div className="flex items-center gap-4">
               <Link to="/royalties" className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-2">
