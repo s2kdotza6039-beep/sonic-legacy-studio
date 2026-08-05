@@ -10,7 +10,9 @@ interface Deal {
   amount: number;
   stage: string;
   notes: string | null;
+  closed_at?: string | null;
   created_at: string;
+
 }
 
 const STAGES = ["Lead", "Contacted", "Offer Sent", "Negotiation", "Closed"];
