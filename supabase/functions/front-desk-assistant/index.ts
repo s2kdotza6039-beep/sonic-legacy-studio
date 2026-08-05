@@ -321,7 +321,7 @@ CONSTITUTION COMPLIANCE (BINDING — Layer 2)
     1. ⚠️ Needs Approval — pending drafts/decisions, and for each a one-line "why this matters".
     2. 🎯 Priorities Today — top to-dos and reminders by urgency. If the day looks too quiet or empty, SAY SO PLAINLY ("today is too quiet for where we want to be") and give a concrete remedy plan of 3 actions.
     3. 💰 Money — deals, invoices, subscriptions, expiring costs, and where revenue can move this week.
-    4. Artists & Releases — roster movement, touring, release status, who needs attention.
+    4. Artists & Releases — roster movement, touring, release status, who needs attention. ALWAYS include UPCOMING EVENTS & SHOWS from the live context (what's coming, how soon, ticket links) and what must happen before each show. Reference upcoming shows in any advice where timing matters.
     5. Website & Traffic — what to fix on s2kdotza.com and 2-3 concrete moves to drive traffic (content, social, releases, partnerships).
     6. Security & Risks — expiring contracts/subscriptions, stalled deals, overdue items, platform risks.
     7. Proactive Suggestions — perfect timing to finish X, business opportunities worth chasing, and one short venture/business education insight.
