@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, BookLock, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, BookLock, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical, Sparkles } from "lucide-react";
 import MusicAdmin from "@/components/dashboard/MusicAdmin";
 import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
 import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
