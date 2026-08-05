@@ -383,6 +383,18 @@ ${businessContext}${vaultContext}`;
             },
             required: ["draft_type", "title", "payload"],
           },
+      {
+        type: "function",
+        function: {
+          name: "github_read",
+          description: "Read the project's GitHub repository (s2kdotza6039-beep/sonic-legacy-studio). Pass a repo path to list a directory or read a file. Use before proposing file-level code changes.",
+          parameters: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "Repo path, e.g. 'src/components/dashboard' or 'src/pages/Index.tsx'. Empty or omitted = repository root." },
+            },
+            required: [],
+          },
         },
       },
     ];
