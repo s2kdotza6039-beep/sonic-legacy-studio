@@ -192,11 +192,17 @@ const FloatingAssistant = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
+          aria-label="Open SYDNEY assistant"
+          className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full group"
         >
-          <Bot size={24} />
+          <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
+          <span className="absolute -inset-1 rounded-full border border-primary/40 group-hover:border-primary/70 transition-colors" />
+          <span className="relative flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary via-primary/80 to-primary/50 text-primary-foreground shadow-[0_10px_40px_-8px_hsl(var(--primary)/0.7)] transition-transform group-hover:scale-105">
+            <Sparkles size={24} />
+          </span>
         </button>
       )}
+
 
       {/* Chat window */}
       {isOpen && (
