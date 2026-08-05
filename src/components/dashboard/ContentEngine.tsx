@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, X, TrendingUp, FlaskConical } from "lucide-react";
+import { Plus, X, TrendingUp, FlaskConical, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ContentPost {
@@ -56,6 +56,20 @@ const ContentEngine = () => {
   };
 
   const filtered = filter === "all" ? posts : posts.filter((p) => p.tag === filter);
+
+  const totalViews = posts.reduce((s, p) => s + (p.views || 0), 0);
+  const winners = posts.filter((p) => p.tag === "WINNER").length;
+  const tests = posts.filter((p) => p.tag === "TEST").length;
+  const metrics = [
+    { label: "Posts", value: posts.length.toLocaleString(), sub: "" },
+    { label: "Total Views", value: totalViews.toLocaleString(), sub: "" },
+    { label: "Avg / Post", value: posts.length ? Math.round(totalViews / posts.length).toLocaleString() : "0", sub: "" },
+    { label: "Winners", value: winners.toLocaleString(), sub: `${tests} tests` },
+  ];
+
+  const recent = [...posts]
+    .sort((a, b) => new Date(b.posted_at || 0).getTime() - new Date(a.posted_at || 0).getTime())
+    .slice(0, 10);
 
   const tagStyle: Record<string, string> = {
     WINNER: "bg-green-500/20 text-green-400 border-green-500/30",
