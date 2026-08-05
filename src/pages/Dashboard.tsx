@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical } from "lucide-react";
+import { Lock, LogOut, User, LayoutDashboard, Users, Film, DollarSign, Music, Star, Lightbulb, FileText, BookOpen, BookLock, NotebookPen, ShieldCheck, Disc3, Headphones, ReceiptText, Activity, Cloud, ShieldAlert, FlaskConical } from "lucide-react";
 import MusicAdmin from "@/components/dashboard/MusicAdmin";
 import PayFastAuditLog from "@/components/dashboard/PayFastAuditLog";
 import PlaybackAuditLog from "@/components/dashboard/PlaybackAuditLog";
@@ -31,12 +31,14 @@ import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
 import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
+import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
 import { Target } from "lucide-react";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "command", label: "AI Command", icon: ShieldCheck },
+  { key: "vault", label: "Knowledge Vault", icon: BookLock },
   { key: "ceo", label: "CEO Diary", icon: BookOpen },
   { key: "notepad", label: "Notepad", icon: NotebookPen },
   { key: "artists", label: "Artists", icon: Users },
@@ -127,6 +129,7 @@ const Dashboard = () => {
               </div>
             )}
             {tab === "command" && <AICommandCentre />}
+            {tab === "vault" && <KnowledgeVault />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}
             {tab === "artists" && <ArtistPipeline />}
