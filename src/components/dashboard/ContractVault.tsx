@@ -288,7 +288,14 @@ const ContractVault = () => {
               <div key={contract.id} className="p-4 hover:bg-secondary/20 transition-colors">
                 <div className="flex items-start gap-3">
                   <FileText size={18} className="text-primary mt-0.5 shrink-0" />
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setReadContract(contract)}
+                    onKeyDown={(e) => { if (e.key === "Enter") setReadContract(contract); }}
+                  >
+
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <h4 className="text-sm font-bold">{contract.title}</h4>
                       <Badge className={`text-[10px] ${statusColor[contract.status]}`}>{statusLabel[contract.status]}</Badge>
@@ -313,25 +320,53 @@ const ContractVault = () => {
                       <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}</SelectContent>
                     </Select>
 
-                    <label className="cursor-pointer">
-                      <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(contract.id, e.target.files[0]); }} />
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild disabled={uploading}>
-                        <span><Upload size={13} /></span>
-                      </Button>
-                    </label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <label className="cursor-pointer">
+                            <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(contract.id, e.target.files[0]); }} />
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" asChild disabled={uploading}>
+                              <span><Upload size={13} /></span>
+                            </Button>
+                          </label>
+                        </TooltipTrigger>
+                        <TooltipContent>Upload file</TooltipContent>
+                      </Tooltip>
 
-                    {contract.file_url && (
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDownload(contract)}>
-                        <Download size={13} />
-                      </Button>
-                    )}
+                      {contract.file_url && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleDownload(contract)}>
+                              <Download size={13} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Download file</TooltipContent>
+                        </Tooltip>
+                      )}
 
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(contract)}>
-                      <Pencil size={13} />
-                    </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setReadContract(contract)}>
+                            <Eye size={13} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Read contract</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(contract)}>
+                            <Pencil size={13} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit contract</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
+                        <Button size="sm" variant="ghost" title="Delete contract" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
+
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
@@ -355,7 +390,46 @@ const ContractVault = () => {
           <ContractTemplates onUseTemplate={handleUseTemplate} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!readContract} onOpenChange={(v) => { if (!v) setReadContract(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="pr-6">{readContract?.title}</DialogTitle></DialogHeader>
+          {readContract && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge className={`text-[10px] ${statusColor[readContract.status]}`}>{statusLabel[readContract.status]}</Badge>
+                <Badge variant="outline" className="text-[10px]">{readContract.contract_type}</Badge>
+                {readContract.value > 0 && <Badge variant="outline" className="text-[10px] text-primary">R{readContract.value.toLocaleString()}</Badge>}
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Party</p>
+                <p className="text-sm">{readContract.party_name || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Description</p>
+                <p className="text-sm whitespace-pre-wrap">{readContract.description || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Notes</p>
+                <p className="text-sm whitespace-pre-wrap">{readContract.notes || "—"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground border-t border-border pt-3">
+                <span>Start: <span className="text-foreground">{readContract.start_date || "—"}</span></span>
+                <span>End: <span className="text-foreground">{readContract.end_date || "—"}</span></span>
+                <span className="col-span-2">File: <span className="text-foreground">{readContract.file_name || "No file uploaded"}</span></span>
+                <span className="col-span-2">Created: <span className="text-foreground">{new Date(readContract.created_at).toLocaleString()}</span></span>
+              </div>
+              <div className="flex gap-2 justify-end">
+                {readContract.file_url && <Button variant="outline" onClick={() => handleDownload(readContract)}>Download</Button>}
+                <Button variant="outline" onClick={() => setReadContract(null)}>Close</Button>
+                <Button onClick={() => { const c = readContract; setReadContract(null); openEdit(c); }}>Edit</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 };
 
