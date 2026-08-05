@@ -66,7 +66,7 @@ const ContentEngine = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display font-bold text-lg">Content Engine</h3>
+        <h3 className="font-display font-bold text-lg">Social Vault <span className="text-xs font-sans font-normal text-muted-foreground">(MPUMI · Social Media Specialist)</span></h3>
         <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs uppercase tracking-widest text-primary hover:text-primary/80 transition-colors">
           {showForm ? <X size={14} /> : <Plus size={14} />} {showForm ? "Cancel" : "Add Content"}
         </button>
