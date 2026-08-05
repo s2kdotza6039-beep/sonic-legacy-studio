@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Bot, Send, X, Maximize2, Mail } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Bot, Send, X, Maximize2, Mail, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
@@ -9,8 +9,29 @@ import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
+type Pos = { x: number; y: number };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/front-desk-assistant`;
+const POS_KEY = "pa_position";
+const WIN_W = 380;
+const WIN_H = 500;
+
+const clampPos = (p: Pos): Pos => ({
+  x: Math.min(Math.max(p.x, 0), Math.max(window.innerWidth - WIN_W, 0)),
+  y: Math.min(Math.max(p.y, 0), Math.max(window.innerHeight - WIN_H, 0)),
+});
+
+const readPos = (): Pos | null => {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (typeof p?.x !== "number" || typeof p?.y !== "number") return null;
+    return p;
+  } catch {
+    return null;
+  }
+};
 
 const FloatingAssistant = () => {
   const { isFounder } = useUserRole();
@@ -21,10 +42,61 @@ const FloatingAssistant = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<Pos | null>(() => readPos());
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const savePos = useCallback((p: Pos | null) => {
+    if (!p) return;
+    try {
+      localStorage.setItem(POS_KEY, JSON.stringify(p));
+    } catch {}
+  }, []);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.closest("[data-assistant-window]")?.getBoundingClientRect();
+      if (!rect) return;
+      dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+      setPos(clampPos({ x: rect.left, y: rect.top }));
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    []
+  );
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    e.preventDefault();
+    setPos(clampPos({ x: e.clientX - d.dx, y: e.clientY - d.dy }));
+  }, []);
+
+  const endDrag = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+      setPos((p) => {
+        savePos(p);
+        return p;
+      });
+    },
+    [savePos]
+  );
+
+  const closeWindow = useCallback(
+    (thenNavigate?: boolean) => {
+      savePos(pos);
+      setIsOpen(false);
+      if (thenNavigate) navigate("/assistant");
+    },
+    [pos, savePos, navigate]
+  );
 
   if (!isFounder) return null;
 
@@ -128,15 +200,26 @@ const FloatingAssistant = () => {
 
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[380px] h-[500px] border border-border bg-card shadow-2xl flex flex-col rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between p-3 border-b border-border bg-secondary/30">
+        <div
+          data-assistant-window
+          style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
+          className={`fixed z-50 w-[380px] h-[500px] border border-border bg-card shadow-2xl flex flex-col rounded-lg overflow-hidden ${pos ? "" : "bottom-6 right-6"}`}
+        >
+          <div
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            className="flex items-center justify-between p-3 border-b border-border bg-secondary/30 cursor-grab active:cursor-grabbing touch-none select-none"
+          >
             <div className="flex items-center gap-2">
+              <GripVertical size={14} className="text-muted-foreground" />
               <Bot size={16} className="text-primary" />
-              <span className="text-sm font-bold">Front Desk Assistant</span>
+              <span className="text-sm font-bold">Personal Assistant</span>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => { setIsOpen(false); navigate("/assistant"); }} className="p-1 hover:text-primary"><Maximize2 size={14} /></button>
-              <button onClick={() => setIsOpen(false)} className="p-1 hover:text-primary"><X size={14} /></button>
+              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow(true)} className="p-1 hover:text-primary"><Maximize2 size={14} /></button>
+              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow()} className="p-1 hover:text-primary"><X size={14} /></button>
             </div>
           </div>
 
