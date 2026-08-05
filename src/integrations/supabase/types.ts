@@ -1229,6 +1229,42 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_vault: {
+        Row: {
+          active: boolean
+          body: string
+          category: string
+          created_at: string
+          id: string
+          is_constitutional: boolean
+          priority: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          body?: string
+          category: string
+          created_at?: string
+          id?: string
+          is_constitutional?: boolean
+          priority?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          category?: string
+          created_at?: string
+          id?: string
+          is_constitutional?: boolean
+          priority?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       news_posts: {
         Row: {
           body: string
