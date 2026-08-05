@@ -200,15 +200,26 @@ const FloatingAssistant = () => {
 
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[380px] h-[500px] border border-border bg-card shadow-2xl flex flex-col rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between p-3 border-b border-border bg-secondary/30">
+        <div
+          data-assistant-window
+          style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
+          className={`fixed z-50 w-[380px] h-[500px] border border-border bg-card shadow-2xl flex flex-col rounded-lg overflow-hidden ${pos ? "" : "bottom-6 right-6"}`}
+        >
+          <div
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            className="flex items-center justify-between p-3 border-b border-border bg-secondary/30 cursor-grab active:cursor-grabbing touch-none select-none"
+          >
             <div className="flex items-center gap-2">
+              <GripVertical size={14} className="text-muted-foreground" />
               <Bot size={16} className="text-primary" />
-              <span className="text-sm font-bold">Front Desk Assistant</span>
+              <span className="text-sm font-bold">Personal Assistant</span>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => { setIsOpen(false); navigate("/assistant"); }} className="p-1 hover:text-primary"><Maximize2 size={14} /></button>
-              <button onClick={() => setIsOpen(false)} className="p-1 hover:text-primary"><X size={14} /></button>
+              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow(true)} className="p-1 hover:text-primary"><Maximize2 size={14} /></button>
+              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow()} className="p-1 hover:text-primary"><X size={14} /></button>
             </div>
           </div>
 
