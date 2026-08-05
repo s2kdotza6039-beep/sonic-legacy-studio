@@ -9,6 +9,24 @@ const Careers = () => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    genre: "",
+    music_link: "",
+    message: "",
+  });
+
+  const setField = (key: keyof typeof form) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const resetForm = () => {
+    setForm({ name: "", email: "", phone: "", genre: "", music_link: "", message: "" });
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -28,19 +46,45 @@ const Careers = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (formType === "talent" && file) {
-      setUploading(true);
+    if (formType !== "talent") {
+      toast({ title: "Submitted!", description: "Your submission has been received. Please allow up to 30 days for review." });
+      resetForm();
+      return;
+    }
+
+    setUploading(true);
+    let fileUrl: string | null = null;
+
+    if (file) {
       const fileName = `${Date.now()}-${file.name}`;
       const { error } = await supabase.storage.from("submissions").upload(fileName, file);
-      setUploading(false);
-
       if (error) {
+        setUploading(false);
         toast({ title: "Upload failed", description: error.message, variant: "destructive" });
         return;
       }
+      fileUrl = fileName;
     }
 
-    toast({ title: "Submitted!", description: "Your submission has been received. Please allow up to 30 days for review." });
+    const { error: insertError } = await supabase.from("artists").insert({
+      name: form.name.trim(),
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      genre: form.genre.trim() || null,
+      music_link: form.music_link.trim() || null,
+      file_url: fileUrl,
+      notes: form.message.trim() || null,
+      status: "pending",
+    });
+    setUploading(false);
+
+    if (insertError) {
+      toast({ title: "Submission failed", description: insertError.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Talent signed in!", description: "Your profile is pending review by the team." });
+    resetForm();
   };
 
   return (
@@ -93,29 +137,29 @@ const Careers = () => {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Full Name</label>
-              <input type="text" required className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+              <input type="text" required value={form.name} onChange={setField("name")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
             </div>
             <div>
               <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Email</label>
-              <input type="email" required className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+              <input type="email" required value={form.email} onChange={setField("email")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
             </div>
           </div>
 
           {/* Phone Number */}
           <div>
             <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Phone Number</label>
-            <input type="tel" placeholder="+27 XX XXX XXXX" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors placeholder:text-muted-foreground/50" />
+            <input type="tel" value={form.phone} onChange={setField("phone")} placeholder="+27 XX XXX XXXX" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors placeholder:text-muted-foreground/50" />
           </div>
 
           {formType === "talent" && (
             <>
               <div>
                 <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Genre / Style</label>
-                <input type="text" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+                <input type="text" value={form.genre} onChange={setField("genre")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
               </div>
               <div>
                 <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Link to Music (Spotify, SoundCloud, etc.)</label>
-                <input type="url" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+                <input type="url" value={form.music_link} onChange={setField("music_link")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
               </div>
 
               {/* MP3 Upload */}
@@ -175,7 +219,7 @@ const Careers = () => {
 
           <div>
             <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Message</label>
-            <textarea rows={5} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors resize-none" />
+            <textarea rows={5} value={form.message} onChange={setField("message")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors resize-none" />
           </div>
 
           <button

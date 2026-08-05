@@ -87,6 +87,17 @@ serve(async (req) => {
       contextParts.push(`CONTRACTS:\n${contracts.map(c => `- ${c.title} (${c.contract_type}, ${c.status}): ${c.party_name || 'N/A'}, R${c.value || 0}${c.end_date ? `, ends: ${c.end_date}` : ''}`).join("\n")}`);
     }
 
+    const { data: upcomingEvents } = await supabase
+      .from("events")
+      .select("title, artist_name, venue, city, country, start_date, ticket_url")
+      .eq("status", "published")
+      .gte("start_date", new Date().toISOString())
+      .order("start_date", { ascending: true })
+      .limit(15);
+    if (upcomingEvents?.length) {
+      contextParts.push(`UPCOMING EVENTS & SHOWS:\n${upcomingEvents.map(e => `- ${e.title}${e.artist_name ? ` — ${e.artist_name}` : ''} @ ${e.venue || 'TBD'}, ${e.city || ''}${e.country ? `, ${e.country}` : ''} on ${e.start_date}${e.ticket_url ? ` (tickets: ${e.ticket_url})` : ''}`).join("\n")}`);
+    }
+
     const businessContext = contextParts.length > 0
       ? `\n\nCURRENT BUSINESS CONTEXT (live data from the database):\n${contextParts.join("\n\n")}`
       : "";
@@ -310,7 +321,7 @@ CONSTITUTION COMPLIANCE (BINDING — Layer 2)
     1. ⚠️ Needs Approval — pending drafts/decisions, and for each a one-line "why this matters".
     2. 🎯 Priorities Today — top to-dos and reminders by urgency. If the day looks too quiet or empty, SAY SO PLAINLY ("today is too quiet for where we want to be") and give a concrete remedy plan of 3 actions.
     3. 💰 Money — deals, invoices, subscriptions, expiring costs, and where revenue can move this week.
-    4. Artists & Releases — roster movement, touring, release status, who needs attention.
+    4. Artists & Releases — roster movement, touring, release status, who needs attention. ALWAYS include UPCOMING EVENTS & SHOWS from the live context (what's coming, how soon, ticket links) and what must happen before each show. Reference upcoming shows in any advice where timing matters.
     5. Website & Traffic — what to fix on s2kdotza.com and 2-3 concrete moves to drive traffic (content, social, releases, partnerships).
     6. Security & Risks — expiring contracts/subscriptions, stalled deals, overdue items, platform risks.
     7. Proactive Suggestions — perfect timing to finish X, business opportunities worth chasing, and one short venture/business education insight.

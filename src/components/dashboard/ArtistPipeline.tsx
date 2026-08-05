@@ -26,9 +26,10 @@ interface Activity {
   created_at: string;
 }
 
-const STATUSES = ["New Artist", "In Conversation", "Signed", "Rejected"];
+const STATUSES = ["Pending", "New Artist", "In Conversation", "Signed", "Rejected"];
 
 const statusColor: Record<string, string> = {
+  "Pending": "bg-amber-500/20 text-amber-400 border-amber-500/30",
   "New Artist": "bg-blue-500/20 text-blue-400 border-blue-500/30",
   "In Conversation": "bg-primary/20 text-primary border-primary/30",
   "Signed": "bg-green-500/20 text-green-400 border-green-500/30",

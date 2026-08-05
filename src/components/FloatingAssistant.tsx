@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bot, Send, X, Maximize2, Mail, GripVertical, Sparkles } from "lucide-react";
+import { Bot, Send, X, Maximize2, Mail, GripVertical, Sparkles, Paperclip, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
+type Attachment = { name: string; content: string };
 type Pos = { x: number; y: number };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/front-desk-assistant`;
@@ -44,6 +45,9 @@ const FloatingAssistant = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(() => readPos());
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const attachInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,14 +102,36 @@ const FloatingAssistant = () => {
     [pos, savePos, navigate]
   );
 
+  const addFiles = useCallback(async (files: FileList | File[]) => {
+    const list = Array.from(files).slice(0, 5);
+    for (const f of list) {
+      if (f.size > 500 * 1024) {
+        toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
+        continue;
+      }
+      try {
+        const text = await f.text();
+        setAttachments((prev) => [...prev, { name: f.name, content: text }]);
+      } catch {
+        toast({ title: "Unreadable file", description: `${f.name} could not be read as text.`, variant: "destructive" });
+      }
+    }
+  }, [toast]);
+
   if (!isFounder) return null;
 
   const send = async () => {
-    if (!input.trim() || isLoading) return;
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    if ((!input.trim() && attachments.length === 0) || isLoading) return;
+    const attachBlock = attachments.length
+      ? `[ATTACHED FILES — please read and discuss these]:\n` +
+        attachments.map((a) => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
+        `\n--- END OF FILES ---\n\n`
+      : "";
+    const userMsg: Msg = { role: "user", content: `${attachBlock}${input.trim()}` };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     setInput("");
+    setAttachments([]);
     setIsLoading(true);
 
     let assistantContent = "";
@@ -262,7 +288,44 @@ const FloatingAssistant = () => {
             <div ref={scrollRef} />
           </div>
 
-          <div className="border-t border-border p-2 flex gap-2">
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOver(false);
+              if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+            }}
+            className={`border-t border-border p-2 transition-colors ${isDragOver ? "bg-primary/10 ring-1 ring-inset ring-primary" : ""}`}
+          >
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1 pb-2">
+                {attachments.map((a, i) => (
+                  <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px]">
+                    <FileText size={10} className="text-primary" />
+                    <span className="max-w-[120px] truncate">{a.name}</span>
+                    <button onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {isDragOver && (
+              <p className="pb-2 text-center text-[10px] uppercase tracking-wider text-primary">Drop files to attach</p>
+            )}
+            <div className="flex gap-2">
+            <input
+              ref={attachInputRef}
+              type="file"
+              multiple
+              accept=".txt,.md,.csv,.json,.log,.ts,.tsx,.js,.html,.xml,.yml,.yaml,text/*"
+              className="hidden"
+              onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
+            />
+            <Button onClick={() => attachInputRef.current?.click()} variant="outline" size="icon" className="shrink-0 h-9 w-9" aria-label="Attach a file">
+              <Paperclip size={14} />
+            </Button>
             <Textarea
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -270,9 +333,10 @@ const FloatingAssistant = () => {
               className="resize-none min-h-[36px] max-h-[80px] text-xs"
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
             />
-            <Button onClick={send} disabled={isLoading || !input.trim()} size="icon" className="shrink-0 h-9 w-9">
+            <Button onClick={send} disabled={isLoading || (!input.trim() && attachments.length === 0)} size="icon" className="shrink-0 h-9 w-9">
               <Send size={14} />
             </Button>
+            </div>
           </div>
         </div>
       )}
