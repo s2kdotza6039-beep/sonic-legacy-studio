@@ -383,6 +383,8 @@ ${businessContext}${vaultContext}`;
             },
             required: ["draft_type", "title", "payload"],
           },
+        },
+      },
       {
         type: "function",
         function: {
