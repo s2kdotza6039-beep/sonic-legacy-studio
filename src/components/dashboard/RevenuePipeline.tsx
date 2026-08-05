@@ -128,8 +128,11 @@ const RevenuePipeline = () => {
       )}
 
       <div className="space-y-2">
-        {deals.length === 0 && <p className="text-sm text-muted-foreground">No deals yet.</p>}
-        {deals.map((d) => (
+        {shownDeals.length === 0 && (
+          <p className="text-sm text-muted-foreground">{view === "active" ? "No active deals yet." : "No archived deals yet."}</p>
+        )}
+        {shownDeals.map((d) => (
+
           <div key={d.id} className="border border-border bg-card p-4 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
               <span className="font-semibold text-sm">{d.deal_title}</span>
