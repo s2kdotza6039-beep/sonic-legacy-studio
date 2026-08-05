@@ -250,6 +250,15 @@ const ContractVault = () => {
                 {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={filterValue} onValueChange={setFilterValue}>
+              <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Value</SelectItem>
+                <SelectItem value="high">High (R100k+)</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="none">No value</SelectItem>
+              </SelectContent>
+            </Select>
             <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" className="gap-1 ml-auto" onClick={openAdd}><Plus size={14} /> New Contract</Button>
