@@ -468,7 +468,57 @@ ${businessContext}${vaultContext}`;
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
+        } else if (tc.function?.name === "github_read") {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const rawPath = String(args.path || "").replace(/^\/+/, "");
+            const ghHeaders: Record<string, string> = {
+              Accept: "application/vnd.github+json",
+              "User-Agent": "s2kdotza-sydney",
+            };
+            const ghToken = Deno.env.get("GITHUB_TOKEN");
+            if (ghToken) ghHeaders.Authorization = `Bearer ${ghToken}`;
+
+            const url = `https://api.github.com/repos/s2kdotza6039-beep/sonic-legacy-studio/contents/${rawPath.split("/").map(encodeURIComponent).join("/")}`;
+            const res = await fetch(url, { headers: ghHeaders });
+            if (!res.ok) {
+              const body = await res.text();
+              console.error(`github_read failed [${res.status}]: ${body}`);
+              toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, status: res.status, error: body.slice(0, 500) }) });
+            } else {
+              const json = await res.json();
+              if (Array.isArray(json)) {
+                toolResults.push({
+                  role: "tool", tool_call_id: tc.id,
+                  content: JSON.stringify({
+                    success: true, type: "directory", path: rawPath || "/",
+                    entries: json.map((e: any) => ({ name: e.name, path: e.path, type: e.type, size: e.size })),
+                  }),
+                });
+              } else if (json?.content) {
+                let decoded = "";
+                try {
+                  decoded = new TextDecoder().decode(
+                    Uint8Array.from(atob(String(json.content).replace(/\n/g, "")), (c) => c.charCodeAt(0)),
+                  );
+                } catch { decoded = "[unable to decode file content]"; }
+                const truncated = decoded.length > 12000;
+                toolResults.push({
+                  role: "tool", tool_call_id: tc.id,
+                  content: JSON.stringify({
+                    success: true, type: "file", path: json.path, size: json.size,
+                    truncated, content: truncated ? decoded.slice(0, 12000) : decoded,
+                  }),
+                });
+              } else {
+                toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: "Unsupported GitHub response (binary or submodule)." }) });
+              }
+            }
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
         }
+      }
       }
       followupMessages = [...messages, assistantMsg, ...toolResults];
     }
