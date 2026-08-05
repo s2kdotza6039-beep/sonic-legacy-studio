@@ -91,6 +91,20 @@ serve(async (req) => {
       ? `\n\nCURRENT BUSINESS CONTEXT (live data from the database):\n${contextParts.join("\n\n")}`
       : "";
 
+    // Founder Constitution / Knowledge Vault (Layer 2 — binding rules)
+    const { data: vault } = await supabase
+      .from("knowledge_vault")
+      .select("category, title, body, is_constitutional, priority")
+      .eq("active", true)
+      .order("priority", { ascending: false });
+
+    const vaultContext = vault?.length
+      ? `\n\nFOUNDER CONSTITUTION & KNOWLEDGE VAULT (BIND TO THIS):\n${vault
+          .map((v) => `[${v.category}] ${v.title}: ${v.body}`)
+          .join("\n\n")}`
+      : "";
+
+
     const systemPrompt = `You are the "Founder Personal Assistant" for S2K DOT ZA, a South African music entertainment and record label company. You serve as an AI-powered private assistant for the CEO/Founder.
 
 YOUR CAPABILITIES:
