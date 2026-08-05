@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Lightbulb, Pencil, Trash2, ThumbsUp, Filter, FolderOpen, FolderPlus } from "lucide-react";
+import { Plus, Lightbulb, Pencil, Trash2, ThumbsUp, Filter, FolderOpen, FolderPlus, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -91,6 +91,8 @@ const IdeasBoard = () => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [open, setOpen] = useState(false);
+  const [readIdea, setReadIdea] = useState<Idea | null>(null);
+
   const [boardOpen, setBoardOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
@@ -359,7 +361,14 @@ const IdeasBoard = () => {
                 </button>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0">
+                <div
+                  className="flex-1 min-w-0 cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setReadIdea(idea)}
+                  onKeyDown={(e) => { if (e.key === "Enter") setReadIdea(idea); }}
+                >
+
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <h4 className="text-sm font-bold">{idea.title}</h4>
                     <Badge className={`text-[10px] ${priorityColor[idea.priority]}`}>{idea.priority}</Badge>
@@ -392,9 +401,13 @@ const IdeasBoard = () => {
                       {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(idea)}>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Read idea" onClick={() => setReadIdea(idea)}>
+                    <Eye size={13} />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Edit idea" onClick={() => openEdit(idea)}>
                     <Pencil size={13} />
                   </Button>
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
@@ -418,8 +431,50 @@ const IdeasBoard = () => {
           );
         })}
       </div>
+
+      {/* Read dialog */}
+      <Dialog open={!!readIdea} onOpenChange={(v) => { if (!v) setReadIdea(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="pr-6">{readIdea?.title}</DialogTitle></DialogHeader>
+          {readIdea && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge className={`text-[10px] ${priorityColor[readIdea.priority]}`}>{readIdea.priority}</Badge>
+                <Badge className={`text-[10px] ${statusColor[readIdea.status]}`}>{statusLabel[readIdea.status]}</Badge>
+                <Badge variant="outline" className="text-[10px]">{readIdea.category}</Badge>
+                {readIdea.board_id && boardMap[readIdea.board_id] && (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: boardMap[readIdea.board_id].color }} />
+                    {boardMap[readIdea.board_id].name}
+                  </Badge>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Description</p>
+                <p className="text-sm whitespace-pre-wrap">{readIdea.description || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Notes</p>
+                <p className="text-sm whitespace-pre-wrap">{readIdea.notes || "—"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground border-t border-border pt-3">
+                <span>Submitted by: <span className="text-foreground">{readIdea.submitted_by || "—"}</span></span>
+                <span>Assigned to: <span className="text-foreground">{readIdea.assigned_to || "—"}</span></span>
+                <span>Due: <span className="text-foreground">{readIdea.due_date || "—"}</span></span>
+                <span>Votes: <span className="text-foreground">{readIdea.votes}</span></span>
+                <span>Created: <span className="text-foreground">{new Date(readIdea.created_at).toLocaleString()}</span></span>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setReadIdea(null)}>Close</Button>
+                <Button onClick={() => { const i = readIdea; setReadIdea(null); openEdit(i); }}>Edit</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
+
 };
 
 export default IdeasBoard;
