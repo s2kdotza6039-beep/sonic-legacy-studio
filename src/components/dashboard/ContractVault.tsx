@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import ContractTemplates from "./ContractTemplates";
@@ -69,6 +71,8 @@ const emptyForm: FormState = {
 const ContractVault = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [open, setOpen] = useState(false);
+  const [readContract, setReadContract] = useState<Contract | null>(null);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [filterStatus, setFilterStatus] = useState("all");
