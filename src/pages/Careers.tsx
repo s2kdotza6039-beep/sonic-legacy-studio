@@ -137,29 +137,29 @@ const Careers = () => {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Full Name</label>
-              <input type="text" required className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+              <input type="text" required value={form.name} onChange={setField("name")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
             </div>
             <div>
               <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Email</label>
-              <input type="email" required className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+              <input type="email" required value={form.email} onChange={setField("email")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
             </div>
           </div>
 
           {/* Phone Number */}
           <div>
             <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Phone Number</label>
-            <input type="tel" placeholder="+27 XX XXX XXXX" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors placeholder:text-muted-foreground/50" />
+            <input type="tel" value={form.phone} onChange={setField("phone")} placeholder="+27 XX XXX XXXX" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors placeholder:text-muted-foreground/50" />
           </div>
 
           {formType === "talent" && (
             <>
               <div>
                 <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Genre / Style</label>
-                <input type="text" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+                <input type="text" value={form.genre} onChange={setField("genre")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
               </div>
               <div>
                 <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Link to Music (Spotify, SoundCloud, etc.)</label>
-                <input type="url" className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
+                <input type="url" value={form.music_link} onChange={setField("music_link")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors" />
               </div>
 
               {/* MP3 Upload */}
@@ -219,7 +219,7 @@ const Careers = () => {
 
           <div>
             <label className="text-xs uppercase tracking-widest text-muted-foreground mb-2 block">Message</label>
-            <textarea rows={5} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors resize-none" />
+            <textarea rows={5} value={form.message} onChange={setField("message")} className="w-full bg-card border border-border px-4 py-3 text-foreground text-sm focus:border-primary outline-none transition-colors resize-none" />
           </div>
 
           <button
