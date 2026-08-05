@@ -77,6 +77,7 @@ const ContractVault = () => {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [filterValue, setFilterValue] = useState("all");
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
@@ -172,12 +173,20 @@ const ContractVault = () => {
     const a = document.createElement("a");
     a.href = url; a.download = contract.file_name || "contract"; a.click();
     URL.revokeObjectURL(url);
+    toast({ title: "Downloaded", description: contract.file_name || "contract" });
   };
 
   const handleStatusChange = async (id: string, status: string) => {
     await supabase.from("contracts").update({ status }).eq("id", id);
     load();
   };
+
+  const visibleContracts = contracts.filter((c) => {
+    if (filterValue === "high") return (c.value || 0) >= 100000;
+    if (filterValue === "medium") return (c.value || 0) > 0 && (c.value || 0) < 100000;
+    if (filterValue === "none") return !c.value;
+    return true;
+  });
 
   const counts = {
     total: contracts.length,
