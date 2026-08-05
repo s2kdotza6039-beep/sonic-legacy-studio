@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Lightbulb, Pencil, Trash2, ThumbsUp, Filter, FolderOpen, FolderPlus, Eye } from "lucide-react";
+import { Plus, Lightbulb, Pencil, Trash2, ThumbsUp, Filter, FolderOpen, FolderPlus, Eye, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -100,6 +100,8 @@ const IdeasBoard = () => {
   const [boardForm, setBoardForm] = useState({ name: "", description: "", color: "#8B5CF6" });
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterBoard, setFilterBoard] = useState<string>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [search, setSearch] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -111,6 +113,7 @@ const IdeasBoard = () => {
   const loadIdeas = async () => {
     let query = supabase.from("ideas").select("*").order("votes", { ascending: false }).order("created_at", { ascending: false });
     if (filterStatus !== "all") query = query.eq("status", filterStatus);
+    if (filterCategory !== "all") query = query.eq("category", filterCategory);
     if (filterBoard === "unassigned") query = query.is("board_id", null);
     else if (filterBoard !== "all") query = query.eq("board_id", filterBoard);
     const { data } = await query;
@@ -118,7 +121,7 @@ const IdeasBoard = () => {
   };
 
   useEffect(() => { loadBoards(); }, []);
-  useEffect(() => { loadIdeas(); }, [filterStatus, filterBoard]);
+  useEffect(() => { loadIdeas(); }, [filterStatus, filterBoard, filterCategory]);
 
   const openAdd = () => { setEditingId(null); setForm({ ...emptyForm, board_id: filterBoard !== "all" && filterBoard !== "unassigned" ? filterBoard : "none" }); setOpen(true); };
   const openEdit = (i: Idea) => { setEditingId(i.id); setForm(ideaToForm(i)); setOpen(true); };
@@ -184,6 +187,13 @@ const IdeasBoard = () => {
   };
 
   const boardMap = boards.reduce<Record<string, Board>>((acc, b) => { acc[b.id] = b; return acc; }, {});
+
+  const term = search.trim().toLowerCase();
+  const filteredIdeas = term
+    ? ideas.filter((i) =>
+        [i.title, i.description, i.notes].some((f) => (f || "").toLowerCase().includes(term))
+      )
+    : ideas;
 
   const counts = {
     total: ideas.length,
@@ -331,12 +341,21 @@ const IdeasBoard = () => {
 
       {/* Filters */}
       <div className="flex gap-2 px-4 py-2 border-b border-border items-center flex-wrap">
-        <Filter size={12} className="text-muted-foreground" />
+        <Search size={12} className="text-muted-foreground" />
+        <Input placeholder="Search ideas..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-[160px] text-xs" />
+        <Filter size={12} className="text-muted-foreground ml-1" />
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             {STATUSES.map((s) => <SelectItem key={s} value={s}>{statusLabel[s]}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterCategory} onValueChange={setFilterCategory}>
+          <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -346,7 +365,10 @@ const IdeasBoard = () => {
         {ideas.length === 0 && (
           <p className="p-8 text-center text-muted-foreground text-sm">No ideas yet. Submit one to get started.</p>
         )}
-        {ideas.map((idea) => {
+        {ideas.length > 0 && filteredIdeas.length === 0 && (
+          <p className="p-8 text-center text-muted-foreground text-sm">No ideas match your search/filters.</p>
+        )}
+        {filteredIdeas.map((idea) => {
           const board = idea.board_id ? boardMap[idea.board_id] : null;
           return (
             <div key={idea.id} className="p-4 hover:bg-secondary/20 transition-colors">

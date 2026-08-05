@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, X, TrendingUp, FlaskConical } from "lucide-react";
+import { Plus, X, TrendingUp, FlaskConical, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ContentPost {
@@ -57,6 +57,20 @@ const ContentEngine = () => {
 
   const filtered = filter === "all" ? posts : posts.filter((p) => p.tag === filter);
 
+  const totalViews = posts.reduce((s, p) => s + (p.views || 0), 0);
+  const winners = posts.filter((p) => p.tag === "WINNER").length;
+  const tests = posts.filter((p) => p.tag === "TEST").length;
+  const metrics = [
+    { label: "Posts", value: posts.length.toLocaleString(), sub: "" },
+    { label: "Total Views", value: totalViews.toLocaleString(), sub: "" },
+    { label: "Avg / Post", value: posts.length ? Math.round(totalViews / posts.length).toLocaleString() : "0", sub: "" },
+    { label: "Winners", value: winners.toLocaleString(), sub: `${tests} tests` },
+  ];
+
+  const recent = [...posts]
+    .sort((a, b) => new Date(b.posted_at || 0).getTime() - new Date(a.posted_at || 0).getTime())
+    .slice(0, 10);
+
   const tagStyle: Record<string, string> = {
     WINNER: "bg-green-500/20 text-green-400 border-green-500/30",
     TEST: "bg-primary/20 text-primary border-primary/30",
@@ -70,6 +84,17 @@ const ContentEngine = () => {
         <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs uppercase tracking-widest text-primary hover:text-primary/80 transition-colors">
           {showForm ? <X size={14} /> : <Plus size={14} />} {showForm ? "Cancel" : "Add Content"}
         </button>
+      </div>
+
+      {/* Engagement metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        {metrics.map((m) => (
+          <div key={m.label} className="border border-border bg-card p-3">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{m.label}</p>
+            <p className="text-xl font-display font-bold text-primary">{m.value}</p>
+            {m.sub && <p className="text-[10px] text-muted-foreground">{m.sub}</p>}
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
@@ -111,6 +136,25 @@ const ContentEngine = () => {
             <span className={`text-xs px-3 py-1 border rounded-sm ${tagStyle[p.tag] || ""}`}>{p.tag}</span>
           </div>
         ))}
+      </div>
+
+      {/* Activity feed */}
+      <div className="mt-6 border border-border bg-card">
+        <div className="flex items-center gap-2 p-3 border-b border-border">
+          <Activity size={14} className="text-primary" />
+          <h4 className="text-xs uppercase tracking-widest font-bold">Activity Feed</h4>
+        </div>
+        <div className="divide-y divide-border">
+          {recent.length === 0 && <p className="p-4 text-xs text-muted-foreground">No activity yet.</p>}
+          {recent.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 px-3 py-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+              <span className="text-xs truncate flex-1">{p.title}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">{p.views.toLocaleString()} views</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">{p.posted_at ? new Date(p.posted_at).toLocaleDateString() : "—"}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -329,6 +329,17 @@ CONSTITUTION COMPLIANCE (BINDING — Layer 2)
   → Mark urgent with ⚠️, money with 💰, focus items with 🎯. Keep it scannable (bullets, bold dates).
   → Do NOT draft content and do NOT call create_draft for this command. Briefing only.
 
+═══════════════════════════════════════════════════════════
+UPGRADE ADVISOR & LOVABLE PROMPT ENGINE
+═══════════════════════════════════════════════════════════
+- You proactively spot improvements across the website, dashboard, and operations. When asked — or when the value is clearly high — give a SHORT prioritized list of 1-3 upgrade suggestions. For each: WHAT (the change), WHY (the problem it solves), BENEFIT (business outcome). No essays.
+- For each suggestion, output a ready-to-paste Lovable prompt in a fenced code block, written in the style of the Founder's engineer: precise, self-contained, referencing exact files/components (e.g. src/components/dashboard/IdeasBoard.tsx, supabase/functions/...), exact fields, states, and acceptance criteria.
+- Every generated Lovable prompt MUST end with this exact line:
+  "At the end, give me a SHORT summarized report (max 4 bullets, one per change, status Done/Partial/Failed)".
+- CREDIT DISCIPLINE: batch related changes into ONE prompt. Never split work that touches the same area into multiple prompts.
+- You are the advisor and operator — NOT the deployer. Never claim you deployed or shipped anything. The Founder pastes the prompt.
+- Use the github_read tool to inspect the repo (s2kdotza6039-beep/sonic-legacy-studio) before proposing file-level changes, so your prompts reference real files and real code.
+
 ${businessContext}${vaultContext}`;
 
     const tools = [
@@ -371,6 +382,20 @@ ${businessContext}${vaultContext}`;
               },
             },
             required: ["draft_type", "title", "payload"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_read",
+          description: "Read the project's GitHub repository (s2kdotza6039-beep/sonic-legacy-studio). Pass a repo path to list a directory or read a file. Use before proposing file-level code changes.",
+          parameters: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "Repo path, e.g. 'src/components/dashboard' or 'src/pages/Index.tsx'. Empty or omitted = repository root." },
+            },
+            required: [],
           },
         },
       },
@@ -442,6 +467,55 @@ ${businessContext}${vaultContext}`;
             }).select().single();
             if (dErr) throw dErr;
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, draft_id: draft.id, message: `Draft queued in AI Command Centre as '${args.draft_type}'. Awaiting Founder approval.` }) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
+        } else if (tc.function?.name === "github_read") {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const rawPath = String(args.path || "").replace(/^\/+/, "");
+            const ghHeaders: Record<string, string> = {
+              Accept: "application/vnd.github+json",
+              "User-Agent": "s2kdotza-sydney",
+            };
+            const ghToken = Deno.env.get("GITHUB_TOKEN");
+            if (ghToken) ghHeaders.Authorization = `Bearer ${ghToken}`;
+
+            const url = `https://api.github.com/repos/s2kdotza6039-beep/sonic-legacy-studio/contents/${rawPath.split("/").map(encodeURIComponent).join("/")}`;
+            const res = await fetch(url, { headers: ghHeaders });
+            if (!res.ok) {
+              const body = await res.text();
+              console.error(`github_read failed [${res.status}]: ${body}`);
+              toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, status: res.status, error: body.slice(0, 500) }) });
+            } else {
+              const json = await res.json();
+              if (Array.isArray(json)) {
+                toolResults.push({
+                  role: "tool", tool_call_id: tc.id,
+                  content: JSON.stringify({
+                    success: true, type: "directory", path: rawPath || "/",
+                    entries: json.map((e: any) => ({ name: e.name, path: e.path, type: e.type, size: e.size })),
+                  }),
+                });
+              } else if (json?.content) {
+                let decoded = "";
+                try {
+                  decoded = new TextDecoder().decode(
+                    Uint8Array.from(atob(String(json.content).replace(/\n/g, "")), (c) => c.charCodeAt(0)),
+                  );
+                } catch { decoded = "[unable to decode file content]"; }
+                const truncated = decoded.length > 12000;
+                toolResults.push({
+                  role: "tool", tool_call_id: tc.id,
+                  content: JSON.stringify({
+                    success: true, type: "file", path: json.path, size: json.size,
+                    truncated, content: truncated ? decoded.slice(0, 12000) : decoded,
+                  }),
+                });
+              } else {
+                toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: "Unsupported GitHub response (binary or submodule)." }) });
+              }
+            }
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }

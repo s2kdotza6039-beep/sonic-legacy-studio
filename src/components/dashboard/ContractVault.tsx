@@ -77,6 +77,7 @@ const ContractVault = () => {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [filterValue, setFilterValue] = useState("all");
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
@@ -172,12 +173,20 @@ const ContractVault = () => {
     const a = document.createElement("a");
     a.href = url; a.download = contract.file_name || "contract"; a.click();
     URL.revokeObjectURL(url);
+    toast({ title: "Downloaded", description: contract.file_name || "contract" });
   };
 
   const handleStatusChange = async (id: string, status: string) => {
     await supabase.from("contracts").update({ status }).eq("id", id);
     load();
   };
+
+  const visibleContracts = contracts.filter((c) => {
+    if (filterValue === "high") return (c.value || 0) >= 100000;
+    if (filterValue === "medium") return (c.value || 0) > 0 && (c.value || 0) < 100000;
+    if (filterValue === "none") return !c.value;
+    return true;
+  });
 
   const counts = {
     total: contracts.length,
@@ -241,6 +250,15 @@ const ContractVault = () => {
                 {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={filterValue} onValueChange={setFilterValue}>
+              <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Value</SelectItem>
+                <SelectItem value="high">High (R100k+)</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="none">No value</SelectItem>
+              </SelectContent>
+            </Select>
             <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingId(null); }}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" className="gap-1 ml-auto" onClick={openAdd}><Plus size={14} /> New Contract</Button>
@@ -284,7 +302,10 @@ const ContractVault = () => {
             {contracts.length === 0 && (
               <p className="p-8 text-center text-muted-foreground text-sm">No contracts yet. Add one to get started.</p>
             )}
-            {contracts.map(contract => (
+            {contracts.length > 0 && visibleContracts.length === 0 && (
+              <p className="p-8 text-center text-muted-foreground text-sm">No contracts match your filters.</p>
+            )}
+            {visibleContracts.map(contract => (
               <div key={contract.id} className="p-4 hover:bg-secondary/20 transition-colors">
                 <div className="flex items-start gap-3">
                   <FileText size={18} className="text-primary mt-0.5 shrink-0" />
