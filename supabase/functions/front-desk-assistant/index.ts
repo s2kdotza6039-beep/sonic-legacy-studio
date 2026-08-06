@@ -534,7 +534,24 @@ ${businessContext}${vaultContext}${memoryContext}`;
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
+        } else if (tc.function?.name === "remember") {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const { error: mErr } = await supabase.from("sydney_memory").upsert({
+              key: String(args.key),
+              value: String(args.value),
+              category: args.category || "general",
+              source: "founder",
+              important: true,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "key" });
+            if (mErr) throw mErr;
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, message: "Remembered. This fact is now part of my long-term memory." }) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
         } else if (tc.function?.name === "github_read") {
+
           try {
             const args = JSON.parse(tc.function.arguments || "{}");
             const rawPath = String(args.path || "").replace(/^\/+/, "");
