@@ -128,6 +128,18 @@ serve(async (req) => {
       ? `\n\nSYDNEY MEMORY (facts the founder told me — remember these):\n${memoryRows.map(m => `- [${m.category}] ${m.key}: ${m.value}`).join("\n")}`
       : "";
 
+    const { data: pastDecisions } = await supabase
+      .from("ai_drafts")
+      .select("draft_type, title, status")
+      .in("status", ["approved_and_published", "rejected"])
+      .order("updated_at", { ascending: false })
+      .limit(25);
+    const learningContext = pastDecisions?.length
+      ? `\n\nFOUNDER PREFERENCES (learned from past approvals — align your recommendations):\n${pastDecisions
+          .map((d) => `- ${d.status === "rejected" ? "REJECTED" : "APPROVED"} [${d.draft_type}] ${d.title}`)
+          .join("\n")}`
+      : "";
+
     const businessContext = contextParts.length > 0
 
       ? `\n\nCURRENT BUSINESS CONTEXT (live data from the database):\n${contextParts.join("\n\n")}`
@@ -386,7 +398,20 @@ LONG-TERM MEMORY
 - When the Founder states a preference, goal, rule, or important decision, call the remember tool to save it so you keep it forever and grow smarter with him.
 - Reference past decisions and preferences naturally in conversation.
 
-${businessContext}${vaultContext}${memoryContext}`;
+═══════════════════════════════════════════════════════════
+LEARN FROM APPROVALS
+═══════════════════════════════════════════════════════════
+- Use the FOUNDER PREFERENCES block (past approvals and rejections) to align every recommendation to the Founder's taste.
+- Favour draft types, topics and angles he has APPROVED before; avoid patterns he has REJECTED.
+- If a new idea looks close to something previously rejected, say so and ask before drafting it.
+
+═══════════════════════════════════════════════════════════
+CROSS-AGENT COORDINATION
+═══════════════════════════════════════════════════════════
+- MPUMI runs the Social Vault. When the Founder's need involves social content, proactively prepare the FULL package for MPUMI: caption(s), hashtags, platform suggestions, and a recommended posting schedule — then queue it via create_draft (draft_type: "social_caption") for Founder approval.
+- PALESA is the public Front Desk assistant. When a visitor-facing update (news, event, release) is approved and published, note that PALESA automatically sees it in her public context — so publishing is how PALESA stays informed, safely and without exposing private data.
+
+${businessContext}${vaultContext}${memoryContext}${learningContext}`;
 
 
     const tools = [
