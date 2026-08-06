@@ -262,6 +262,40 @@ const DailyBriefing = () => {
             </ul>
           )}
         </div>
+
+        <div className={sectionCard}>
+          <p className={label}>
+            <History size={13} className="text-primary" /> Approval History
+          </p>
+          {history.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Nothing approved or rejected yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {history.map((h) => {
+                const isPublished = h.status === "approved_and_published" || h.status === "published";
+                const isRejected = h.status === "rejected";
+                return (
+                  <li key={h.id} className="flex items-start gap-2 border-b border-border/50 pb-2 last:border-0">
+                    {isPublished ? (
+                      <CheckCircle2 size={13} className="text-green-500 mt-1 shrink-0" />
+                    ) : isRejected ? (
+                      <XCircle size={13} className="text-destructive mt-1 shrink-0" />
+                    ) : (
+                      <Clock3 size={13} className="text-muted-foreground mt-1 shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm truncate">{h.title}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {isPublished ? "Published" : isRejected ? "Rejected" : "Deferred"}
+                        {h.rejected_reason ? ` · ${h.rejected_reason}` : ""}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
