@@ -31,7 +31,7 @@ export default function SandboxPayments() {
   const [access, setAccess] = useState(loadAccess());
 
   useEffect(() => {
-    supabase.from("tracks").select("*").eq("is_active", true).order("sort_order")
+    supabase.from("tracks_public").select("*").eq("is_active", true).order("sort_order")
       .then(({ data }) => {
         const list = (data ?? []) as Track[];
         setTracks(list);
