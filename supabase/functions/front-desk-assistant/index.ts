@@ -98,7 +98,38 @@ serve(async (req) => {
       contextParts.push(`UPCOMING EVENTS & SHOWS:\n${upcomingEvents.map(e => `- ${e.title}${e.artist_name ? ` — ${e.artist_name}` : ''} @ ${e.venue || 'TBD'}, ${e.city || ''}${e.country ? `, ${e.country}` : ''} on ${e.start_date}${e.ticket_url ? ` (tickets: ${e.ticket_url})` : ''}`).join("\n")}`);
     }
 
+    const { data: unpaidRoyalties } = await supabase
+      .from("royalty_income")
+      .select("source, month, gross, net, fees, territory")
+      .eq("paid", false)
+      .order("month", { ascending: false })
+      .limit(12);
+    if (unpaidRoyalties?.length) {
+      contextParts.push(`ROYALTIES (unpaid):\n${unpaidRoyalties.map(r => `- ${r.source} (${r.month}): gross R${r.gross || 0}, net R${r.net || 0}, fees R${r.fees || 0}${r.territory ? `, ${r.territory}` : ''}`).join("\n")}`);
+    }
+
+    const { data: bookingLeads } = await supabase
+      .from("booking_enquiries")
+      .select("name, artist_requested, event_type, event_date, budget, status, email")
+      .in("status", ["new", "pending", "open"])
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (bookingLeads?.length) {
+      contextParts.push(`BOOKING LEADS NEEDING ATTENTION:\n${bookingLeads.map(b => `- ${b.name}${b.artist_requested ? ` → ${b.artist_requested}` : ''}${b.event_type ? ` (${b.event_type})` : ''}${b.event_date ? ` on ${b.event_date}` : ''}${b.budget ? `, budget R${b.budget}` : ''} — ${b.status}${b.email ? ` <${b.email}>` : ''}`).join("\n")}`);
+    }
+
+    const { data: memoryRows } = await supabase
+      .from("sydney_memory")
+      .select("key, value, category")
+      .eq("important", true)
+      .order("updated_at", { ascending: false })
+      .limit(30);
+    const memoryContext = memoryRows?.length
+      ? `\n\nSYDNEY MEMORY (facts the founder told me — remember these):\n${memoryRows.map(m => `- [${m.category}] ${m.key}: ${m.value}`).join("\n")}`
+      : "";
+
     const businessContext = contextParts.length > 0
+
       ? `\n\nCURRENT BUSINESS CONTEXT (live data from the database):\n${contextParts.join("\n\n")}`
       : "";
 
