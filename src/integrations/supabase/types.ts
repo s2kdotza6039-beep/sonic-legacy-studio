@@ -678,10 +678,14 @@ export type Database = {
       }
       content_posts: {
         Row: {
+          caption: string | null
           created_at: string
+          hashtags: string | null
           id: string
           platform: string | null
+          post_status: string
           posted_at: string | null
+          scheduled_at: string | null
           tag: string
           title: string
           updated_at: string
@@ -689,10 +693,14 @@ export type Database = {
           views: number
         }
         Insert: {
+          caption?: string | null
           created_at?: string
+          hashtags?: string | null
           id?: string
           platform?: string | null
+          post_status?: string
           posted_at?: string | null
+          scheduled_at?: string | null
           tag?: string
           title: string
           updated_at?: string
@@ -700,10 +708,14 @@ export type Database = {
           views?: number
         }
         Update: {
+          caption?: string | null
           created_at?: string
+          hashtags?: string | null
           id?: string
           platform?: string | null
+          post_status?: string
           posted_at?: string | null
+          scheduled_at?: string | null
           tag?: string
           title?: string
           updated_at?: string
