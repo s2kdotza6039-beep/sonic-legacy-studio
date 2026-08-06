@@ -253,7 +253,7 @@ export default function SecurityAuditLogViewer() {
           .select("*")
           .order("created_at", { ascending: false })
           .range(offset, offset + PAGE - 1);
-        q = applyFilters(q, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search });
+        q = applyFilters(q as unknown as SBQuery, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search }) as unknown as typeof q;
         const { data, error } = await q;
         if (error) throw error;
         const batch = (data as AuditRow[]) ?? [];
