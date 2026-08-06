@@ -446,7 +446,24 @@ ${businessContext}${vaultContext}${memoryContext}`;
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "remember",
+          description: "Save a fact, preference, goal, rule, or important decision the Founder stated into long-term memory. Use whenever he tells you something worth remembering forever.",
+          parameters: {
+            type: "object",
+            properties: {
+              key: { type: "string", description: "Short unique identifier for the fact, e.g. 'preferred_meeting_time'." },
+              value: { type: "string", description: "The fact itself, stated clearly." },
+              category: { type: "string", description: "Optional category, e.g. 'preference', 'goal', 'rule', 'decision', 'general'." },
+            },
+            required: ["key", "value"],
+          },
+        },
+      },
     ];
+
 
     const callAI = async (msgs: any[], stream: boolean) =>
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
