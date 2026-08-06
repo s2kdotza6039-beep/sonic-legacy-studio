@@ -896,6 +896,13 @@ export type Database = {
             referencedRelation: "tracks"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "download_tokens_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       email_drafts: {
@@ -1433,6 +1440,13 @@ export type Database = {
             referencedRelation: "tracks"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payments_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       phase2_deploy_state: {
@@ -1511,6 +1525,13 @@ export type Database = {
             columns: ["track_id"]
             isOneToOne: false
             referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playback_events_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2503,7 +2524,66 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      tracks_public: {
+        Row: {
+          artist_name: string | null
+          artist_slug: string | null
+          cover_url: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          id: string | null
+          is_active: boolean | null
+          pct_free: number | null
+          pct_gold: number | null
+          pct_standard: number | null
+          price_download_cents: number | null
+          price_gold_cents: number | null
+          price_standard_cents: number | null
+          slug: string | null
+          sort_order: number | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          artist_name?: string | null
+          artist_slug?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string | null
+          is_active?: boolean | null
+          pct_free?: number | null
+          pct_gold?: number | null
+          pct_standard?: number | null
+          price_download_cents?: number | null
+          price_gold_cents?: number | null
+          price_standard_cents?: number | null
+          slug?: string | null
+          sort_order?: number | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          artist_name?: string | null
+          artist_slug?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string | null
+          is_active?: boolean | null
+          pct_free?: number | null
+          pct_gold?: number | null
+          pct_standard?: number | null
+          price_download_cents?: number | null
+          price_gold_cents?: number | null
+          price_standard_cents?: number | null
+          slug?: string | null
+          sort_order?: number | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       approve_ai_draft: { Args: { _draft_id: string }; Returns: string }
