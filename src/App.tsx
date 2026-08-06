@@ -28,6 +28,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsConditions from "./pages/TermsConditions";
 import Popia from "./pages/Popia";
 import FloatingAssistant from "./components/FloatingAssistant";
+import PalesaAssistant from "./components/PalesaAssistant";
 import Unsubscribe from "./pages/Unsubscribe";
 import SandboxPayments from "./pages/SandboxPayments";
 import SecurityRulesDoc from "./pages/SecurityRulesDoc";
