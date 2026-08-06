@@ -27,6 +27,7 @@ const DailyBriefing = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [history, setHistory] = useState<Draft[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -37,13 +38,19 @@ const DailyBriefing = () => {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [d, t, r, de, ar, rel] = await Promise.all([
+    const [d, t, r, de, ar, rel, hist] = await Promise.all([
       supabase.from("ai_drafts").select("*").eq("status", "pending").order("created_at", { ascending: false }).limit(15),
       supabase.from("ceo_todos").select("*").eq("is_done", false).order("due_date", { ascending: true }).limit(12),
       supabase.from("reminders").select("*").eq("is_done", false).order("due_at", { ascending: true }).limit(10),
       supabase.from("deals").select("*").not("stage", "eq", "Closed").order("created_at", { ascending: false }).limit(10),
       supabase.from("artists").select("*").limit(20),
       supabase.from("releases").select("*").order("created_at", { ascending: false }).limit(8),
+      supabase
+        .from("ai_drafts")
+        .select("*")
+        .in("status", ["approved_and_published", "published", "rejected", "deferred"])
+        .order("updated_at", { ascending: false })
+        .limit(8),
     ]);
     if (d.data) setDrafts((d.data as Draft[]).filter((x) => x.status === "pending"));
     if (t.data) setTodos(t.data as Todo[]);
@@ -51,6 +58,7 @@ const DailyBriefing = () => {
     if (de.data) setDeals(de.data as Deal[]);
     if (ar.data) setArtists(ar.data as Artist[]);
     if (rel.data) setReleases(rel.data as Release[]);
+    if (hist.data) setHistory(hist.data as Draft[]);
     setLoading(false);
   };
 
