@@ -48,7 +48,7 @@ serve(async (req) => {
     const { data: events } = await supabase
       .from("events")
       .select("title, artist_name, venue, city, start_date, ticket_url")
-      .eq("published", true)
+      .eq("status", "published")
       .gte("start_date", nowIso)
       .order("start_date", { ascending: true })
       .limit(20);
@@ -60,8 +60,8 @@ serve(async (req) => {
 
     const { data: news } = await supabase
       .from("news_posts")
-      .select("title, excerpt, published_at, published")
-      .eq("published", true)
+      .select("title, excerpt, published_at")
+      .eq("status", "published")
       .order("published_at", { ascending: false })
       .limit(10);
     if (news?.length) {
