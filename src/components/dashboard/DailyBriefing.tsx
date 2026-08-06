@@ -14,9 +14,11 @@ import {
   Sparkles,
   Check,
   Clock3,
+  History,
+  XCircle,
 } from "lucide-react";
 
-type Draft = { id: string; draft_type: string; title: string; status: string; command: string | null; created_at: string };
+type Draft = { id: string; draft_type: string; title: string; status: string; command: string | null; created_at: string; published_at?: string | null; rejected_reason?: string | null };
 type Todo = { id: string; title: string; description: string | null; category: string; priority: string; due_date: string | null; is_done: boolean };
 type Reminder = { id: string; message: string; reminder_type: string; due_at: string; is_done: boolean };
 type Deal = { id: string; deal_title: string; client_name: string | null; stage: string; amount: number | null };
@@ -27,6 +29,7 @@ const DailyBriefing = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [history, setHistory] = useState<Draft[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -37,13 +40,19 @@ const DailyBriefing = () => {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [d, t, r, de, ar, rel] = await Promise.all([
+    const [d, t, r, de, ar, rel, hist] = await Promise.all([
       supabase.from("ai_drafts").select("*").eq("status", "pending").order("created_at", { ascending: false }).limit(15),
       supabase.from("ceo_todos").select("*").eq("is_done", false).order("due_date", { ascending: true }).limit(12),
       supabase.from("reminders").select("*").eq("is_done", false).order("due_at", { ascending: true }).limit(10),
       supabase.from("deals").select("*").not("stage", "eq", "Closed").order("created_at", { ascending: false }).limit(10),
       supabase.from("artists").select("*").limit(20),
       supabase.from("releases").select("*").order("created_at", { ascending: false }).limit(8),
+      supabase
+        .from("ai_drafts")
+        .select("*")
+        .in("status", ["approved_and_published", "published", "rejected", "deferred"])
+        .order("updated_at", { ascending: false })
+        .limit(8),
     ]);
     if (d.data) setDrafts((d.data as Draft[]).filter((x) => x.status === "pending"));
     if (t.data) setTodos(t.data as Todo[]);
@@ -51,6 +60,7 @@ const DailyBriefing = () => {
     if (de.data) setDeals(de.data as Deal[]);
     if (ar.data) setArtists(ar.data as Artist[]);
     if (rel.data) setReleases(rel.data as Release[]);
+    if (hist.data) setHistory(hist.data as Draft[]);
     setLoading(false);
   };
 
@@ -251,6 +261,40 @@ const DailyBriefing = () => {
                   <span className="ml-auto text-[10px] uppercase tracking-widest text-muted-foreground shrink-0">{r.status}</span>
                 </li>
               ))}
+            </ul>
+          )}
+        </div>
+
+        <div className={sectionCard}>
+          <p className={label}>
+            <History size={13} className="text-primary" /> Approval History
+          </p>
+          {history.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Nothing approved or rejected yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {history.map((h) => {
+                const isPublished = h.status === "approved_and_published" || h.status === "published";
+                const isRejected = h.status === "rejected";
+                return (
+                  <li key={h.id} className="flex items-start gap-2 border-b border-border/50 pb-2 last:border-0">
+                    {isPublished ? (
+                      <CheckCircle2 size={13} className="text-green-500 mt-1 shrink-0" />
+                    ) : isRejected ? (
+                      <XCircle size={13} className="text-destructive mt-1 shrink-0" />
+                    ) : (
+                      <Clock3 size={13} className="text-muted-foreground mt-1 shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm truncate">{h.title}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {isPublished ? "Published" : isRejected ? "Rejected" : "Deferred"}
+                        {h.rejected_reason ? ` · ${h.rejected_reason}` : ""}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
