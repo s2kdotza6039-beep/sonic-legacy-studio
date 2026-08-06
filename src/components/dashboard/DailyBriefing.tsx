@@ -16,7 +16,7 @@ import {
   Clock3,
 } from "lucide-react";
 
-type Draft = { id: string; draft_type: string; title: string; status: string; command: string | null; created_at: string };
+type Draft = { id: string; draft_type: string; title: string; status: string; command: string | null; created_at: string; published_at?: string | null; rejected_reason?: string | null };
 type Todo = { id: string; title: string; description: string | null; category: string; priority: string; due_date: string | null; is_done: boolean };
 type Reminder = { id: string; message: string; reminder_type: string; due_at: string; is_done: boolean };
 type Deal = { id: string; deal_title: string; client_name: string | null; stage: string; amount: number | null };
