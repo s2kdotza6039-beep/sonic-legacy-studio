@@ -166,7 +166,7 @@ export default function SecurityAuditLogViewer() {
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, to);
-    q = applyFilters(q, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search });
+    q = applyFilters(q as unknown as SBQuery, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search }) as unknown as typeof q;
     const { data, count, error } = await q;
     if (error) console.error("audit query failed", error);
     setRows((data as AuditRow[]) ?? []);
