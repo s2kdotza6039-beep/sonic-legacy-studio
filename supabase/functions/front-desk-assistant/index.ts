@@ -98,7 +98,38 @@ serve(async (req) => {
       contextParts.push(`UPCOMING EVENTS & SHOWS:\n${upcomingEvents.map(e => `- ${e.title}${e.artist_name ? ` — ${e.artist_name}` : ''} @ ${e.venue || 'TBD'}, ${e.city || ''}${e.country ? `, ${e.country}` : ''} on ${e.start_date}${e.ticket_url ? ` (tickets: ${e.ticket_url})` : ''}`).join("\n")}`);
     }
 
+    const { data: unpaidRoyalties } = await supabase
+      .from("royalty_income")
+      .select("source, month, gross, net, fees, territory")
+      .eq("paid", false)
+      .order("month", { ascending: false })
+      .limit(12);
+    if (unpaidRoyalties?.length) {
+      contextParts.push(`ROYALTIES (unpaid):\n${unpaidRoyalties.map(r => `- ${r.source} (${r.month}): gross R${r.gross || 0}, net R${r.net || 0}, fees R${r.fees || 0}${r.territory ? `, ${r.territory}` : ''}`).join("\n")}`);
+    }
+
+    const { data: bookingLeads } = await supabase
+      .from("booking_enquiries")
+      .select("name, artist_requested, event_type, event_date, budget, status, email")
+      .in("status", ["new", "pending", "open"])
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (bookingLeads?.length) {
+      contextParts.push(`BOOKING LEADS NEEDING ATTENTION:\n${bookingLeads.map(b => `- ${b.name}${b.artist_requested ? ` → ${b.artist_requested}` : ''}${b.event_type ? ` (${b.event_type})` : ''}${b.event_date ? ` on ${b.event_date}` : ''}${b.budget ? `, budget R${b.budget}` : ''} — ${b.status}${b.email ? ` <${b.email}>` : ''}`).join("\n")}`);
+    }
+
+    const { data: memoryRows } = await supabase
+      .from("sydney_memory")
+      .select("key, value, category")
+      .eq("important", true)
+      .order("updated_at", { ascending: false })
+      .limit(30);
+    const memoryContext = memoryRows?.length
+      ? `\n\nSYDNEY MEMORY (facts the founder told me — remember these):\n${memoryRows.map(m => `- [${m.category}] ${m.key}: ${m.value}`).join("\n")}`
+      : "";
+
     const businessContext = contextParts.length > 0
+
       ? `\n\nCURRENT BUSINESS CONTEXT (live data from the database):\n${contextParts.join("\n\n")}`
       : "";
 
@@ -340,7 +371,23 @@ UPGRADE ADVISOR & LOVABLE PROMPT ENGINE
 - You are the advisor and operator — NOT the deployer. Never claim you deployed or shipped anything. The Founder pastes the prompt.
 - Use the github_read tool to inspect the repo (s2kdotza6039-beep/sonic-legacy-studio) before proposing file-level changes, so your prompts reference real files and real code.
 
-${businessContext}${vaultContext}`;
+═══════════════════════════════════════════════════════════
+PROACTIVE NUDGES
+═══════════════════════════════════════════════════════════
+- At the start of every session and after answering, scan the live context for genuine nudges the Founder should act on NOW: expiring subscriptions, unpaid royalties, open booking leads, stalled deals, overdue reminders, quiet days with no activity, an artist who needs attention, or a great timing opportunity.
+- Surface them proactively with a clear recommended action. Don't wait to be asked.
+- If things are too quiet, say so plainly and give a 3-action remedy plan.
+- Do NOT manufacture urgency. Only real, actionable nudges grounded in the data above. Never fabricate.
+
+═══════════════════════════════════════════════════════════
+LONG-TERM MEMORY
+═══════════════════════════════════════════════════════════
+- Use the SYDNEY MEMORY context to personalize your answers and avoid repeating yourself or re-asking things you already know.
+- When the Founder states a preference, goal, rule, or important decision, call the remember tool to save it so you keep it forever and grow smarter with him.
+- Reference past decisions and preferences naturally in conversation.
+
+${businessContext}${vaultContext}${memoryContext}`;
+
 
     const tools = [
       {
@@ -399,7 +446,24 @@ ${businessContext}${vaultContext}`;
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "remember",
+          description: "Save a fact, preference, goal, rule, or important decision the Founder stated into long-term memory. Use whenever he tells you something worth remembering forever.",
+          parameters: {
+            type: "object",
+            properties: {
+              key: { type: "string", description: "Short unique identifier for the fact, e.g. 'preferred_meeting_time'." },
+              value: { type: "string", description: "The fact itself, stated clearly." },
+              category: { type: "string", description: "Optional category, e.g. 'preference', 'goal', 'rule', 'decision', 'general'." },
+            },
+            required: ["key", "value"],
+          },
+        },
+      },
     ];
+
 
     const callAI = async (msgs: any[], stream: boolean) =>
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -470,7 +534,24 @@ ${businessContext}${vaultContext}`;
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
+        } else if (tc.function?.name === "remember") {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const { error: mErr } = await supabase.from("sydney_memory").upsert({
+              key: String(args.key),
+              value: String(args.value),
+              category: args.category || "general",
+              source: "founder",
+              important: true,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "key" });
+            if (mErr) throw mErr;
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, message: "Remembered. This fact is now part of my long-term memory." }) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
         } else if (tc.function?.name === "github_read") {
+
           try {
             const args = JSON.parse(tc.function.arguments || "{}");
             const rawPath = String(args.path || "").replace(/^\/+/, "");

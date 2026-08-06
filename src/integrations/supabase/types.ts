@@ -2295,6 +2295,39 @@ export type Database = {
         }
         Relationships: []
       }
+      sydney_memory: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          important: boolean
+          key: string
+          source: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          important?: boolean
+          key: string
+          source?: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          important?: boolean
+          key?: string
+          source?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       territory_data: {
         Row: {
           actual_revenue: number
