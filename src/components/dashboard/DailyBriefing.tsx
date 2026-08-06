@@ -14,6 +14,8 @@ import {
   Sparkles,
   Check,
   Clock3,
+  History,
+  XCircle,
 } from "lucide-react";
 
 type Draft = { id: string; draft_type: string; title: string; status: string; command: string | null; created_at: string; published_at?: string | null; rejected_reason?: string | null };
