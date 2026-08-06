@@ -77,7 +77,12 @@ const csvEscape = (v: unknown) => {
 const firstDryResult = (row: AuditRow): DryResult | null =>
   (row.metadata?.results?.[0] as DryResult | undefined) ?? null;
 
-type SBQuery = ReturnType<ReturnType<typeof supabase.from>["select"]>;
+// Loose structural type: avoids coupling to a specific generated table type.
+type SBQuery = {
+  gte: (c: string, v: string) => SBQuery;
+  eq: (c: string, v: unknown) => SBQuery;
+  or: (f: string) => SBQuery;
+};
 const applyFilters = (
   q: SBQuery,
   opts: {
