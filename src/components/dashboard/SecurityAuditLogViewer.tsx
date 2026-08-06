@@ -77,7 +77,12 @@ const csvEscape = (v: unknown) => {
 const firstDryResult = (row: AuditRow): DryResult | null =>
   (row.metadata?.results?.[0] as DryResult | undefined) ?? null;
 
-type SBQuery = ReturnType<ReturnType<typeof supabase.from>["select"]>;
+// Loose structural type: avoids coupling to a specific generated table type.
+type SBQuery = {
+  gte: (c: string, v: string) => SBQuery;
+  eq: (c: string, v: unknown) => SBQuery;
+  or: (f: string) => SBQuery;
+};
 const applyFilters = (
   q: SBQuery,
   opts: {
@@ -161,7 +166,7 @@ export default function SecurityAuditLogViewer() {
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, to);
-    q = applyFilters(q, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search });
+    q = applyFilters(q as unknown as SBQuery, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search }) as unknown as typeof q;
     const { data, count, error } = await q;
     if (error) console.error("audit query failed", error);
     setRows((data as AuditRow[]) ?? []);
@@ -248,7 +253,7 @@ export default function SecurityAuditLogViewer() {
           .select("*")
           .order("created_at", { ascending: false })
           .range(offset, offset + PAGE - 1);
-        q = applyFilters(q, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search });
+        q = applyFilters(q as unknown as SBQuery, { sinceIso, action: effectiveAction, entity, actor, destination, matched, search }) as unknown as typeof q;
         const { data, error } = await q;
         if (error) throw error;
         const batch = (data as AuditRow[]) ?? [];
