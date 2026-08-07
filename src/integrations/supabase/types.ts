@@ -2504,6 +2504,39 @@ export type Database = {
         }
         Relationships: []
       }
+      upcoming_release: {
+        Row: {
+          countdown_active: boolean
+          created_at: string
+          id: number
+          release_date: string
+          subtitle: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          countdown_active?: boolean
+          created_at?: string
+          id?: number
+          release_date?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          countdown_active?: boolean
+          created_at?: string
+          id?: number
+          release_date?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
