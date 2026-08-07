@@ -213,14 +213,17 @@ const Assistant = () => {
         <div className="flex-1 flex flex-col">
           <div className="border-b border-border p-4 bg-card">
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")} className="gap-1 text-xs">
+                <ArrowLeft size={14} /> Return
+              </Button>
               <Bot size={20} className="text-primary" />
-              <h1 className="text-lg font-display font-bold">Front Desk Assistant</h1>
+              <h1 className="text-lg font-display font-bold">SYDNEY · Personal Assistant</h1>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Your AI-powered business assistant for S2K DOT ZA</p>
+            <p className="text-xs text-muted-foreground mt-1">Your private COO partner for S2KDOTZA — strategy, drafts and daily briefings</p>
           </div>
 
           <ScrollArea className="flex-1 p-4">
-            <div className="max-w-3xl mx-auto space-y-4">
+            <div className="max-w-4xl mx-auto space-y-4">
               {messages.length === 0 && (
                 <div className="text-center py-12">
                   <Bot size={48} className="text-primary mx-auto mb-4 opacity-50" />
