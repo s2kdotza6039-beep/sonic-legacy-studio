@@ -291,17 +291,28 @@ const Assistant = () => {
           </ScrollArea>
 
           <div className="border-t border-border p-4 bg-card">
-            <div className="max-w-3xl mx-auto flex gap-2">
+            <div className="max-w-4xl mx-auto w-full flex flex-col gap-2">
               <Textarea
                 value={input}
+                rows={inputRows}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Ask your Front Desk Assistant..."
-                className="resize-none min-h-[44px] max-h-[120px] text-sm"
+                placeholder="Ask SYDNEY anything..."
+                className="w-full resize-y min-h-[60px] max-h-[320px] text-sm"
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               />
-              <Button onClick={send} disabled={isLoading || !input.trim()} size="icon" className="shrink-0 h-[44px] w-[44px]">
-                <Send size={16} />
-              </Button>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setInputRows(r => Math.min(8, r + 2))}>
+                    <Sparkles size={12} /> Expand
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setInputRows(2)}>
+                    Reset
+                  </Button>
+                </div>
+                <Button onClick={send} disabled={isLoading || !input.trim()} size="sm" className="gap-1 text-xs">
+                  <Send size={14} /> Send
+                </Button>
+              </div>
             </div>
           </div>
         </div>
