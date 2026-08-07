@@ -33,7 +33,7 @@ export default function SandboxPayments() {
   useEffect(() => {
     supabase.from("tracks_public").select("*").eq("is_active", true).order("sort_order")
       .then(({ data }) => {
-        const list = (data ?? []) as Track[];
+        const list = (data ?? []) as unknown as Track[];
         setTracks(list);
         if (list[0]) setTrackId(list[0].id);
       });
