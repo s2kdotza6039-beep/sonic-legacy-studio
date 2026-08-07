@@ -1,12 +1,13 @@
 import Layout from "@/components/Layout";
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -23,6 +24,8 @@ const Assistant = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const [inputRows, setInputRows] = useState(2);
 
   useEffect(() => { fetchConversations(); }, []);
 
@@ -210,14 +213,17 @@ const Assistant = () => {
         <div className="flex-1 flex flex-col">
           <div className="border-b border-border p-4 bg-card">
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")} className="gap-1 text-xs">
+                <ArrowLeft size={14} /> Return
+              </Button>
               <Bot size={20} className="text-primary" />
-              <h1 className="text-lg font-display font-bold">Front Desk Assistant</h1>
+              <h1 className="text-lg font-display font-bold">SYDNEY · Personal Assistant</h1>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Your AI-powered business assistant for S2K DOT ZA</p>
+            <p className="text-xs text-muted-foreground mt-1">Your private COO partner for S2KDOTZA — strategy, drafts and daily briefings</p>
           </div>
 
           <ScrollArea className="flex-1 p-4">
-            <div className="max-w-3xl mx-auto space-y-4">
+            <div className="max-w-4xl mx-auto space-y-4">
               {messages.length === 0 && (
                 <div className="text-center py-12">
                   <Bot size={48} className="text-primary mx-auto mb-4 opacity-50" />
@@ -285,17 +291,28 @@ const Assistant = () => {
           </ScrollArea>
 
           <div className="border-t border-border p-4 bg-card">
-            <div className="max-w-3xl mx-auto flex gap-2">
+            <div className="max-w-4xl mx-auto w-full flex flex-col gap-2">
               <Textarea
                 value={input}
+                rows={inputRows}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Ask your Front Desk Assistant..."
-                className="resize-none min-h-[44px] max-h-[120px] text-sm"
+                placeholder="Ask SYDNEY anything..."
+                className="w-full resize-y min-h-[60px] max-h-[320px] text-sm"
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               />
-              <Button onClick={send} disabled={isLoading || !input.trim()} size="icon" className="shrink-0 h-[44px] w-[44px]">
-                <Send size={16} />
-              </Button>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setInputRows(r => Math.min(8, r + 2))}>
+                    <Sparkles size={12} /> Expand
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="text-xs" onClick={() => setInputRows(2)}>
+                    Reset
+                  </Button>
+                </div>
+                <Button onClick={send} disabled={isLoading || !input.trim()} size="sm" className="gap-1 text-xs">
+                  <Send size={14} /> Send
+                </Button>
+              </div>
             </div>
           </div>
         </div>
