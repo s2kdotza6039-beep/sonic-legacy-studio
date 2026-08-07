@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; images?: string[] };
 type Attachment = { name: string; content: string };
 type Pos = { x: number; y: number };
 
@@ -302,6 +302,18 @@ const FloatingAssistant = () => {
                       </div>
                     ) : m.content}
                   </div>
+                  {m.role === "user" && m.images && m.images.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {m.images.slice(0, 4).map((src, k) => (
+                        <img
+                          key={k}
+                          src={src}
+                          alt={`Attached image ${k + 1} analyzed by SYDNEY`}
+                          className="h-16 w-16 rounded object-cover border border-border"
+                        />
+                      ))}
+                    </div>
+                  )}
                   {m.role === "assistant" && m.content.length > 40 && (
                     <button onClick={() => saveAsDraft(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
                       <Mail size={9} /> Save as draft
