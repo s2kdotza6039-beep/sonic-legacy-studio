@@ -24,6 +24,8 @@ const Assistant = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const [inputRows, setInputRows] = useState(2);
 
   useEffect(() => { fetchConversations(); }, []);
 
