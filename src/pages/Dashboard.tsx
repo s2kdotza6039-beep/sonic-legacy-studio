@@ -169,7 +169,12 @@ const Dashboard = () => {
             {tab === "scorecard" && <ArtistScorecard />}
             {tab === "ideas" && <IdeasBoard />}
             {tab === "content" && <ContentEngine />}
-            {tab === "releases" && <ReleasesManager />}
+            {tab === "releases" && (
+              <>
+                <ReleaseCountdownAdmin />
+                <ReleasesManager />
+              </>
+            )}
             {tab === "revenue" && <RevenuePipeline />}
             {tab === "contracts" && <ContractVault />}
             {tab === "betting" && <BettingSystem />}
