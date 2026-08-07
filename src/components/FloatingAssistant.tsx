@@ -235,24 +235,51 @@ const FloatingAssistant = () => {
       {isOpen && (
         <div
           data-assistant-window
-          style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
-          className={`fixed z-50 w-[380px] h-[500px] border border-border bg-card shadow-2xl flex flex-col rounded-lg overflow-hidden ${pos ? "" : "bottom-6 right-6"}`}
+          style={
+            expanded
+              ? { width: "min(640px, 100vw)" }
+              : pos
+              ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" }
+              : undefined
+          }
+          className={`fixed z-50 border border-border bg-card shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${
+            expanded
+              ? "top-0 right-0 bottom-0 left-auto h-screen rounded-none"
+              : `w-[380px] h-[500px] rounded-lg ${pos ? "" : "bottom-6 right-6"}`
+          }`}
         >
           <div
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            className="flex items-center justify-between p-3 border-b border-border bg-secondary/30 cursor-grab active:cursor-grabbing touch-none select-none"
+            onPointerDown={expanded ? undefined : onPointerDown}
+            onPointerMove={expanded ? undefined : onPointerMove}
+            onPointerUp={expanded ? undefined : endDrag}
+            onPointerCancel={expanded ? undefined : endDrag}
+            className={`flex items-center justify-between p-3 border-b border-border bg-secondary/30 touch-none select-none ${
+              expanded ? "" : "cursor-grab active:cursor-grabbing"
+            }`}
           >
             <div className="flex items-center gap-2">
-              <GripVertical size={14} className="text-muted-foreground" />
+              {!expanded && <GripVertical size={14} className="text-muted-foreground" />}
               <Bot size={16} className="text-primary" />
               <span className="text-sm font-bold">SYDNEY · Personal Assistant</span>
             </div>
             <div className="flex items-center gap-1">
-              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow(true)} className="p-1 hover:text-primary"><Maximize2 size={14} /></button>
-              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow()} className="p-1 hover:text-primary"><X size={14} /></button>
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => setExpanded((v) => !v)}
+                aria-label={expanded ? "Shrink assistant" : "Expand assistant"}
+                className="p-1 hover:text-primary"
+              >
+                {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => closeWindow(true)}
+                aria-label="Open full assistant page"
+                className="p-1 hover:text-primary"
+              >
+                <ExternalLink size={14} />
+              </button>
+              <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow()} aria-label="Close assistant" className="p-1 hover:text-primary"><X size={14} /></button>
             </div>
           </div>
 
