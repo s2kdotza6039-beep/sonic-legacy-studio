@@ -33,6 +33,7 @@ import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
 import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
+import ReleaseCountdownAdmin from "@/components/dashboard/ReleaseCountdownAdmin";
 import DailyBriefing from "@/components/dashboard/DailyBriefing";
 import { Target } from "lucide-react";
 

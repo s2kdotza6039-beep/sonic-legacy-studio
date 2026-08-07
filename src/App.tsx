@@ -18,6 +18,7 @@ import Careers from "./pages/Careers";
 import Contact from "./pages/Contact";
 import Watch from "./pages/Watch";
 import Listen from "./pages/Listen";
+import UpcomingReleases from "./pages/UpcomingReleases";
 import Events from "./pages/Events";
 import Dashboard from "./pages/Dashboard";
 import Royalties from "./pages/Royalties";
@@ -61,6 +62,7 @@ const App = () => (
             <Route path="/popia" element={<Popia />} />
             <Route path="/watch" element={<Watch />} />
             <Route path="/listen" element={<Listen />} />
+            <Route path="/upcoming" element={<UpcomingReleases />} />
             <Route path="/events" element={<Events />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
