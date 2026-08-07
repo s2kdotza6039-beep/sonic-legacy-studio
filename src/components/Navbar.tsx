@@ -12,7 +12,7 @@ const navLinks = [
   { label: "Partnerships", path: "/partnerships" },
   { label: "News", path: "/news" },
   { label: "Watch", path: "/watch" },
-  { label: "Listen", path: "/listen" },
+  { label: "Upcoming", path: "/upcoming" },
   { label: "Careers", path: "/careers" },
   { label: "Contact", path: "/contact" },
 ];

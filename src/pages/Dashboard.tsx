@@ -33,6 +33,7 @@ import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
 import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
+import ReleaseCountdownAdmin from "@/components/dashboard/ReleaseCountdownAdmin";
 import DailyBriefing from "@/components/dashboard/DailyBriefing";
 import { Target } from "lucide-react";
 
@@ -168,7 +169,12 @@ const Dashboard = () => {
             {tab === "scorecard" && <ArtistScorecard />}
             {tab === "ideas" && <IdeasBoard />}
             {tab === "content" && <ContentEngine />}
-            {tab === "releases" && <ReleasesManager />}
+            {tab === "releases" && (
+              <>
+                <ReleaseCountdownAdmin />
+                <ReleasesManager />
+              </>
+            )}
             {tab === "revenue" && <RevenuePipeline />}
             {tab === "contracts" && <ContractVault />}
             {tab === "betting" && <BettingSystem />}

@@ -214,7 +214,7 @@ const Assistant = () => {
           <div className="border-b border-border p-4 bg-card">
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")} className="gap-1 text-xs">
-                <ArrowLeft size={14} /> Return
+                <ArrowLeft size={14} /> Back to Workspace
               </Button>
               <Bot size={20} className="text-primary" />
               <h1 className="text-lg font-display font-bold">SYDNEY · Personal Assistant</h1>
