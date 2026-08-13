@@ -369,8 +369,6 @@ const FloatingAssistant = () => {
                       </button>
                     </div>
                   )}
-
-                  )}
                 </div>
               </div>
             ))}
