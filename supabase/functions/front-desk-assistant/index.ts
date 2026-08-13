@@ -535,7 +535,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       const m = (f.mime || "").toLowerCase();
       try {
         if (m.includes("pdf") || n.endsWith(".pdf")) {
-          const pdfjs: any = await import("https://esm.sh/pdfjs-dist@4.6.82/legacy/build/pdf.mjs");
+          const pdfjs: any = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs");
           const doc = await pdfjs.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
           let text = "";
           const pages = Math.min(doc.numPages, 30);
