@@ -135,16 +135,36 @@ const Assistant = () => {
   };
 
   const send = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachments.length === 0) || isLoading) return;
     if (!activeConvo) {
       await newConversation();
     }
 
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    const textFiles = attachments.filter(a => a.kind === "text");
+    const imageFiles = attachments.filter(a => a.kind === "image");
+    const audioFiles = attachments.filter(a => a.kind === "audio");
+
+    const attachBlock = textFiles.length
+      ? `[ATTACHED FILES — please read and discuss these]:\n` +
+        textFiles.map(a => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
+        `\n--- END OF FILES ---\n\n`
+      : "";
+    const mediaNote = (imageFiles.length || audioFiles.length)
+      ? `[ATTACHED MEDIA]: ${[...imageFiles, ...audioFiles].map(a => `${a.kind}: ${a.name}`).join(", ")}\n\n`
+      : "";
+
+    const userMsg: Msg = {
+      role: "user",
+      content: `${attachBlock}${mediaNote}${input.trim()}`,
+      images: imageFiles.length ? imageFiles.map(a => a.content) : undefined,
+      audio: audioFiles.length ? audioFiles.map(a => a.content) : undefined,
+    };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     setInput("");
+    setAttachments([]);
     setIsLoading(true);
+
 
     // Save user message
     if (activeConvo) {
