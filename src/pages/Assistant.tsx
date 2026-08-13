@@ -46,6 +46,45 @@ const Assistant = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const [inputRows, setInputRows] = useState(2);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+
+  const readAsDataUrl = (f: File) =>
+    new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("read failed"));
+      r.readAsDataURL(f);
+    });
+
+  const addFiles = async (files: FileList | File[]) => {
+    for (const f of Array.from(files).slice(0, 5)) {
+      try {
+        if (f.type.startsWith("image/")) {
+          if (f.size > 5 * 1024 * 1024) {
+            toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" });
+            continue;
+          }
+          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content: await readAsDataUrl(f) }]);
+        } else if (f.type.startsWith("audio/")) {
+          if (f.size > 20 * 1024 * 1024) {
+            toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" });
+            continue;
+          }
+          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content: await readAsDataUrl(f) }]);
+        } else {
+          if (f.size > 500 * 1024) {
+            toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
+            continue;
+          }
+          setAttachments((prev) => [...prev, { name: f.name, kind: "text", content: await f.text() }]);
+        }
+      } catch {
+        toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
+      }
+    }
+  };
+
 
   useEffect(() => { fetchConversations(); }, []);
 
