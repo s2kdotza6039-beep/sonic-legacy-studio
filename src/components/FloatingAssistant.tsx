@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bot, Send, X, Maximize2, Minimize2, ExternalLink, Mail, GripVertical, Sparkles, Paperclip, FileText } from "lucide-react";
+import { Bot, Send, X, Maximize2, Minimize2, ExternalLink, Mail, GripVertical, Sparkles, Paperclip, FileText, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +34,24 @@ const readPos = (): Pos | null => {
   }
 };
 
+export const speak = (text: string) => {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const clean = text
+    .replace(/```[\s\S]*?```/g, " code block ")
+    .replace(/[*_#>`~|]/g, "")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return;
+  const u = new SpeechSynthesisUtterance(clean);
+  const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith("en"));
+  if (voice) u.voice = voice;
+  u.lang = voice?.lang || "en-US";
+  synth.speak(u);
+};
+
 const FloatingAssistant = () => {
   const { isFounder } = useUserRole();
   const { toast } = useToast();
@@ -49,6 +67,33 @@ const FloatingAssistant = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const attachInputRef = useRef<HTMLInputElement>(null);
+  const [nudge, setNudge] = useState<string | null>(null);
+  const lastNudgeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from("reminders")
+        .select("id,message,due_at")
+        .eq("is_done", false)
+        .lte("due_at", soon)
+        .order("due_at", { ascending: true })
+        .limit(1);
+      if (cancelled || !data?.length) return;
+      const msg = `⏰ Reminder: ${data[0].message}`;
+      if (lastNudgeRef.current === msg) return;
+      lastNudgeRef.current = msg;
+      setNudge(msg);
+      setIsOpen(true);
+    };
+    check();
+    const t = setInterval(check, 30000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
+
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -283,7 +328,18 @@ const FloatingAssistant = () => {
             </div>
           </div>
 
+          {nudge && (
+            <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2">
+              <Sparkles size={12} className="text-primary shrink-0" />
+              <p className="flex-1 text-[11px] leading-snug">{nudge}</p>
+              <button onClick={() => setNudge(null)} aria-label="Dismiss reminder" className="text-muted-foreground hover:text-primary">
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+
             {messages.length === 0 && (
               <div className="text-center py-6 text-xs text-muted-foreground">
                 <Bot size={24} className="mx-auto mb-2 opacity-50" />
@@ -315,9 +371,14 @@ const FloatingAssistant = () => {
                     </div>
                   )}
                   {m.role === "assistant" && m.content.length > 40 && (
-                    <button onClick={() => saveAsDraft(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
-                      <Mail size={9} /> Save as draft
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => saveAsDraft(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
+                        <Mail size={9} /> Save as draft
+                      </button>
+                      <button onClick={() => speak(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
+                        <Volume2 size={9} /> Listen
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

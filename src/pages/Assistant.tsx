@@ -7,11 +7,31 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[] };
+type Attachment = { name: string; kind: "text" | "image" | "audio"; content: string };
 type Convo = { id: string; title: string; created_at: string };
+
+const speak = (text: string) => {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const clean = text
+    .replace(/```[\s\S]*?```/g, " code block ")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/[*_#>`~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return;
+  const u = new SpeechSynthesisUtterance(clean);
+  const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith("en"));
+  if (voice) u.voice = voice;
+  u.lang = voice?.lang || "en-US";
+  synth.speak(u);
+};
+
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/front-desk-assistant`;
 
@@ -26,6 +46,49 @@ const Assistant = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const [inputRows, setInputRows] = useState(2);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+
+  const readAsDataUrl = (f: File) =>
+    new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("read failed"));
+      r.readAsDataURL(f);
+    });
+
+  const addFiles = async (files: FileList | File[]) => {
+    for (const f of Array.from(files).slice(0, 5)) {
+      try {
+        if (f.type.startsWith("image/")) {
+          if (f.size > 5 * 1024 * 1024) {
+            toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" });
+            continue;
+          }
+          const content = await readAsDataUrl(f);
+          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content }]);
+        } else if (f.type.startsWith("audio/")) {
+          if (f.size > 20 * 1024 * 1024) {
+            toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" });
+            continue;
+          }
+          const content = await readAsDataUrl(f);
+          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content }]);
+        } else {
+          if (f.size > 500 * 1024) {
+            toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
+            continue;
+          }
+          const content = await f.text();
+          setAttachments((prev) => [...prev, { name: f.name, kind: "text", content }]);
+        }
+
+      } catch {
+        toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
+      }
+    }
+  };
+
 
   useEffect(() => { fetchConversations(); }, []);
 
@@ -72,16 +135,36 @@ const Assistant = () => {
   };
 
   const send = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachments.length === 0) || isLoading) return;
     if (!activeConvo) {
       await newConversation();
     }
 
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    const textFiles = attachments.filter(a => a.kind === "text");
+    const imageFiles = attachments.filter(a => a.kind === "image");
+    const audioFiles = attachments.filter(a => a.kind === "audio");
+
+    const attachBlock = textFiles.length
+      ? `[ATTACHED FILES — please read and discuss these]:\n` +
+        textFiles.map(a => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
+        `\n--- END OF FILES ---\n\n`
+      : "";
+    const mediaNote = (imageFiles.length || audioFiles.length)
+      ? `[ATTACHED MEDIA]: ${[...imageFiles, ...audioFiles].map(a => `${a.kind}: ${a.name}`).join(", ")}\n\n`
+      : "";
+
+    const userMsg: Msg = {
+      role: "user",
+      content: `${attachBlock}${mediaNote}${input.trim()}`,
+      images: imageFiles.length ? imageFiles.map(a => a.content) : undefined,
+      audio: audioFiles.length ? audioFiles.map(a => a.content) : undefined,
+    };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     setInput("");
+    setAttachments([]);
     setIsLoading(true);
+
 
     // Save user message
     if (activeConvo) {
@@ -117,7 +200,7 @@ const Assistant = () => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ messages: allMessages, conversation_id: activeConvo }),
+        body: JSON.stringify({ messages: allMessages.map(({ role, content }) => ({ role, content })), conversation_id: activeConvo }),
       });
 
       if (!resp.ok) {
@@ -262,14 +345,37 @@ const Assistant = () => {
                         </div>
                       ) : m.content}
                     </div>
-                    {m.role === "assistant" && m.content.length > 40 && (
-                      <button
-                        onClick={() => saveAsDraft(m.content)}
-                        className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1"
-                      >
-                        <Mail size={10} /> Save as draft
-                      </button>
+                    {m.role === "user" && m.images && m.images.length > 0 && (
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {m.images.slice(0, 4).map((src, k) => (
+                          <img key={k} src={src} alt={`Attached image ${k + 1} sent to SYDNEY`} className="h-16 w-16 rounded object-cover border border-border" />
+                        ))}
+                      </div>
                     )}
+                    {m.role === "user" && m.audio && m.audio.length > 0 && (
+                      <div className="flex flex-col gap-1 items-end">
+                        {m.audio.map((src, k) => (
+                          <audio key={k} src={src} controls className="h-8" />
+                        ))}
+                      </div>
+                    )}
+                    {m.role === "assistant" && m.content.length > 40 && (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => saveAsDraft(m.content)}
+                          className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1"
+                        >
+                          <Mail size={10} /> Save as draft
+                        </button>
+                        <button
+                          onClick={() => speak(m.content)}
+                          className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1"
+                        >
+                          <Volume2 size={10} /> Listen
+                        </button>
+                      </div>
+                    )}
+
                   </div>
                   {m.role === "user" && (
                     <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center shrink-0">
@@ -292,6 +398,25 @@ const Assistant = () => {
 
           <div className="border-t border-border p-4 bg-card">
             <div className="max-w-4xl mx-auto w-full flex flex-col gap-2">
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((a, i) => (
+                    <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-1 text-[10px]">
+                      {a.kind === "image" ? (
+                        <img src={a.content} alt={a.name} className="h-6 w-6 rounded object-cover" />
+                      ) : a.kind === "audio" ? (
+                        <AudioLines size={12} className="text-primary" />
+                      ) : (
+                        <FileText size={12} className="text-primary" />
+                      )}
+                      <span className="max-w-[140px] truncate">{a.name}</span>
+                      <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
               <Textarea
                 value={input}
                 rows={inputRows}
@@ -302,6 +427,17 @@ const Assistant = () => {
               />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
+                  <input
+                    ref={attachInputRef}
+                    type="file"
+                    multiple
+                    accept=".txt,.md,.csv,.json,.log,.ts,.tsx,.js,.html,.xml,.yml,.yaml,text/*,audio/*,image/*"
+                    className="hidden"
+                    onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
+                  />
+                  <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => attachInputRef.current?.click()}>
+                    <Paperclip size={12} /> Attach
+                  </Button>
                   <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setInputRows(r => Math.min(8, r + 2))}>
                     <Sparkles size={12} /> Expand
                   </Button>
@@ -309,9 +445,10 @@ const Assistant = () => {
                     Reset
                   </Button>
                 </div>
-                <Button onClick={send} disabled={isLoading || !input.trim()} size="sm" className="gap-1 text-xs">
+                <Button onClick={send} disabled={isLoading || (!input.trim() && attachments.length === 0)} size="sm" className="gap-1 text-xs">
                   <Send size={14} /> Send
                 </Button>
+
               </div>
             </div>
           </div>
