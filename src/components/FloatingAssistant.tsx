@@ -328,7 +328,18 @@ const FloatingAssistant = () => {
             </div>
           </div>
 
+          {nudge && (
+            <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2">
+              <Sparkles size={12} className="text-primary shrink-0" />
+              <p className="flex-1 text-[11px] leading-snug">{nudge}</p>
+              <button onClick={() => setNudge(null)} aria-label="Dismiss reminder" className="text-muted-foreground hover:text-primary">
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+
             {messages.length === 0 && (
               <div className="text-center py-6 text-xs text-muted-foreground">
                 <Bot size={24} className="mx-auto mb-2 opacity-50" />
