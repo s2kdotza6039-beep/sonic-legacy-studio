@@ -360,9 +360,16 @@ const FloatingAssistant = () => {
                     </div>
                   )}
                   {m.role === "assistant" && m.content.length > 40 && (
-                    <button onClick={() => saveAsDraft(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
-                      <Mail size={9} /> Save as draft
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => saveAsDraft(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
+                        <Mail size={9} /> Save as draft
+                      </button>
+                      <button onClick={() => speak(m.content)} className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
+                        <Volume2 size={9} /> Listen
+                      </button>
+                    </div>
+                  )}
+
                   )}
                 </div>
               </div>
