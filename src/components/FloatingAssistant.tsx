@@ -446,7 +446,13 @@ const FloatingAssistant = () => {
               <div className="flex flex-wrap gap-1 pb-2">
                 {attachments.map((a, i) => (
                   <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px]">
-                    <FileText size={10} className="text-primary" />
+                    {a.kind === "image" && a.dataUrl ? (
+                      <img src={a.dataUrl} alt={`Attached ${a.name}`} className="h-4 w-4 rounded object-cover" />
+                    ) : a.kind === "audio" ? (
+                      <AudioLines size={10} className="text-primary" />
+                    ) : (
+                      <FileText size={10} className="text-primary" />
+                    )}
                     <span className="max-w-[120px] truncate">{a.name}</span>
                     <button onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
                       <X size={10} />
@@ -463,7 +469,8 @@ const FloatingAssistant = () => {
               ref={attachInputRef}
               type="file"
               multiple
-              accept=".txt,.md,.csv,.json,.log,.ts,.tsx,.js,.html,.xml,.yml,.yaml,text/*"
+              accept=".txt,.md,.csv,.json,.log,.ts,.tsx,.js,.html,.xml,.yml,.yaml,.pdf,.doc,.docx,.xls,.xlsx,text/*,image/*,audio/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
               className="hidden"
               onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
             />
