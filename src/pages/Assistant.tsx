@@ -200,7 +200,7 @@ const Assistant = () => {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ messages: allMessages.map(({ role, content }) => ({ role, content })), conversation_id: activeConvo }),
+        body: JSON.stringify({ messages: allMessages, conversation_id: activeConvo }),
       });
 
       if (!resp.ok) {

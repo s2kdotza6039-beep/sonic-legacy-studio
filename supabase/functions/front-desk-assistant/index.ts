@@ -515,13 +515,95 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     ];
 
 
+    const sheetToText = (XLSX: any, sheet: any): string => {
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+      return rows.slice(0, 200)
+        .map((r) => (r || []).slice(0, 20).map((c: any) => (c ?? "").toString().trim()).join(" | "))
+        .join("\n");
+    };
+
+    const b64ToBytes = (b64: string) => {
+      const bin = atob(b64);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    };
+
+    const extractDoc = async (f: { name: string; mime?: string; base64: string }) => {
+      const bytes = b64ToBytes(f.base64);
+      const n = (f.name || "").toLowerCase();
+      const m = (f.mime || "").toLowerCase();
+      try {
+        if (m.includes("pdf") || n.endsWith(".pdf")) {
+          const pdfjs: any = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs");
+          const doc = await pdfjs.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
+          let text = "";
+          const pages = Math.min(doc.numPages, 30);
+          for (let p = 1; p <= pages; p++) {
+            const page = await doc.getPage(p);
+            const tc = await page.getTextContent();
+            text += tc.items.map((i: any) => i.str).join(" ") + "\n";
+          }
+          return text;
+        }
+        if (m.includes("sheet") || m.includes("excel") || m.includes("csv") || /\.(xlsx|xls|csv)$/.test(n)) {
+          const XLSX: any = await import("https://esm.sh/xlsx@0.18.5");
+          const wb = XLSX.read(bytes, { type: "array" });
+          return wb.SheetNames.slice(0, 5)
+            .map((s: string) => `# Sheet: ${s}\n${sheetToText(XLSX, wb.Sheets[s])}`)
+            .join("\n\n");
+        }
+        if (m.includes("word") || /\.(docx|doc)$/.test(n)) {
+          const mammoth: any = await import("https://esm.sh/mammoth@1.8.0");
+          const r = await mammoth.extractRawText({ arrayBuffer: bytes.buffer });
+          return r.value || "";
+        }
+      } catch (e) {
+        return `[Could not parse ${f.name}: ${(e as Error).message}]`;
+      }
+      try {
+        return new TextDecoder().decode(bytes);
+      } catch {
+        return `[Unreadable file ${f.name}]`;
+      }
+    };
+
+    const toGeminiMsgs = async (msgs: any[]) => {
+      const out: any[] = [];
+      for (const m of msgs) {
+        const hasMedia = m?.role === "user" && (m.images?.length || m.audio?.length || m.files?.length);
+        if (!hasMedia) {
+          out.push({ role: m.role, content: typeof m.content === "string" ? m.content : String(m.content ?? "") });
+          continue;
+        }
+        const parts: any[] = [];
+        if (m.content) parts.push({ type: "text", text: m.content });
+        for (const url of (m.images || []).slice(0, 4)) {
+          parts.push({ type: "image_url", image_url: { url } });
+        }
+        for (const a of (m.audio || []).slice(0, 1)) {
+          const mimeMatch = /^data:([^;]+);base64,(.*)$/.exec(a);
+          if (!mimeMatch) continue;
+          const mime = mimeMatch[1];
+          const format = mime.includes("wav") ? "wav" : mime.includes("ogg") ? "ogg" : "mp3";
+          parts.push({ type: "input_audio", input_audio: { data: mimeMatch[2], format } });
+        }
+        for (const f of (m.files || []).slice(0, 3)) {
+          const text = (await extractDoc(f)).slice(0, 15000);
+          parts.push({ type: "text", text: `\n--- DOCUMENT: ${f.name} ---\n${text}\n--- END DOCUMENT ---` });
+        }
+        out.push({ role: "user", content: parts });
+      }
+      return out;
+    };
+
     const callAI = async (msgs: any[], stream: boolean) =>
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
-          messages: [{ role: "system", content: systemPrompt }, ...msgs],
+          messages: [{ role: "system", content: systemPrompt }, ...(await toGeminiMsgs(msgs))],
           tools,
           stream,
         }),
@@ -529,6 +611,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
 
     // First call: non-streaming so we can detect tool calls reliably.
     const first = await callAI(messages, false);
+
     if (!first.ok) {
       if (first.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (first.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
