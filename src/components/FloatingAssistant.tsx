@@ -67,6 +67,33 @@ const FloatingAssistant = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const attachInputRef = useRef<HTMLInputElement>(null);
+  const [nudge, setNudge] = useState<string | null>(null);
+  const lastNudgeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      const soon = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from("reminders")
+        .select("id,message,due_at")
+        .eq("is_done", false)
+        .lte("due_at", soon)
+        .order("due_at", { ascending: true })
+        .limit(1);
+      if (cancelled || !data?.length) return;
+      const msg = `⏰ Reminder: ${data[0].message}`;
+      if (lastNudgeRef.current === msg) return;
+      lastNudgeRef.current = msg;
+      setNudge(msg);
+      setIsOpen(true);
+    };
+    check();
+    const t = setInterval(check, 30000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
+
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
