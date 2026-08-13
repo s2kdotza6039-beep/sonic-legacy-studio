@@ -398,6 +398,25 @@ const Assistant = () => {
 
           <div className="border-t border-border p-4 bg-card">
             <div className="max-w-4xl mx-auto w-full flex flex-col gap-2">
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((a, i) => (
+                    <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-1 text-[10px]">
+                      {a.kind === "image" ? (
+                        <img src={a.content} alt={a.name} className="h-6 w-6 rounded object-cover" />
+                      ) : a.kind === "audio" ? (
+                        <AudioLines size={12} className="text-primary" />
+                      ) : (
+                        <FileText size={12} className="text-primary" />
+                      )}
+                      <span className="max-w-[140px] truncate">{a.name}</span>
+                      <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
               <Textarea
                 value={input}
                 rows={inputRows}
@@ -408,6 +427,17 @@ const Assistant = () => {
               />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
+                  <input
+                    ref={attachInputRef}
+                    type="file"
+                    multiple
+                    accept=".txt,.md,.csv,.json,.log,.ts,.tsx,.js,.html,.xml,.yml,.yaml,text/*,audio/*,image/*"
+                    className="hidden"
+                    onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
+                  />
+                  <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => attachInputRef.current?.click()}>
+                    <Paperclip size={12} /> Attach
+                  </Button>
                   <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setInputRows(r => Math.min(8, r + 2))}>
                     <Sparkles size={12} /> Expand
                   </Button>
@@ -415,9 +445,10 @@ const Assistant = () => {
                     Reset
                   </Button>
                 </div>
-                <Button onClick={send} disabled={isLoading || !input.trim()} size="sm" className="gap-1 text-xs">
+                <Button onClick={send} disabled={isLoading || (!input.trim() && attachments.length === 0)} size="sm" className="gap-1 text-xs">
                   <Send size={14} /> Send
                 </Button>
+
               </div>
             </div>
           </div>
