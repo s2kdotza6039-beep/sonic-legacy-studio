@@ -345,14 +345,37 @@ const Assistant = () => {
                         </div>
                       ) : m.content}
                     </div>
-                    {m.role === "assistant" && m.content.length > 40 && (
-                      <button
-                        onClick={() => saveAsDraft(m.content)}
-                        className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1"
-                      >
-                        <Mail size={10} /> Save as draft
-                      </button>
+                    {m.role === "user" && m.images && m.images.length > 0 && (
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {m.images.slice(0, 4).map((src, k) => (
+                          <img key={k} src={src} alt={`Attached image ${k + 1} sent to SYDNEY`} className="h-16 w-16 rounded object-cover border border-border" />
+                        ))}
+                      </div>
                     )}
+                    {m.role === "user" && m.audio && m.audio.length > 0 && (
+                      <div className="flex flex-col gap-1 items-end">
+                        {m.audio.map((src, k) => (
+                          <audio key={k} src={src} controls className="h-8" />
+                        ))}
+                      </div>
+                    )}
+                    {m.role === "assistant" && m.content.length > 40 && (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => saveAsDraft(m.content)}
+                          className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1"
+                        >
+                          <Mail size={10} /> Save as draft
+                        </button>
+                        <button
+                          onClick={() => speak(m.content)}
+                          className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1"
+                        >
+                          <Volume2 size={10} /> Listen
+                        </button>
+                      </div>
+                    )}
+
                   </div>
                   {m.role === "user" && (
                     <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center shrink-0">
