@@ -150,18 +150,42 @@ const FloatingAssistant = () => {
     [pos, savePos, navigate]
   );
 
+  const readAsDataUrl = (f: File) =>
+    new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("read failed"));
+      r.readAsDataURL(f);
+    });
+
   const addFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files).slice(0, 5);
     for (const f of list) {
-      if (f.size > 500 * 1024) {
-        toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
-        continue;
-      }
+      const name = f.name.toLowerCase();
+      const isDoc = /\.(pdf|doc|docx|xls|xlsx|csv)$/.test(name) ||
+        /pdf|word|excel|sheet|csv/.test(f.type);
       try {
-        const text = await f.text();
-        setAttachments((prev) => [...prev, { name: f.name, content: text }]);
+        if (f.type.startsWith("image/")) {
+          if (f.size > 5 * 1024 * 1024) { toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" }); continue; }
+          const dataUrl = await readAsDataUrl(f);
+          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "image", dataUrl, mime: f.type }]);
+        } else if (f.type.startsWith("audio/")) {
+          if (f.size > 20 * 1024 * 1024) { toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" }); continue; }
+          const dataUrl = await readAsDataUrl(f);
+          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "audio", dataUrl, mime: f.type }]);
+        } else if (isDoc) {
+          if (f.size > 15 * 1024 * 1024) { toast({ title: "Document too large", description: `${f.name} exceeds 15MB.`, variant: "destructive" }); continue; }
+          const dataUrl = await readAsDataUrl(f);
+          const base64 = dataUrl.split(",")[1] ?? "";
+          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "file", mime: f.type || "application/octet-stream", base64 }]);
+          toast({ title: "Document attached", description: `${f.name} will be read by SYDNEY.` });
+        } else {
+          if (f.size > 500 * 1024) { toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" }); continue; }
+          const text = await f.text();
+          setAttachments((prev) => [...prev, { name: f.name, content: text, kind: "text" }]);
+        }
       } catch {
-        toast({ title: "Unreadable file", description: `${f.name} could not be read as text.`, variant: "destructive" });
+        toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
       }
     }
   }, [toast]);
@@ -170,13 +194,30 @@ const FloatingAssistant = () => {
 
   const send = async () => {
     if ((!input.trim() && attachments.length === 0) || isLoading) return;
-    const attachBlock = attachments.length
+    const textAtts = attachments.filter((a) => (a.kind ?? "text") === "text");
+    const imageAtts = attachments.filter((a) => a.kind === "image");
+    const audioAtts = attachments.filter((a) => a.kind === "audio");
+    const fileAtts = attachments.filter((a) => a.kind === "file");
+    const attachBlock = textAtts.length
       ? `[ATTACHED FILES — please read and discuss these]:\n` +
-        attachments.map((a) => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
+        textAtts.map((a) => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
         `\n--- END OF FILES ---\n\n`
       : "";
-    const userMsg: Msg = { role: "user", content: `${attachBlock}${input.trim()}` };
+    const mediaNote = [
+      imageAtts.length ? `${imageAtts.length} image(s)` : null,
+      audioAtts.length ? `${audioAtts.length} audio file(s)` : null,
+      fileAtts.length ? `${fileAtts.length} document(s): ${fileAtts.map((f) => f.name).join(", ")}` : null,
+    ].filter(Boolean).join(", ");
+    const noteBlock = mediaNote ? `[ATTACHED MEDIA: ${mediaNote} — please analyse them]\n\n` : "";
+    const userMsg: Msg = {
+      role: "user",
+      content: `${attachBlock}${noteBlock}${input.trim()}`,
+      ...(imageAtts.length ? { images: imageAtts.map((a) => a.dataUrl!) } : {}),
+      ...(audioAtts.length ? { audio: audioAtts.map((a) => a.dataUrl!) } : {}),
+      ...(fileAtts.length ? { files: fileAtts.map((a) => ({ name: a.name, mime: a.mime!, base64: a.base64! })) } : {}),
+    };
     const allMessages = [...messages, userMsg];
+
     setMessages(allMessages);
     setInput("");
     setAttachments([]);
