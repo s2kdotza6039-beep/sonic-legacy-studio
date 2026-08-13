@@ -7,11 +7,31 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[] };
+type Attachment = { name: string; kind: "text" | "image" | "audio"; content: string };
 type Convo = { id: string; title: string; created_at: string };
+
+const speak = (text: string) => {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const clean = text
+    .replace(/```[\s\S]*?```/g, " code block ")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/[*_#>`~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return;
+  const u = new SpeechSynthesisUtterance(clean);
+  const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith("en"));
+  if (voice) u.voice = voice;
+  u.lang = voice?.lang || "en-US";
+  synth.speak(u);
+};
+
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/front-desk-assistant`;
 
