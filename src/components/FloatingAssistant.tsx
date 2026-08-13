@@ -34,6 +34,24 @@ const readPos = (): Pos | null => {
   }
 };
 
+export const speak = (text: string) => {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const clean = text
+    .replace(/```[\s\S]*?```/g, " code block ")
+    .replace(/[*_#>`~|]/g, "")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return;
+  const u = new SpeechSynthesisUtterance(clean);
+  const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith("en"));
+  if (voice) u.voice = voice;
+  u.lang = voice?.lang || "en-US";
+  synth.speak(u);
+};
+
 const FloatingAssistant = () => {
   const { isFounder } = useUserRole();
   const { toast } = useToast();
