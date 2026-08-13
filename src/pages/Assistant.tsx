@@ -65,20 +65,24 @@ const Assistant = () => {
             toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" });
             continue;
           }
-          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content: await readAsDataUrl(f) }]);
+          const content = await readAsDataUrl(f);
+          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content }]);
         } else if (f.type.startsWith("audio/")) {
           if (f.size > 20 * 1024 * 1024) {
             toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" });
             continue;
           }
-          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content: await readAsDataUrl(f) }]);
+          const content = await readAsDataUrl(f);
+          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content }]);
         } else {
           if (f.size > 500 * 1024) {
             toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
             continue;
           }
-          setAttachments((prev) => [...prev, { name: f.name, kind: "text", content: await f.text() }]);
+          const content = await f.text();
+          setAttachments((prev) => [...prev, { name: f.name, kind: "text", content }]);
         }
+
       } catch {
         toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
       }
