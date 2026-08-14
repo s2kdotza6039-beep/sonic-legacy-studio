@@ -571,11 +571,18 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     const toGeminiMsgs = async (msgs: any[]) => {
       const out: any[] = [];
       for (const m of msgs) {
+        // Pass tool-protocol messages through untouched: flattening them would
+        // drop tool_calls / tool_call_id and the gateway rejects the request (400).
+        if (m?.role === "tool" || m?.tool_calls || m?.tool_call_id) {
+          out.push(m);
+          continue;
+        }
         const hasMedia = m?.role === "user" && (m.images?.length || m.audio?.length || m.files?.length);
         if (!hasMedia) {
           out.push({ role: m.role, content: typeof m.content === "string" ? m.content : String(m.content ?? "") });
           continue;
         }
+
         const parts: any[] = [];
         if (m.content) parts.push({ type: "text", text: m.content });
         for (const url of (m.images || []).slice(0, 4)) {
