@@ -529,9 +529,28 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       return out;
     };
 
+    const MAX_DOC_BYTES = 15 * 1024 * 1024;
+    const attachmentErrors: string[] = [];
+
     const extractDoc = async (f: { name: string; mime?: string; base64: string }) => {
-      const bytes = b64ToBytes(f.base64);
-      const n = (f.name || "").toLowerCase();
+      const name = f?.name || "attachment";
+      if (!f?.base64) {
+        attachmentErrors.push(`${name}: empty file data`);
+        return `[No data received for ${name}]`;
+      }
+      let bytes: Uint8Array;
+      try {
+        bytes = b64ToBytes(f.base64);
+      } catch (e) {
+        attachmentErrors.push(`${name}: base64 decode failed`);
+        console.error("attachment decode failed", name, (e as Error).message);
+        return `[Could not decode ${name}]`;
+      }
+      if (bytes.byteLength > MAX_DOC_BYTES) {
+        attachmentErrors.push(`${name}: exceeds 15MB limit`);
+        return `[${name} is too large to read (${(bytes.byteLength / 1048576).toFixed(1)}MB, limit 15MB)]`;
+      }
+      const n = name.toLowerCase();
       const m = (f.mime || "").toLowerCase();
       try {
         if (m.includes("pdf") || n.endsWith(".pdf")) {
@@ -544,28 +563,49 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
             const tc = await page.getTextContent();
             text += tc.items.map((i: any) => i.str).join(" ") + "\n";
           }
+          if (!text.trim()) {
+            attachmentErrors.push(`${name}: no extractable text (likely a scanned PDF)`);
+            return `[${name} contains no extractable text — it may be a scanned image PDF]`;
+          }
           return text;
         }
         if (m.includes("sheet") || m.includes("excel") || m.includes("csv") || /\.(xlsx|xls|csv)$/.test(n)) {
           const XLSX: any = await import("https://esm.sh/xlsx@0.18.5");
           const wb = XLSX.read(bytes, { type: "array" });
-          return wb.SheetNames.slice(0, 5)
+          const text = wb.SheetNames.slice(0, 5)
             .map((s: string) => `# Sheet: ${s}\n${sheetToText(XLSX, wb.Sheets[s])}`)
             .join("\n\n");
+          if (!text.trim()) attachmentErrors.push(`${name}: spreadsheet appears empty`);
+          return text || `[${name} appears to be empty]`;
         }
         if (m.includes("word") || /\.(docx|doc)$/.test(n)) {
           const mammoth: any = await import("https://esm.sh/mammoth@1.8.0");
           const r = await mammoth.extractRawText({ arrayBuffer: bytes.buffer });
-          return r.value || "";
+          if (!r.value?.trim()) attachmentErrors.push(`${name}: no extractable text`);
+          return r.value || `[${name} contains no extractable text]`;
         }
       } catch (e) {
-        return `[Could not parse ${f.name}: ${(e as Error).message}]`;
+        attachmentErrors.push(`${name}: parse failed (${(e as Error).message})`);
+        console.error("attachment parse failed", name, m, (e as Error).message);
+        return `[Could not parse ${name}: ${(e as Error).message}]`;
       }
       try {
         return new TextDecoder().decode(bytes);
       } catch {
-        return `[Unreadable file ${f.name}]`;
+        attachmentErrors.push(`${name}: unreadable binary`);
+        return `[Unreadable file ${name}]`;
       }
+    };
+
+    const audioFormat = (mime: string) => {
+      const m = mime.toLowerCase();
+      if (m.includes("wav")) return "wav";
+      if (m.includes("webm")) return "webm";
+      if (m.includes("ogg")) return "ogg";
+      if (m.includes("flac")) return "flac";
+      if (m.includes("aac")) return "aac";
+      if (m.includes("mp4") || m.includes("m4a") || m.includes("x-m4a")) return "m4a";
+      return "mp3";
     };
 
     const toGeminiMsgs = async (msgs: any[]) => {
@@ -579,30 +619,56 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
         }
         const hasMedia = m?.role === "user" && (m.images?.length || m.audio?.length || m.files?.length);
         if (!hasMedia) {
-          out.push({ role: m.role, content: typeof m.content === "string" ? m.content : String(m.content ?? "") });
+          out.push({
+            role: m.role,
+            content: Array.isArray(m.content)
+              ? m.content
+              : typeof m.content === "string"
+                ? m.content
+                : String(m.content ?? ""),
+          });
           continue;
         }
 
         const parts: any[] = [];
         if (m.content) parts.push({ type: "text", text: m.content });
         for (const url of (m.images || []).slice(0, 4)) {
+          if (typeof url !== "string" || !/^(data:image\/|https?:\/\/)/.test(url)) {
+            attachmentErrors.push("image: unsupported source, skipped");
+            continue;
+          }
           parts.push({ type: "image_url", image_url: { url } });
         }
         for (const a of (m.audio || []).slice(0, 1)) {
-          const mimeMatch = /^data:([^;]+);base64,(.*)$/.exec(a);
-          if (!mimeMatch) continue;
-          const mime = mimeMatch[1];
-          const format = mime.includes("wav") ? "wav" : mime.includes("ogg") ? "ogg" : "mp3";
-          parts.push({ type: "input_audio", input_audio: { data: mimeMatch[2], format } });
+          const mimeMatch = typeof a === "string" ? /^data:([^;]+);base64,(.*)$/.exec(a) : null;
+          if (!mimeMatch || !mimeMatch[2]) {
+            attachmentErrors.push("audio: could not read clip, skipped");
+            continue;
+          }
+          parts.push({ type: "input_audio", input_audio: { data: mimeMatch[2], format: audioFormat(mimeMatch[1]) } });
         }
         for (const f of (m.files || []).slice(0, 3)) {
           const text = (await extractDoc(f)).slice(0, 15000);
-          parts.push({ type: "text", text: `\n--- DOCUMENT: ${f.name} ---\n${text}\n--- END DOCUMENT ---` });
+          parts.push({ type: "text", text: `\n--- DOCUMENT: ${f?.name || "attachment"} ---\n${text}\n--- END DOCUMENT ---` });
         }
+        if ((m.files || []).length > 3) attachmentErrors.push("only the first 3 documents per message were read");
+        if ((m.images || []).length > 4) attachmentErrors.push("only the first 4 images per message were read");
+        if ((m.audio || []).length > 1) attachmentErrors.push("only the first audio clip per message was read");
         out.push({ role: "user", content: parts });
       }
       return out;
     };
+
+    // Convert attachments ONCE — re-parsing documents on the follow-up call is
+    // wasteful and would re-run PDF/Office extraction for every tool round-trip.
+    const preparedMessages = await toGeminiMsgs(messages);
+    if (attachmentErrors.length) {
+      console.warn("attachment processing warnings:", JSON.stringify(attachmentErrors));
+      preparedMessages.push({
+        role: "system",
+        content: `ATTACHMENT PROCESSING NOTES (tell the Founder plainly if relevant): ${attachmentErrors.join("; ")}`,
+      });
+    }
 
     const callAI = async (msgs: any[], stream: boolean) =>
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -610,28 +676,34 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
-          messages: [{ role: "system", content: systemPrompt }, ...(await toGeminiMsgs(msgs))],
+          messages: [{ role: "system", content: systemPrompt }, ...msgs],
           tools,
           stream,
         }),
       });
 
     // First call: non-streaming so we can detect tool calls reliably.
-    const first = await callAI(messages, false);
+    const first = await callAI(preparedMessages, false);
 
     if (!first.ok) {
       if (first.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (first.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const t = await first.text();
-      console.error("AI gateway error:", first.status, t);
-      return new Response(JSON.stringify({ error: "AI service temporarily unavailable" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.error("AI gateway error:", first.status, t, "attachmentWarnings:", JSON.stringify(attachmentErrors));
+      const hadAttachments = messages.some((m: any) => m?.images?.length || m?.audio?.length || m?.files?.length);
+      return new Response(JSON.stringify({
+        error: hadAttachments
+          ? "AI service could not process this message — one of the attachments may be unsupported or too large."
+          : "AI service temporarily unavailable",
+        attachment_warnings: attachmentErrors,
+      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const firstJson = await first.json();
     const choice = firstJson.choices?.[0];
     const toolCalls = choice?.message?.tool_calls;
 
-    let followupMessages = messages;
+    let followupMessages = preparedMessages;
     if (toolCalls && toolCalls.length > 0) {
       const assistantMsg = { role: "assistant", content: choice.message.content || "", tool_calls: toolCalls };
       const toolResults: any[] = [];
@@ -742,7 +814,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           }
         }
       }
-      followupMessages = [...messages, assistantMsg, ...toolResults];
+      followupMessages = [...preparedMessages, assistantMsg, ...toolResults];
     }
 
     // Second call: streaming for the user-visible reply.
