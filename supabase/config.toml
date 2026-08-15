@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.palesa-front-desk]
 verify_jwt = false
+
+[functions.content-api]
+verify_jwt = false
