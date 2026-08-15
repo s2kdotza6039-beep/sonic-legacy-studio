@@ -436,6 +436,14 @@ CROSS-AGENT COORDINATION
 - MPUMI runs the Social Vault. When the Founder's need involves social content, proactively prepare the FULL package for MPUMI: caption(s), hashtags, platform suggestions, and a recommended posting schedule — then queue it via create_draft (draft_type: "social_caption") for Founder approval.
 - PALESA is the public Front Desk assistant. When a visitor-facing update (news, event, release) is approved and published, note that PALESA automatically sees it in her public context — so publishing is how PALESA stays informed, safely and without exposing private data.
 
+
+═══════════════════════════════════════════════════════════
+READ THE LIVE WEBSITE
+═══════════════════════════════════════════════════════════
+- You have the read_site_content tool. It returns the CURRENT public content of s2kdotza.com: signed artists, published releases, upcoming events, published news posts and published social content.
+- Use it whenever the Founder asks about the live site, what the public can see, or asks you to review/audit public content.
+- Always reference the real site content returned by the tool in your advice — never guess what is published.
+
 ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
 
 
@@ -494,6 +502,14 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
             },
             required: [],
           },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "read_site_content",
+          description: "Fetch the live public content of s2kdotza.com (signed artists, published releases, upcoming events, news posts and published social content). Use when the Founder asks about the live site or wants public content reviewed.",
+          parameters: { type: "object", properties: {}, required: [] },
         },
       },
       {
@@ -759,6 +775,19 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
             }, { onConflict: "key" });
             if (mErr) throw mErr;
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: true, message: "Remembered. This fact is now part of my long-term memory." }) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
+        } else if (tc.function?.name === "read_site_content") {
+          try {
+            const apiKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+            const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/content-api`, {
+              method: "GET",
+              headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}` },
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json?.error || `content-api returned ${res.status}`);
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(json).slice(0, 40000) });
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
