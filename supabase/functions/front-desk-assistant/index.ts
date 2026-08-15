@@ -689,8 +689,14 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       if (first.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       if (first.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const t = await first.text();
-      console.error("AI gateway error:", first.status, t);
-      return new Response(JSON.stringify({ error: "AI service temporarily unavailable" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      console.error("AI gateway error:", first.status, t, "attachmentWarnings:", JSON.stringify(attachmentErrors));
+      const hadAttachments = messages.some((m: any) => m?.images?.length || m?.audio?.length || m?.files?.length);
+      return new Response(JSON.stringify({
+        error: hadAttachments
+          ? "AI service could not process this message — one of the attachments may be unsupported or too large."
+          : "AI service temporarily unavailable",
+        attachment_warnings: attachmentErrors,
+      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const firstJson = await first.json();
