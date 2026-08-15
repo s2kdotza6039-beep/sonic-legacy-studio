@@ -697,7 +697,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     const choice = firstJson.choices?.[0];
     const toolCalls = choice?.message?.tool_calls;
 
-    let followupMessages = messages;
+    let followupMessages = preparedMessages;
     if (toolCalls && toolCalls.length > 0) {
       const assistantMsg = { role: "assistant", content: choice.message.content || "", tool_calls: toolCalls };
       const toolResults: any[] = [];
@@ -808,7 +808,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           }
         }
       }
-      followupMessages = [...messages, assistantMsg, ...toolResults];
+      followupMessages = [...preparedMessages, assistantMsg, ...toolResults];
     }
 
     // Second call: streaming for the user-visible reply.
