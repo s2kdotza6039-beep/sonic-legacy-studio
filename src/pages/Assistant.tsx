@@ -10,8 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[] };
-type Attachment = { name: string; kind: "text" | "image" | "audio"; content: string };
+type DocFile = { name: string; mime: string; base64: string };
+type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[]; files?: DocFile[] };
+type Attachment = { name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string };
 type Convo = { id: string; title: string; created_at: string };
 
 const speak = (text: string) => {
@@ -32,6 +33,11 @@ const speak = (text: string) => {
   synth.speak(u);
 };
 
+
+const DOC_EXT = /\.(pdf|docx?|xlsx?|pptx?)$/i;
+const isDocFile = (f: File) =>
+  DOC_EXT.test(f.name) ||
+  /pdf|word|excel|sheet|officedocument|ms-?excel|msword/i.test(f.type);
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/front-desk-assistant`;
 
@@ -66,14 +72,26 @@ const Assistant = () => {
             continue;
           }
           const content = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content }]);
+          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content, mime: f.type }]);
         } else if (f.type.startsWith("audio/")) {
           if (f.size > 20 * 1024 * 1024) {
             toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" });
             continue;
           }
           const content = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content }]);
+          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content, mime: f.type }]);
+        } else if (isDocFile(f)) {
+          if (f.size > 15 * 1024 * 1024) {
+            toast({ title: "Document too large", description: `${f.name} exceeds 15MB.`, variant: "destructive" });
+            continue;
+          }
+          const dataUrl = await readAsDataUrl(f);
+          const base64 = dataUrl.split(",")[1] || "";
+          if (!base64) {
+            toast({ title: "Unreadable document", description: `${f.name} could not be read.`, variant: "destructive" });
+            continue;
+          }
+          setAttachments((prev) => [...prev, { name: f.name, kind: "file", content: "", mime: f.type || "application/octet-stream", base64 }]);
         } else {
           if (f.size > 500 * 1024) {
             toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
@@ -143,14 +161,15 @@ const Assistant = () => {
     const textFiles = attachments.filter(a => a.kind === "text");
     const imageFiles = attachments.filter(a => a.kind === "image");
     const audioFiles = attachments.filter(a => a.kind === "audio");
+    const docFiles = attachments.filter(a => a.kind === "file");
 
     const attachBlock = textFiles.length
       ? `[ATTACHED FILES — please read and discuss these]:\n` +
         textFiles.map(a => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
         `\n--- END OF FILES ---\n\n`
       : "";
-    const mediaNote = (imageFiles.length || audioFiles.length)
-      ? `[ATTACHED MEDIA]: ${[...imageFiles, ...audioFiles].map(a => `${a.kind}: ${a.name}`).join(", ")}\n\n`
+    const mediaNote = (imageFiles.length || audioFiles.length || docFiles.length)
+      ? `[ATTACHED MEDIA]: ${[...imageFiles, ...audioFiles, ...docFiles].map(a => `${a.kind === "file" ? "document" : a.kind}: ${a.name}`).join(", ")}\n\n`
       : "";
 
     const userMsg: Msg = {
@@ -158,6 +177,7 @@ const Assistant = () => {
       content: `${attachBlock}${mediaNote}${input.trim()}`,
       images: imageFiles.length ? imageFiles.map(a => a.content) : undefined,
       audio: audioFiles.length ? audioFiles.map(a => a.content) : undefined,
+      files: docFiles.length ? docFiles.map(a => ({ name: a.name, mime: a.mime || "application/octet-stream", base64: a.base64 || "" })) : undefined,
     };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
@@ -205,7 +225,10 @@ const Assistant = () => {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Request failed" }));
-        throw new Error(err.error || `Error ${resp.status}`);
+        const warnings = Array.isArray(err.attachment_warnings) && err.attachment_warnings.length
+          ? ` (${err.attachment_warnings.join("; ")})`
+          : "";
+        throw new Error(`${err.error || `Error ${resp.status}`}${warnings}`);
       }
 
       const reader = resp.body?.getReader();
@@ -431,7 +454,7 @@ const Assistant = () => {
                     ref={attachInputRef}
                     type="file"
                     multiple
-                    accept=".txt,.md,.csv,.json,.log,.ts,.tsx,.js,.html,.xml,.yml,.yaml,text/*,audio/*,image/*"
+                    accept=".txt,.md,.csv,.json,.log,.ts,.tsx,.js,.html,.xml,.yml,.yaml,.pdf,.doc,.docx,.xls,.xlsx,text/*,audio/*,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     className="hidden"
                     onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
                   />
