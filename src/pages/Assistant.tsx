@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2 } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2, Square, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 type DocFile = { name: string; mime: string; base64: string };
@@ -15,23 +15,39 @@ type Msg = { role: "user" | "assistant"; content: string; images?: string[]; aud
 type Attachment = { name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string };
 type Convo = { id: string; title: string; created_at: string };
 
-const speak = (text: string) => {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  const synth = window.speechSynthesis;
-  synth.cancel();
-  const clean = text
+const cleanForSpeech = (text: string) =>
+  text
     .replace(/```[\s\S]*?```/g, " code block ")
     .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
     .replace(/[*_#>`~|]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+let lastSpokenText = "";
+
+const utter = (text: string, rate = 1) => {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const clean = cleanForSpeech(text);
   if (!clean) return;
+  lastSpokenText = clean;
   const u = new SpeechSynthesisUtterance(clean);
   const voice = synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith("en"));
   if (voice) u.voice = voice;
   u.lang = voice?.lang || "en-US";
+  u.rate = rate;
   synth.speak(u);
 };
+
+const speak = (text: string) => utter(text, 1);
+const stopSpeech = () => window.speechSynthesis?.cancel();
+const pauseSpeech = () => window.speechSynthesis?.pause();
+const resumeSpeech = () => window.speechSynthesis?.resume();
+// Web Speech API has no native seek: Rewind = restart, Forward = replay faster.
+const rewindSpeech = (text?: string) => utter(text || lastSpokenText, 1);
+const forwardSpeech = (text?: string) => utter(text || lastSpokenText, 2);
+
 
 
 const DOC_EXT = /\.(pdf|docx?|xlsx?|pptx?)$/i;
