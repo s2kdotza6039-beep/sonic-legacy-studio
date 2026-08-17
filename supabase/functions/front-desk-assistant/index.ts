@@ -5,7 +5,13 @@ import { requireFounderOrService } from "../_shared/authGuard.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Expose-Headers": "x-attachment-debug",
 };
+
+// Structured log helper so attachment handling is traceable in edge logs.
+const slog = (event: string, data: Record<string, unknown>) =>
+  console.log(JSON.stringify({ fn: "front-desk-assistant", event, ...data }));
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -433,6 +439,16 @@ PROACTIVE NUDGES
 - Do NOT manufacture urgency. Only real, actionable nudges grounded in the data above. Never fabricate.
 
 ═══════════════════════════════════════════════════════════
+VERIFY BEFORE CONCLUDING (REQUIRED)
+═══════════════════════════════════════════════════════════
+- Do NOT conclude something is broken, missing, or not implemented based only on a single error or an assumption. Before you tell the Founder that a feature is broken or needs building, VERIFY against the actual code and data.
+- USE github_read to inspect the repository (supabase/functions/front-desk-assistant/index.ts, src/components, etc.) and read_site_content / your data context to check the real state BEFORE concluding.
+- If an attachment or tool call errors (e.g. "could not find file", a parse failure, or a query error), DO NOT immediately assume the whole capability is broken or recommend rebuilding it. First: retry once, check the file/size/format, and verify the code path actually exists. Then report the SPECIFIC error, not a general "this isn't wired up."
+- When you are uncertain, say what is uncertain and what you verified vs. what you are assuming. Label assumptions as assumptions.
+- Only if you have genuinely verified that something is absent or broken should you say so — and then give the precise fix, not a broad workaround.
+- Never recommend converting, rebuilding, or replacing a capability that the repo shows already exists and is wired.
+
+═══════════════════════════════════════════════════════════
 LONG-TERM MEMORY
 ═══════════════════════════════════════════════════════════
 - Use the SYDNEY MEMORY context to personalize your answers and avoid repeating yourself or re-asking things you already know.
@@ -565,6 +581,32 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     const MAX_DOC_BYTES = 15 * 1024 * 1024;
     const attachmentErrors: string[] = [];
 
+    type AttachDebug = {
+      name: string;
+      mime: string;
+      detected: "image" | "audio" | "pdf" | "xlsx" | "csv" | "doc" | "text" | "unknown";
+      bytes?: number;
+      text_chars?: number;
+      status: "ok" | "skipped" | "error";
+      error?: string;
+    };
+    const attachmentDebug: AttachDebug[] = [];
+    const geminiParts: { role: string; parts: string[] }[] = [];
+
+    const detectKind = (name: string, mime: string): AttachDebug["detected"] => {
+      const n = (name || "").toLowerCase();
+      const m = (mime || "").toLowerCase();
+      if (m.startsWith("image/")) return "image";
+      if (m.startsWith("audio/")) return "audio";
+      if (m.includes("pdf") || n.endsWith(".pdf")) return "pdf";
+      if (n.endsWith(".csv") || m.includes("csv")) return "csv";
+      if (m.includes("sheet") || m.includes("excel") || /\.(xlsx|xls)$/.test(n)) return "xlsx";
+      if (m.includes("word") || /\.(docx|doc)$/.test(n)) return "doc";
+      if (m.startsWith("text/") || /\.(txt|md|json|log|ya?ml|xml|tsx?|jsx?|html)$/.test(n)) return "text";
+      return "unknown";
+    };
+
+
     const extractDoc = async (f: { name: string; mime?: string; base64: string }) => {
       const name = f?.name || "attachment";
       if (!f?.base64) {
@@ -668,25 +710,54 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
         for (const url of (m.images || []).slice(0, 4)) {
           if (typeof url !== "string" || !/^(data:image\/|https?:\/\/)/.test(url)) {
             attachmentErrors.push("image: unsupported source, skipped");
+            attachmentDebug.push({ name: "image", mime: "image/*", detected: "image", status: "skipped", error: "unsupported source" });
             continue;
           }
+          const mime = /^data:([^;]+);/.exec(url)?.[1] || "image/*";
+          attachmentDebug.push({
+            name: "image",
+            mime,
+            detected: "image",
+            bytes: url.startsWith("data:") ? Math.round((url.length - url.indexOf(",") - 1) * 0.75) : undefined,
+            status: "ok",
+          });
           parts.push({ type: "image_url", image_url: { url } });
         }
         for (const a of (m.audio || []).slice(0, 1)) {
           const mimeMatch = typeof a === "string" ? /^data:([^;]+);base64,(.*)$/.exec(a) : null;
           if (!mimeMatch || !mimeMatch[2]) {
             attachmentErrors.push("audio: could not read clip, skipped");
+            attachmentDebug.push({ name: "audio", mime: "audio/*", detected: "audio", status: "skipped", error: "could not read clip" });
             continue;
           }
+          attachmentDebug.push({
+            name: "audio",
+            mime: mimeMatch[1],
+            detected: "audio",
+            bytes: Math.round(mimeMatch[2].length * 0.75),
+            status: "ok",
+          });
           parts.push({ type: "input_audio", input_audio: { data: mimeMatch[2], format: audioFormat(mimeMatch[1]) } });
         }
         for (const f of (m.files || []).slice(0, 3)) {
+          const before = attachmentErrors.length;
           const text = (await extractDoc(f)).slice(0, 15000);
+          const failed = attachmentErrors.length > before;
+          attachmentDebug.push({
+            name: f?.name || "attachment",
+            mime: f?.mime || "application/octet-stream",
+            detected: detectKind(f?.name || "", f?.mime || ""),
+            bytes: f?.base64 ? Math.round(f.base64.length * 0.75) : 0,
+            text_chars: text.length,
+            status: failed ? "error" : "ok",
+            error: failed ? attachmentErrors[attachmentErrors.length - 1] : undefined,
+          });
           parts.push({ type: "text", text: `\n--- DOCUMENT: ${f?.name || "attachment"} ---\n${text}\n--- END DOCUMENT ---` });
         }
         if ((m.files || []).length > 3) attachmentErrors.push("only the first 3 documents per message were read");
         if ((m.images || []).length > 4) attachmentErrors.push("only the first 4 images per message were read");
         if ((m.audio || []).length > 1) attachmentErrors.push("only the first audio clip per message was read");
+        geminiParts.push({ role: "user", parts: parts.map((p: any) => p.type) });
         out.push({ role: "user", content: parts });
       }
       return out;
@@ -695,6 +766,13 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     // Convert attachments ONCE — re-parsing documents on the follow-up call is
     // wasteful and would re-run PDF/Office extraction for every tool round-trip.
     const preparedMessages = await toGeminiMsgs(messages);
+    const debugPayload = {
+      model: "google/gemini-2.5-flash",
+      attachments: attachmentDebug,
+      sent_to_gemini: geminiParts,
+      warnings: attachmentErrors,
+    };
+    slog("attachments_prepared", debugPayload);
     if (attachmentErrors.length) {
       console.warn("attachment processing warnings:", JSON.stringify(attachmentErrors));
       preparedMessages.push({
@@ -702,6 +780,8 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
         content: `ATTACHMENT PROCESSING NOTES (tell the Founder plainly if relevant): ${attachmentErrors.join("; ")}`,
       });
     }
+    const debugHeader = { "x-attachment-debug": encodeURIComponent(JSON.stringify(debugPayload)).slice(0, 6000) };
+
 
     const callAI = async (msgs: any[], stream: boolean) =>
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -729,7 +809,8 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           ? "AI service could not process this message — one of the attachments may be unsupported or too large."
           : "AI service temporarily unavailable",
         attachment_warnings: attachmentErrors,
-      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        attachment_debug: debugPayload,
+      }), { status: 500, headers: { ...corsHeaders, ...debugHeader, "Content-Type": "application/json" } });
     }
 
     const firstJson = await first.json();
@@ -872,7 +953,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     }
 
     return new Response(second.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      headers: { ...corsHeaders, ...debugHeader, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
     console.error("front-desk-assistant error:", e);
