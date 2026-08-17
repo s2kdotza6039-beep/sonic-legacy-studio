@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2, Square, Pause, Play, SkipBack, SkipForward, Bug } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2, Square, Pause, Play, SkipBack, SkipForward, Bug, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import HtmlPreview from "../components/HtmlPreview";
 
@@ -73,6 +73,14 @@ const Assistant = () => {
   const attachInputRef = useRef<HTMLInputElement>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem("assistant_sidebar_open") !== "false"; } catch { return true; }
+  });
+  const toggleSidebar = () => setSidebarOpen(prev => {
+    const next = !prev;
+    try { localStorage.setItem("assistant_sidebar_open", String(next)); } catch {}
+    return next;
+  });
 
   const readDebugHeader = (resp: Response) => {
     const raw = resp.headers.get("x-attachment-debug");
@@ -325,7 +333,8 @@ const Assistant = () => {
     <Layout>
       <div className="min-h-[calc(100vh-200px)] flex">
         {/* Sidebar */}
-        <div className="w-64 border-r border-border bg-card p-3 flex flex-col">
+        {sidebarOpen && (
+        <div className="w-64 shrink-0 border-r border-border bg-card p-3 flex flex-col">
           <Button onClick={newConversation} size="sm" className="w-full mb-3 gap-1 text-xs">
             <Plus size={12} /> New Chat
           </Button>
@@ -346,11 +355,15 @@ const Assistant = () => {
             </div>
           </ScrollArea>
         </div>
+        )}
 
         {/* Chat */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <div className="border-b border-border p-4 bg-card">
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={toggleSidebar} aria-label={sidebarOpen ? "Hide chats" : "Show chats"} title={sidebarOpen ? "Hide" : "Chats"} className="gap-1 text-xs">
+                {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")} className="gap-1 text-xs">
                 <ArrowLeft size={14} /> Back to Workspace
               </Button>
