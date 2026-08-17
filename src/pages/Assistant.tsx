@@ -395,9 +395,10 @@ const Assistant = () => {
                         : "bg-card border border-border"
                     }`}>
                       {m.role === "assistant" ? (
-                        <div className="prose prose-sm prose-invert max-w-none">
-                          <ReactMarkdown>{m.content}</ReactMarkdown>
-                        </div>
+                          <div className="prose prose-sm prose-invert max-w-none">
+                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                            <HtmlPreview content={m.content} />
+                          </div>
                       ) : m.content}
                     </div>
                     {m.role === "user" && m.images && m.images.length > 0 && (
