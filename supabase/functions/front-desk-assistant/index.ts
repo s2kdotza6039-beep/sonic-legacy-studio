@@ -5,7 +5,13 @@ import { requireFounderOrService } from "../_shared/authGuard.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Expose-Headers": "x-attachment-debug",
 };
+
+// Structured log helper so attachment handling is traceable in edge logs.
+const slog = (event: string, data: Record<string, unknown>) =>
+  console.log(JSON.stringify({ fn: "front-desk-assistant", event, ...data }));
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
