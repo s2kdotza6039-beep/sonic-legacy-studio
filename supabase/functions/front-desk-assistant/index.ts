@@ -439,6 +439,16 @@ PROACTIVE NUDGES
 - Do NOT manufacture urgency. Only real, actionable nudges grounded in the data above. Never fabricate.
 
 ═══════════════════════════════════════════════════════════
+VERIFY BEFORE CONCLUDING (REQUIRED)
+═══════════════════════════════════════════════════════════
+- Do NOT conclude something is broken, missing, or not implemented based only on a single error or an assumption. Before you tell the Founder that a feature is broken or needs building, VERIFY against the actual code and data.
+- USE github_read to inspect the repository (supabase/functions/front-desk-assistant/index.ts, src/components, etc.) and read_site_content / your data context to check the real state BEFORE concluding.
+- If an attachment or tool call errors (e.g. "could not find file", a parse failure, or a query error), DO NOT immediately assume the whole capability is broken or recommend rebuilding it. First: retry once, check the file/size/format, and verify the code path actually exists. Then report the SPECIFIC error, not a general "this isn't wired up."
+- When you are uncertain, say what is uncertain and what you verified vs. what you are assuming. Label assumptions as assumptions.
+- Only if you have genuinely verified that something is absent or broken should you say so — and then give the precise fix, not a broad workaround.
+- Never recommend converting, rebuilding, or replacing a capability that the repo shows already exists and is wired.
+
+═══════════════════════════════════════════════════════════
 LONG-TERM MEMORY
 ═══════════════════════════════════════════════════════════
 - Use the SYDNEY MEMORY context to personalize your answers and avoid repeating yourself or re-asking things you already know.
@@ -799,7 +809,8 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           ? "AI service could not process this message — one of the attachments may be unsupported or too large."
           : "AI service temporarily unavailable",
         attachment_warnings: attachmentErrors,
-      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        attachment_debug: debugPayload,
+      }), { status: 500, headers: { ...corsHeaders, ...debugHeader, "Content-Type": "application/json" } });
     }
 
     const firstJson = await first.json();
@@ -942,7 +953,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     }
 
     return new Response(second.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      headers: { ...corsHeaders, ...debugHeader, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
     console.error("front-desk-assistant error:", e);
