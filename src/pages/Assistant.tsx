@@ -412,6 +412,23 @@ const Assistant = () => {
                         >
                           <Volume2 size={10} /> Listen
                         </button>
+                        <div className="flex items-center gap-2 border-l border-border pl-2">
+                          <button onClick={stopSpeech} aria-label="Stop speech" title="Stop" className="text-muted-foreground hover:text-primary">
+                            <Square size={11} />
+                          </button>
+                          <button onClick={pauseSpeech} aria-label="Pause speech" title="Pause" className="text-muted-foreground hover:text-primary">
+                            <Pause size={11} />
+                          </button>
+                          <button onClick={resumeSpeech} aria-label="Resume speech" title="Resume" className="text-muted-foreground hover:text-primary">
+                            <Play size={11} />
+                          </button>
+                          <button onClick={() => rewindSpeech(m.content)} aria-label="Rewind speech" title="Rewind (restart)" className="text-muted-foreground hover:text-primary">
+                            <SkipBack size={11} />
+                          </button>
+                          <button onClick={() => forwardSpeech(m.content)} aria-label="Forward speech" title="Forward (faster)" className="text-muted-foreground hover:text-primary">
+                            <SkipForward size={11} />
+                          </button>
+                        </div>
                       </div>
                     )}
 
