@@ -700,25 +700,54 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
         for (const url of (m.images || []).slice(0, 4)) {
           if (typeof url !== "string" || !/^(data:image\/|https?:\/\/)/.test(url)) {
             attachmentErrors.push("image: unsupported source, skipped");
+            attachmentDebug.push({ name: "image", mime: "image/*", detected: "image", status: "skipped", error: "unsupported source" });
             continue;
           }
+          const mime = /^data:([^;]+);/.exec(url)?.[1] || "image/*";
+          attachmentDebug.push({
+            name: "image",
+            mime,
+            detected: "image",
+            bytes: url.startsWith("data:") ? Math.round((url.length - url.indexOf(",") - 1) * 0.75) : undefined,
+            status: "ok",
+          });
           parts.push({ type: "image_url", image_url: { url } });
         }
         for (const a of (m.audio || []).slice(0, 1)) {
           const mimeMatch = typeof a === "string" ? /^data:([^;]+);base64,(.*)$/.exec(a) : null;
           if (!mimeMatch || !mimeMatch[2]) {
             attachmentErrors.push("audio: could not read clip, skipped");
+            attachmentDebug.push({ name: "audio", mime: "audio/*", detected: "audio", status: "skipped", error: "could not read clip" });
             continue;
           }
+          attachmentDebug.push({
+            name: "audio",
+            mime: mimeMatch[1],
+            detected: "audio",
+            bytes: Math.round(mimeMatch[2].length * 0.75),
+            status: "ok",
+          });
           parts.push({ type: "input_audio", input_audio: { data: mimeMatch[2], format: audioFormat(mimeMatch[1]) } });
         }
         for (const f of (m.files || []).slice(0, 3)) {
+          const before = attachmentErrors.length;
           const text = (await extractDoc(f)).slice(0, 15000);
+          const failed = attachmentErrors.length > before;
+          attachmentDebug.push({
+            name: f?.name || "attachment",
+            mime: f?.mime || "application/octet-stream",
+            detected: detectKind(f?.name || "", f?.mime || ""),
+            bytes: f?.base64 ? Math.round(f.base64.length * 0.75) : 0,
+            text_chars: text.length,
+            status: failed ? "error" : "ok",
+            error: failed ? attachmentErrors[attachmentErrors.length - 1] : undefined,
+          });
           parts.push({ type: "text", text: `\n--- DOCUMENT: ${f?.name || "attachment"} ---\n${text}\n--- END DOCUMENT ---` });
         }
         if ((m.files || []).length > 3) attachmentErrors.push("only the first 3 documents per message were read");
         if ((m.images || []).length > 4) attachmentErrors.push("only the first 4 images per message were read");
         if ((m.audio || []).length > 1) attachmentErrors.push("only the first audio clip per message was read");
+        geminiParts.push({ role: "user", parts: parts.map((p: any) => p.type) });
         out.push({ role: "user", content: parts });
       }
       return out;
@@ -727,6 +756,13 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     // Convert attachments ONCE — re-parsing documents on the follow-up call is
     // wasteful and would re-run PDF/Office extraction for every tool round-trip.
     const preparedMessages = await toGeminiMsgs(messages);
+    const debugPayload = {
+      model: "google/gemini-2.5-flash",
+      attachments: attachmentDebug,
+      sent_to_gemini: geminiParts,
+      warnings: attachmentErrors,
+    };
+    slog("attachments_prepared", debugPayload);
     if (attachmentErrors.length) {
       console.warn("attachment processing warnings:", JSON.stringify(attachmentErrors));
       preparedMessages.push({
@@ -734,6 +770,8 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
         content: `ATTACHMENT PROCESSING NOTES (tell the Founder plainly if relevant): ${attachmentErrors.join("; ")}`,
       });
     }
+    const debugHeader = { "x-attachment-debug": encodeURIComponent(JSON.stringify(debugPayload)).slice(0, 6000) };
+
 
     const callAI = async (msgs: any[], stream: boolean) =>
       fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
