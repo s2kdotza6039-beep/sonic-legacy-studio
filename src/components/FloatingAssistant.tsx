@@ -7,6 +7,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
+import HtmlPreview from "./HtmlPreview";
 
 type DocFile = { name: string; mime: string; base64: string };
 type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[]; files?: DocFile[] };
@@ -396,10 +397,11 @@ const FloatingAssistant = () => {
                     m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary border border-border"
                   }`}>
                     {m.role === "assistant" ? (
-                      <div className="prose prose-xs prose-invert max-w-none">
-                        <ReactMarkdown>{m.content}</ReactMarkdown>
-                      </div>
-                    ) : m.content}
+                        <div className="prose prose-xs prose-invert max-w-none">
+                          <ReactMarkdown>{m.content}</ReactMarkdown>
+                          <HtmlPreview content={m.content} />
+                        </div>
+                      ) : m.content}
                   </div>
                   {m.role === "user" && m.images && m.images.length > 0 && (
                     <div className="flex flex-wrap gap-1">
