@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2, Square, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2, Square, Pause, Play, SkipBack, SkipForward, Bug } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 type DocFile = { name: string; mime: string; base64: string };
@@ -70,6 +70,18 @@ const Assistant = () => {
   const [inputRows, setInputRows] = useState(2);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const attachInputRef = useRef<HTMLInputElement>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [showDebug, setShowDebug] = useState(false);
+
+  const readDebugHeader = (resp: Response) => {
+    const raw = resp.headers.get("x-attachment-debug");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(decodeURIComponent(raw));
+      setDebugInfo(parsed);
+      console.info("[SYDNEY attachment debug]", parsed);
+    } catch {}
+  };
 
   const readAsDataUrl = (f: File) =>
     new Promise<string>((resolve, reject) => {
@@ -239,8 +251,11 @@ const Assistant = () => {
         body: JSON.stringify({ messages: allMessages, conversation_id: activeConvo }),
       });
 
+      readDebugHeader(resp);
+
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Request failed" }));
+        if (err.attachment_debug) setDebugInfo(err.attachment_debug);
         const warnings = Array.isArray(err.attachment_warnings) && err.attachment_warnings.length
           ? ` (${err.attachment_warnings.join("; ")})`
           : "";
@@ -471,6 +486,40 @@ const Assistant = () => {
                       </button>
                     </span>
                   ))}
+                </div>
+              )}
+              {debugInfo && (
+                <div className="border border-border bg-secondary/30 text-[10px]">
+                  <button
+                    onClick={() => setShowDebug(v => !v)}
+                    className="w-full flex items-center gap-1 px-2 py-1 uppercase tracking-wider text-muted-foreground hover:text-primary"
+                  >
+                    <Bug size={11} /> Attachment debug ({debugInfo.attachments?.length || 0} detected)
+                  </button>
+                  {showDebug && (
+                    <div className="px-2 pb-2 space-y-1">
+                      {(debugInfo.attachments || []).length === 0 && (
+                        <p className="text-muted-foreground">No attachments were detected in the last request.</p>
+                      )}
+                      {(debugInfo.attachments || []).map((a: any, i: number) => (
+                        <div key={i} className="flex flex-wrap gap-2 border-b border-border/50 pb-1">
+                          <span className="font-mono">{a.detected}</span>
+                          <span className="truncate max-w-[180px]">{a.name}</span>
+                          <span className="text-muted-foreground">{a.mime}</span>
+                          {typeof a.bytes === "number" && <span className="text-muted-foreground">{(a.bytes / 1024).toFixed(0)}KB</span>}
+                          {typeof a.text_chars === "number" && <span className="text-muted-foreground">{a.text_chars} chars</span>}
+                          <span className={a.status === "ok" ? "text-primary" : "text-destructive"}>{a.status}</span>
+                          {a.error && <span className="text-destructive">{a.error}</span>}
+                        </div>
+                      ))}
+                      <p className="text-muted-foreground">
+                        Sent to {debugInfo.model}: {(debugInfo.sent_to_gemini || []).map((m: any) => m.parts.join("+")).join(" | ") || "text only"}
+                      </p>
+                      {(debugInfo.warnings || []).length > 0 && (
+                        <p className="text-destructive">Warnings: {debugInfo.warnings.join("; ")}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               <Textarea
