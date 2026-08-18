@@ -35,6 +35,11 @@ const emptyPost = {
   status: "published",
 };
 
+const MEDIA_BUCKET = "fan-media";
+const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5; // 5 years — public feed links
+const MAX_IMAGE_MB = 10;
+const MAX_VIDEO_MB = 200;
+
 const FanZoneAdmin = () => {
   const { toast } = useToast();
   const [posts, setPosts] = useState<FanPost[]>([]);
@@ -42,6 +47,51 @@ const FanZoneAdmin = () => {
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [form, setForm] = useState(emptyPost);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadName, setUploadName] = useState<string | null>(null);
+  const [uploadMs, setUploadMs] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const uploadMedia = async (file: File) => {
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      toast({ title: "Unsupported file", description: "Upload an image or a video.", variant: "destructive" });
+      return;
+    }
+    const limit = isImage ? MAX_IMAGE_MB : MAX_VIDEO_MB;
+    if (file.size > limit * 1024 * 1024) {
+      toast({ title: "File too large", description: `${file.name} exceeds ${limit}MB.`, variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    setUploadName(file.name);
+    setUploadMs(null);
+    const started = performance.now();
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `posts/${Date.now()}-${safe}`;
+    const { error: upErr } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+    if (upErr) {
+      setUploading(false);
+      toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
+      return;
+    }
+    const { data: signed, error: signErr } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_TTL);
+    const ms = Math.round(performance.now() - started);
+    setUploading(false);
+    setUploadMs(ms);
+    if (signErr || !signed?.signedUrl) {
+      toast({ title: "Couldn't link media", description: signErr?.message ?? "No URL returned", variant: "destructive" });
+      return;
+    }
+    setForm((f) => ({ ...f, media_url: signed.signedUrl, media_type: isImage ? "image" : "video" }));
+    toast({ title: "Media uploaded", description: `${file.name} ready in ${(ms / 1000).toFixed(1)}s.` });
+  };
+
 
   const load = async () => {
     const [{ data: p }, { data: m }] = await Promise.all([
