@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { requireFounderOrService } from "../_shared/authGuard.ts";
+import { buildGeminiMsgs, type AttachDebug } from "./geminiMsgs.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -166,6 +168,40 @@ serve(async (req) => {
 
 
     const systemPrompt = `You are SYDNEY, the Founder's Personal Assistant and Chief Operating Agent for S2K DOT ZA, a South African music entertainment and record label company. You serve Thulani Ngcobo (Pitch Black Afro) — Founder and CEO. Always identify yourself as SYDNEY.
+
+SYDNEY — THE ULTIMATE ALL-ROUNDER PARTNER (Founder's Doctrine)
+You are not a narrow task-tool. You are a MULTI-SKILLED, HANDS-ON, ALWAYS-ALERT partner who does everything an AI can do to serve Thulani and S2KDOTZA. You wear many hats at once — producer, label CEO, creative director, A&R, engineer, strategist, marketer, deal-maker, researcher, and trusted advisor — and you apply the right skill automatically based on what is needed.
+
+YOUR SKILLS (apply them proactively, not just when asked):
+
+PRODUCER & A&R: Evaluate music, spot hits, advise on arrangement/production, develop artists, identify talent, protect artist sovereignty.
+
+LABEL CEO & EXECUTIVE: Think about the whole business — revenue, ownership, contracts, partnerships, risks, opportunities, institutional permanence.
+
+ENGINEER & OPERATOR: Use every tool (github_read, read_site_content, create_draft, draft_email, remember), read documents/images/audio, and give ready-to-paste Lovable prompts.
+
+STRATEGIST & ADVISOR: Whole-story thinking, "don't just answer, understand the decision being made," rank options, flag silent risks.
+
+MARKETER & GROWTH: Drive traffic to s2kdotza.com, content ideas, release strategy, audience growth, brand positioning.
+
+DRAFTER & CREATOR: Draft contracts, emails, news, social captions, proposals, artist briefs, plans — following the house style (contract_style) and brand tone.
+
+RESEARCHER & CRITIC: Verify before concluding, say "I don't know" honestly, challenge bad decisions, label assumptions.
+
+ALWAYS-ALERT BEHAVIOUR:
+
+Never wait to be a tool — you proactively watch the kingdom (site, roster, releases, revenue, risks) and raise what matters.
+
+When a task comes in, ask "Which hat serves best here?" and apply it — do the WHOLE job, not the minimum.
+
+Combine skills: e.g. when reviewing a song, also think release strategy + social (for MPUMI) + what to fix; when drafting a contract, also protect the artist and flag risks.
+
+Be efficient with credits (batch prompts) but thorough — never sacrifice quality or safety for speed.
+
+Always land on a recommended next action and explain the why.
+
+FINAL: You are the co-founder-in-AI that helps Thulani SEE FURTHER, THINK CLEARER, MOVE FASTER, WASTE LESS, and BUILD THE LEGACY. Be proactive, honest, strategic, resourceful, critical when needed, and protect the mission.
+
 
 WHO YOU ARE:
 - You are a business partner, mentor and right hand — not just a tool. You think like a COO.
@@ -591,30 +627,10 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     const MAX_DOC_BYTES = 15 * 1024 * 1024;
     const attachmentErrors: string[] = [];
 
-    type AttachDebug = {
-      name: string;
-      mime: string;
-      detected: "image" | "audio" | "pdf" | "xlsx" | "csv" | "doc" | "text" | "unknown";
-      bytes?: number;
-      text_chars?: number;
-      status: "ok" | "skipped" | "error";
-      error?: string;
-    };
     const attachmentDebug: AttachDebug[] = [];
     const geminiParts: { role: string; parts: string[] }[] = [];
 
-    const detectKind = (name: string, mime: string): AttachDebug["detected"] => {
-      const n = (name || "").toLowerCase();
-      const m = (mime || "").toLowerCase();
-      if (m.startsWith("image/")) return "image";
-      if (m.startsWith("audio/")) return "audio";
-      if (m.includes("pdf") || n.endsWith(".pdf")) return "pdf";
-      if (n.endsWith(".csv") || m.includes("csv")) return "csv";
-      if (m.includes("sheet") || m.includes("excel") || /\.(xlsx|xls)$/.test(n)) return "xlsx";
-      if (m.includes("word") || /\.(docx|doc)$/.test(n)) return "doc";
-      if (m.startsWith("text/") || /\.(txt|md|json|log|ya?ml|xml|tsx?|jsx?|html)$/.test(n)) return "text";
-      return "unknown";
-    };
+
 
 
     const extractDoc = async (f: { name: string; mime?: string; base64: string }) => {
@@ -682,100 +698,15 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       }
     };
 
-    const audioFormat = (mime: string) => {
-      const m = mime.toLowerCase();
-      if (m.includes("wav")) return "wav";
-      if (m.includes("webm")) return "webm";
-      if (m.includes("ogg")) return "ogg";
-      if (m.includes("flac")) return "flac";
-      if (m.includes("aac")) return "aac";
-      if (m.includes("mp4") || m.includes("m4a") || m.includes("x-m4a")) return "m4a";
-      return "mp3";
-    };
-
-    const toGeminiMsgs = async (msgs: any[]) => {
-      const out: any[] = [];
-      for (const m of msgs) {
-        // Pass tool-protocol messages through untouched: flattening them would
-        // drop tool_calls / tool_call_id and the gateway rejects the request (400).
-        if (m?.role === "tool" || m?.tool_calls || m?.tool_call_id) {
-          out.push(m);
-          continue;
-        }
-        const hasMedia = m?.role === "user" && (m.images?.length || m.audio?.length || m.files?.length);
-        if (!hasMedia) {
-          out.push({
-            role: m.role,
-            content: Array.isArray(m.content)
-              ? m.content
-              : typeof m.content === "string"
-                ? m.content
-                : String(m.content ?? ""),
-          });
-          continue;
-        }
-
-        const parts: any[] = [];
-        if (m.content) parts.push({ type: "text", text: m.content });
-        for (const url of (m.images || []).slice(0, 4)) {
-          if (typeof url !== "string" || !/^(data:image\/|https?:\/\/)/.test(url)) {
-            attachmentErrors.push("image: unsupported source, skipped");
-            attachmentDebug.push({ name: "image", mime: "image/*", detected: "image", status: "skipped", error: "unsupported source" });
-            continue;
-          }
-          const mime = /^data:([^;]+);/.exec(url)?.[1] || "image/*";
-          attachmentDebug.push({
-            name: "image",
-            mime,
-            detected: "image",
-            bytes: url.startsWith("data:") ? Math.round((url.length - url.indexOf(",") - 1) * 0.75) : undefined,
-            status: "ok",
-          });
-          parts.push({ type: "image_url", image_url: { url } });
-        }
-        for (const a of (m.audio || []).slice(0, 1)) {
-          const mimeMatch = typeof a === "string" ? /^data:([^;]+);base64,(.*)$/.exec(a) : null;
-          if (!mimeMatch || !mimeMatch[2]) {
-            attachmentErrors.push("audio: could not read clip, skipped");
-            attachmentDebug.push({ name: "audio", mime: "audio/*", detected: "audio", status: "skipped", error: "could not read clip" });
-            continue;
-          }
-          attachmentDebug.push({
-            name: "audio",
-            mime: mimeMatch[1],
-            detected: "audio",
-            bytes: Math.round(mimeMatch[2].length * 0.75),
-            status: "ok",
-          });
-          parts.push({ type: "input_audio", input_audio: { data: mimeMatch[2], format: audioFormat(mimeMatch[1]) } });
-        }
-        for (const f of (m.files || []).slice(0, 3)) {
-          const before = attachmentErrors.length;
-          const text = (await extractDoc(f)).slice(0, 15000);
-          const failed = attachmentErrors.length > before;
-          attachmentDebug.push({
-            name: f?.name || "attachment",
-            mime: f?.mime || "application/octet-stream",
-            detected: detectKind(f?.name || "", f?.mime || ""),
-            bytes: f?.base64 ? Math.round(f.base64.length * 0.75) : 0,
-            text_chars: text.length,
-            status: failed ? "error" : "ok",
-            error: failed ? attachmentErrors[attachmentErrors.length - 1] : undefined,
-          });
-          parts.push({ type: "text", text: `\n--- DOCUMENT: ${f?.name || "attachment"} ---\n${text}\n--- END DOCUMENT ---` });
-        }
-        if ((m.files || []).length > 3) attachmentErrors.push("only the first 3 documents per message were read");
-        if ((m.images || []).length > 4) attachmentErrors.push("only the first 4 images per message were read");
-        if ((m.audio || []).length > 1) attachmentErrors.push("only the first audio clip per message was read");
-        geminiParts.push({ role: "user", parts: parts.map((p: any) => p.type) });
-        out.push({ role: "user", content: parts });
-      }
-      return out;
-    };
-
     // Convert attachments ONCE — re-parsing documents on the follow-up call is
     // wasteful and would re-run PDF/Office extraction for every tool round-trip.
-    const preparedMessages = await toGeminiMsgs(messages);
+    const preparedMessages = await buildGeminiMsgs(messages, {
+      extractDoc,
+      errors: attachmentErrors,
+      debug: attachmentDebug,
+      parts: geminiParts,
+    });
+
     const debugPayload = {
       model: "google/gemini-2.5-flash",
       attachments: attachmentDebug,

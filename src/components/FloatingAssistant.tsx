@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bot, Send, X, Maximize2, Minimize2, ExternalLink, Mail, GripVertical, Sparkles, Paperclip, FileText, Volume2, AudioLines } from "lucide-react";
+import { Bot, Send, X, Maximize2, Minimize2, ExternalLink, Mail, GripVertical, Sparkles, Paperclip, FileText, Volume2, AudioLines, Loader2, Check, AlertTriangle, PanelLeftClose, PanelLeftOpen, Sunrise, ListChecks, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,8 @@ import HtmlPreview from "./HtmlPreview";
 
 type DocFile = { name: string; mime: string; base64: string };
 type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[]; files?: DocFile[] };
-type Attachment = { name: string; content: string; kind?: "text" | "image" | "audio" | "file"; dataUrl?: string; mime?: string; base64?: string };
+type AttachStatus = "uploading" | "parsing" | "ready" | "error";
+type Attachment = { id: string; name: string; content: string; kind?: "text" | "image" | "audio" | "file"; dataUrl?: string; mime?: string; base64?: string; status: AttachStatus };
 
 type Pos = { x: number; y: number };
 
@@ -72,6 +73,14 @@ const FloatingAssistant = () => {
   const attachInputRef = useRef<HTMLInputElement>(null);
   const [nudge, setNudge] = useState<string | null>(null);
   const lastNudgeRef = useRef<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem("floating_assistant_sidebar_open") === "true"; } catch { return false; }
+  });
+  const toggleSidebar = () => setSidebarOpen((prev) => {
+    const next = !prev;
+    try { localStorage.setItem("floating_assistant_sidebar_open", String(next)); } catch {}
+    return next;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -165,40 +174,55 @@ const FloatingAssistant = () => {
       const name = f.name.toLowerCase();
       const isDoc = /\.(pdf|doc|docx|xls|xlsx|csv)$/.test(name) ||
         /pdf|word|excel|sheet|csv/.test(f.type);
+      const kind: NonNullable<Attachment["kind"]> = f.type.startsWith("image/")
+        ? "image"
+        : f.type.startsWith("audio/")
+          ? "audio"
+          : isDoc
+            ? "file"
+            : "text";
+      const limit = kind === "image" ? 5 : kind === "audio" ? 20 : kind === "file" ? 15 : 0.5;
+      if (f.size > limit * 1024 * 1024) {
+        toast({ title: "File too large", description: `${f.name} exceeds ${limit}MB.`, variant: "destructive" });
+        continue;
+      }
+      const id = `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      // Chip appears immediately so the Founder sees upload → parse → ready.
+      setAttachments((prev) => [...prev, { id, name: f.name, content: "", kind, mime: f.type, status: "uploading" }]);
+      const patch = (u: Partial<Attachment>) =>
+        setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...u } : a)));
       try {
-        if (f.type.startsWith("image/")) {
-          if (f.size > 5 * 1024 * 1024) { toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" }); continue; }
+        if (kind === "image" || kind === "audio") {
           const dataUrl = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "image", dataUrl, mime: f.type }]);
-        } else if (f.type.startsWith("audio/")) {
-          if (f.size > 20 * 1024 * 1024) { toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" }); continue; }
-          const dataUrl = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "audio", dataUrl, mime: f.type }]);
-        } else if (isDoc) {
-          if (f.size > 15 * 1024 * 1024) { toast({ title: "Document too large", description: `${f.name} exceeds 15MB.`, variant: "destructive" }); continue; }
+          patch({ dataUrl, mime: f.type, status: "ready" });
+        } else if (kind === "file") {
+          patch({ status: "parsing" });
           const dataUrl = await readAsDataUrl(f);
           const base64 = dataUrl.split(",")[1] ?? "";
-          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "file", mime: f.type || "application/octet-stream", base64 }]);
-          toast({ title: "Document attached", description: `${f.name} will be read by SYDNEY.` });
+          patch({ mime: f.type || "application/octet-stream", base64, status: base64 ? "ready" : "error" });
+          if (base64) toast({ title: "Document attached", description: `${f.name} will be read by SYDNEY.` });
         } else {
-          if (f.size > 500 * 1024) { toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" }); continue; }
+          patch({ status: "parsing" });
           const text = await f.text();
-          setAttachments((prev) => [...prev, { name: f.name, content: text, kind: "text" }]);
+          patch({ content: text, status: "ready" });
         }
       } catch {
+        patch({ status: "error" });
         toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
       }
     }
   }, [toast]);
 
+
   if (!isFounder) return null;
 
   const send = async () => {
     if ((!input.trim() && attachments.length === 0) || isLoading) return;
-    const textAtts = attachments.filter((a) => (a.kind ?? "text") === "text");
-    const imageAtts = attachments.filter((a) => a.kind === "image");
-    const audioAtts = attachments.filter((a) => a.kind === "audio");
-    const fileAtts = attachments.filter((a) => a.kind === "file");
+    const ready = attachments.filter((a) => a.status === "ready");
+    const textAtts = ready.filter((a) => (a.kind ?? "text") === "text");
+    const imageAtts = ready.filter((a) => a.kind === "image");
+    const audioAtts = ready.filter((a) => a.kind === "audio");
+    const fileAtts = ready.filter((a) => a.kind === "file");
     const attachBlock = textAtts.length
       ? `[ATTACHED FILES — please read and discuss these]:\n` +
         textAtts.map((a) => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
@@ -331,12 +355,13 @@ const FloatingAssistant = () => {
               ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" }
               : undefined
           }
-          className={`fixed z-50 border border-border bg-card shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${
+          className={`fixed z-50 border border-border bg-card shadow-2xl flex flex-col overflow-hidden relative transition-all duration-300 ${
             expanded
               ? "top-0 right-0 bottom-0 left-auto h-screen rounded-none"
               : `w-[380px] h-[500px] rounded-lg ${pos ? "" : "bottom-6 right-6"}`
           }`}
         >
+
           <div
             onPointerDown={expanded ? undefined : onPointerDown}
             onPointerMove={expanded ? undefined : onPointerMove}
@@ -348,6 +373,16 @@ const FloatingAssistant = () => {
           >
             <div className="flex items-center gap-2">
               {!expanded && <GripVertical size={14} className="text-muted-foreground" />}
+              {expanded && (
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={toggleSidebar}
+                  aria-label={sidebarOpen ? "Hide quick actions" : "Show quick actions"}
+                  className="p-1 hover:text-primary"
+                >
+                  {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+                </button>
+              )}
               <Bot size={16} className="text-primary" />
               <span className="text-sm font-bold">SYDNEY · Personal Assistant</span>
             </div>
@@ -360,6 +395,7 @@ const FloatingAssistant = () => {
               >
                 {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
+
               <button
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => closeWindow(true)}
@@ -371,6 +407,37 @@ const FloatingAssistant = () => {
               <button onPointerDown={(e) => e.stopPropagation()} onClick={() => closeWindow()} aria-label="Close assistant" className="p-1 hover:text-primary"><X size={14} /></button>
             </div>
           </div>
+
+          {/* Quick actions drawer (expanded mode) */}
+          {expanded && (
+            <div
+              aria-hidden={!sidebarOpen}
+              className={`absolute left-0 top-[49px] bottom-0 z-40 w-52 border-r border-border bg-card p-3 space-y-2 shadow-2xl transition-transform duration-300 ease-in-out ${
+                sidebarOpen ? "translate-x-0" : "-translate-x-full"
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Quick actions</p>
+              {[
+                { icon: Sunrise, label: "Morning briefing", prompt: "RUN MORNING BRIEFING" },
+                { icon: ListChecks, label: "Today's recap", prompt: "What did you do today?" },
+              ].map(({ icon: Icon, label, prompt }) => (
+                <button
+                  key={label}
+                  onClick={() => { setInput(prompt); setSidebarOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded border border-border px-2 py-1.5 text-left text-xs hover:bg-secondary/60"
+                >
+                  <Icon size={12} className="text-primary" /> {label}
+                </button>
+              ))}
+              <button
+                onClick={() => { setMessages([]); setSidebarOpen(false); }}
+                className="flex w-full items-center gap-2 rounded border border-border px-2 py-1.5 text-left text-xs hover:bg-secondary/60"
+              >
+                <Eraser size={12} className="text-primary" /> Clear chat
+              </button>
+            </div>
+          )}
+
 
           {nudge && (
             <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2">
@@ -446,8 +513,8 @@ const FloatingAssistant = () => {
           >
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-1 pb-2">
-                {attachments.map((a, i) => (
-                  <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px]">
+                {attachments.map((a) => (
+                  <span key={a.id} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px]">
                     {a.kind === "image" && a.dataUrl ? (
                       <img src={a.dataUrl} alt={`Attached ${a.name}`} className="h-4 w-4 rounded object-cover" />
                     ) : a.kind === "audio" ? (
@@ -456,11 +523,18 @@ const FloatingAssistant = () => {
                       <FileText size={10} className="text-primary" />
                     )}
                     <span className="max-w-[120px] truncate">{a.name}</span>
-                    <button onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
+                    <span className={`flex items-center gap-0.5 uppercase tracking-wider ${a.status === "error" ? "text-destructive" : a.status === "ready" ? "text-primary" : "text-muted-foreground"}`}>
+                      {a.status === "uploading" && <><Loader2 size={9} className="animate-spin" /> Uploading</>}
+                      {a.status === "parsing" && <><Loader2 size={9} className="animate-spin" /> Reading</>}
+                      {a.status === "ready" && <><Check size={9} /> Ready</>}
+                      {a.status === "error" && <><AlertTriangle size={9} /> Failed</>}
+                    </span>
+                    <button onClick={() => setAttachments((prev) => prev.filter((p) => p.id !== a.id))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
                       <X size={10} />
                     </button>
                   </span>
                 ))}
+
               </div>
             )}
             {isDragOver && (

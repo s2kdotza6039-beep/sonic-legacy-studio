@@ -23,7 +23,7 @@ ${html}
 </body>
 </html>`;
   return (
-    <div className="w-full mt-2">
+    <div className="w-full max-w-full mt-2">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25 transition-colors"
@@ -36,11 +36,12 @@ ${html}
         <iframe
           title="Sydney layout preview"
           sandbox="allow-scripts"
-          className="w-full h-[420px] bg-white rounded-md border border-border mt-2"
+          className="block w-full max-w-full h-[420px] max-h-[70vh] bg-white rounded-md border border-border mt-2 transition-all duration-300"
           srcDoc={srcDoc}
         />
       )}
     </div>
+
   );
 };
 

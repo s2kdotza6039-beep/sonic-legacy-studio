@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2, Square, Pause, Play, SkipBack, SkipForward, Bug, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, Mail, ArrowLeft, Sparkles, Paperclip, FileText, X, AudioLines, Volume2, Square, Pause, Play, SkipBack, SkipForward, Bug, PanelLeftClose, PanelLeftOpen, Loader2, Check, AlertTriangle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import HtmlPreview from "../components/HtmlPreview";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type DocFile = { name: string; mime: string; base64: string };
 type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[]; files?: DocFile[] };
-type Attachment = { name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string };
+type AttachStatus = "uploading" | "parsing" | "ready" | "error";
+type Attachment = { id: string; name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string; status: AttachStatus };
 type Convo = { id: string; title: string; created_at: string };
 
 const cleanForSpeech = (text: string) =>
@@ -81,6 +83,9 @@ const Assistant = () => {
     try { localStorage.setItem("assistant_sidebar_open", String(next)); } catch {}
     return next;
   });
+  const isMobile = useIsMobile();
+  // On small screens the drawer starts closed so the chat keeps full width.
+  useEffect(() => { if (isMobile) setSidebarOpen(false); }, [isMobile]);
 
   const readDebugHeader = (resp: Response) => {
     const raw = resp.headers.get("x-attachment-debug");
@@ -102,47 +107,49 @@ const Assistant = () => {
 
   const addFiles = async (files: FileList | File[]) => {
     for (const f of Array.from(files).slice(0, 5)) {
+      const id = `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const kind: Attachment["kind"] = f.type.startsWith("image/")
+        ? "image"
+        : f.type.startsWith("audio/")
+          ? "audio"
+          : isDocFile(f)
+            ? "file"
+            : "text";
+      const limit = kind === "image" ? 5 : kind === "audio" ? 20 : kind === "file" ? 15 : 0.5;
+      if (f.size > limit * 1024 * 1024) {
+        toast({ title: "File too large", description: `${f.name} exceeds ${limit}MB.`, variant: "destructive" });
+        continue;
+      }
+      // Show the chip immediately so the Founder sees upload → parse → ready.
+      setAttachments((prev) => [...prev, { id, name: f.name, kind, content: "", mime: f.type, status: "uploading" }]);
+      const patch = (u: Partial<Attachment>) =>
+        setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...u } : a)));
       try {
-        if (f.type.startsWith("image/")) {
-          if (f.size > 5 * 1024 * 1024) {
-            toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" });
-            continue;
-          }
+        if (kind === "image" || kind === "audio") {
           const content = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content, mime: f.type }]);
-        } else if (f.type.startsWith("audio/")) {
-          if (f.size > 20 * 1024 * 1024) {
-            toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" });
-            continue;
-          }
-          const content = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content, mime: f.type }]);
-        } else if (isDocFile(f)) {
-          if (f.size > 15 * 1024 * 1024) {
-            toast({ title: "Document too large", description: `${f.name} exceeds 15MB.`, variant: "destructive" });
-            continue;
-          }
+          patch({ content, mime: f.type, status: "ready" });
+        } else if (kind === "file") {
+          patch({ status: "parsing" });
           const dataUrl = await readAsDataUrl(f);
           const base64 = dataUrl.split(",")[1] || "";
           if (!base64) {
+            patch({ status: "error" });
             toast({ title: "Unreadable document", description: `${f.name} could not be read.`, variant: "destructive" });
             continue;
           }
-          setAttachments((prev) => [...prev, { name: f.name, kind: "file", content: "", mime: f.type || "application/octet-stream", base64 }]);
+          patch({ mime: f.type || "application/octet-stream", base64, status: "ready" });
         } else {
-          if (f.size > 500 * 1024) {
-            toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
-            continue;
-          }
+          patch({ status: "parsing" });
           const content = await f.text();
-          setAttachments((prev) => [...prev, { name: f.name, kind: "text", content }]);
+          patch({ content, status: "ready" });
         }
-
       } catch {
+        patch({ status: "error" });
         toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
       }
     }
   };
+
 
 
   useEffect(() => { fetchConversations(); }, []);
@@ -195,10 +202,11 @@ const Assistant = () => {
       await newConversation();
     }
 
-    const textFiles = attachments.filter(a => a.kind === "text");
-    const imageFiles = attachments.filter(a => a.kind === "image");
-    const audioFiles = attachments.filter(a => a.kind === "audio");
-    const docFiles = attachments.filter(a => a.kind === "file");
+    const ready = attachments.filter(a => a.status === "ready");
+    const textFiles = ready.filter(a => a.kind === "text");
+    const imageFiles = ready.filter(a => a.kind === "image");
+    const audioFiles = ready.filter(a => a.kind === "audio");
+    const docFiles = ready.filter(a => a.kind === "file");
 
     const attachBlock = textFiles.length
       ? `[ATTACHED FILES — please read and discuss these]:\n` +
@@ -331,22 +339,36 @@ const Assistant = () => {
 
   return (
     <Layout>
-      <div className="min-h-[calc(100vh-200px)] flex">
+      <div className="min-h-[calc(100vh-200px)] flex relative overflow-hidden">
+        {/* Mobile drawer backdrop */}
+        {isMobile && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden
+            className="absolute inset-0 z-30 bg-background/70 backdrop-blur-sm animate-fade-in"
+          />
+        )}
         {/* Sidebar */}
-        {sidebarOpen && (
-        <div className="w-64 shrink-0 border-r border-border bg-card p-3 flex flex-col">
-          <Button onClick={newConversation} size="sm" className="w-full mb-3 gap-1 text-xs">
+        <div
+          className={`bg-card flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+            isMobile
+              ? `absolute inset-y-0 left-0 z-40 w-64 border-r border-border shadow-2xl ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`
+              : `shrink-0 ${sidebarOpen ? "w-64 border-r border-border p-3" : "w-0 border-r-0 p-0"}`
+          } ${isMobile ? "p-3" : ""}`}
+          aria-hidden={!sidebarOpen}
+        >
+          <Button onClick={newConversation} size="sm" className="w-full mb-3 gap-1 text-xs shrink-0">
             <Plus size={12} /> New Chat
           </Button>
           <ScrollArea className="flex-1">
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-[13rem]">
               {conversations.map(c => (
                 <div
                   key={c.id}
                   className={`flex items-center gap-2 p-2 cursor-pointer text-xs group ${activeConvo === c.id ? "bg-primary/10 border border-primary/30" : "hover:bg-secondary/50 border border-transparent"}`}
                 >
                   <MessageSquare size={12} className="shrink-0 text-muted-foreground" />
-                  <span onClick={() => loadConversation(c.id)} className="flex-1 truncate">{c.title}</span>
+                  <span onClick={() => { loadConversation(c.id); if (isMobile) setSidebarOpen(false); }} className="flex-1 truncate">{c.title}</span>
                   <button onClick={() => deleteConversation(c.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
                     <Trash2 size={10} />
                   </button>
@@ -355,7 +377,7 @@ const Assistant = () => {
             </div>
           </ScrollArea>
         </div>
-        )}
+
 
         {/* Chat */}
         <div className="flex-1 flex flex-col min-w-0">
@@ -486,9 +508,9 @@ const Assistant = () => {
             <div className="max-w-4xl mx-auto w-full flex flex-col gap-2">
               {attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {attachments.map((a, i) => (
-                    <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-1 text-[10px]">
-                      {a.kind === "image" ? (
+                  {attachments.map((a) => (
+                    <span key={a.id} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-1 text-[10px]">
+                      {a.kind === "image" && a.content ? (
                         <img src={a.content} alt={a.name} className="h-6 w-6 rounded object-cover" />
                       ) : a.kind === "audio" ? (
                         <AudioLines size={12} className="text-primary" />
@@ -496,13 +518,24 @@ const Assistant = () => {
                         <FileText size={12} className="text-primary" />
                       )}
                       <span className="max-w-[140px] truncate">{a.name}</span>
-                      <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
+                      <span
+                        className={`flex items-center gap-1 uppercase tracking-wider ${
+                          a.status === "error" ? "text-destructive" : a.status === "ready" ? "text-primary" : "text-muted-foreground"
+                        }`}
+                      >
+                        {a.status === "uploading" && <><Loader2 size={10} className="animate-spin" /> Uploading</>}
+                        {a.status === "parsing" && <><Loader2 size={10} className="animate-spin" /> Reading</>}
+                        {a.status === "ready" && <><Check size={10} /> Ready</>}
+                        {a.status === "error" && <><AlertTriangle size={10} /> Failed</>}
+                      </span>
+                      <button onClick={() => setAttachments(prev => prev.filter(p => p.id !== a.id))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
                         <X size={10} />
                       </button>
                     </span>
                   ))}
                 </div>
               )}
+
               {debugInfo && (
                 <div className="border border-border bg-secondary/30 text-[10px]">
                   <button
