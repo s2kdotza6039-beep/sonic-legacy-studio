@@ -13,6 +13,7 @@ const navLinks = [
   { label: "News", path: "/news" },
   { label: "Watch", path: "/watch" },
   { label: "Upcoming", path: "/upcoming" },
+  { label: "Fan Zone", path: "/fan-zone" },
   { label: "Careers", path: "/careers" },
   { label: "Contact", path: "/contact" },
 ];

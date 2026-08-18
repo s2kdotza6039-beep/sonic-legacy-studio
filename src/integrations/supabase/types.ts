@@ -1099,6 +1099,93 @@ export type Database = {
         }
         Relationships: []
       }
+      fan_messages: {
+        Row: {
+          admin_reply: string | null
+          category: string
+          created_at: string
+          fan_email: string | null
+          fan_name: string
+          id: string
+          is_public: boolean
+          message: string
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          admin_reply?: string | null
+          category?: string
+          created_at?: string
+          fan_email?: string | null
+          fan_name: string
+          id?: string
+          is_public?: boolean
+          message: string
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          admin_reply?: string | null
+          category?: string
+          created_at?: string
+          fan_email?: string | null
+          fan_name?: string
+          id?: string
+          is_public?: boolean
+          message?: string
+          status?: string
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      fan_posts: {
+        Row: {
+          artist_tag: string | null
+          body: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          likes: number
+          media_type: string
+          media_url: string | null
+          scheduled_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          views: number
+        }
+        Insert: {
+          artist_tag?: string | null
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          likes?: number
+          media_type?: string
+          media_url?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          views?: number
+        }
+        Update: {
+          artist_tag?: string | null
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          likes?: number
+          media_type?: string
+          media_url?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          views?: number
+        }
+        Relationships: []
+      }
       idea_boards: {
         Row: {
           color: string
