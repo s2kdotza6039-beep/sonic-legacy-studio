@@ -202,10 +202,11 @@ const Assistant = () => {
       await newConversation();
     }
 
-    const textFiles = attachments.filter(a => a.kind === "text");
-    const imageFiles = attachments.filter(a => a.kind === "image");
-    const audioFiles = attachments.filter(a => a.kind === "audio");
-    const docFiles = attachments.filter(a => a.kind === "file");
+    const ready = attachments.filter(a => a.status === "ready");
+    const textFiles = ready.filter(a => a.kind === "text");
+    const imageFiles = ready.filter(a => a.kind === "image");
+    const audioFiles = ready.filter(a => a.kind === "audio");
+    const docFiles = ready.filter(a => a.kind === "file");
 
     const attachBlock = textFiles.length
       ? `[ATTACHED FILES — please read and discuss these]:\n` +
