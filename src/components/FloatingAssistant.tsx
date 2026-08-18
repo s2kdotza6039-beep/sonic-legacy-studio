@@ -166,31 +166,45 @@ const FloatingAssistant = () => {
       const name = f.name.toLowerCase();
       const isDoc = /\.(pdf|doc|docx|xls|xlsx|csv)$/.test(name) ||
         /pdf|word|excel|sheet|csv/.test(f.type);
+      const kind: NonNullable<Attachment["kind"]> = f.type.startsWith("image/")
+        ? "image"
+        : f.type.startsWith("audio/")
+          ? "audio"
+          : isDoc
+            ? "file"
+            : "text";
+      const limit = kind === "image" ? 5 : kind === "audio" ? 20 : kind === "file" ? 15 : 0.5;
+      if (f.size > limit * 1024 * 1024) {
+        toast({ title: "File too large", description: `${f.name} exceeds ${limit}MB.`, variant: "destructive" });
+        continue;
+      }
+      const id = `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      // Chip appears immediately so the Founder sees upload → parse → ready.
+      setAttachments((prev) => [...prev, { id, name: f.name, content: "", kind, mime: f.type, status: "uploading" }]);
+      const patch = (u: Partial<Attachment>) =>
+        setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...u } : a)));
       try {
-        if (f.type.startsWith("image/")) {
-          if (f.size > 5 * 1024 * 1024) { toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" }); continue; }
+        if (kind === "image" || kind === "audio") {
           const dataUrl = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "image", dataUrl, mime: f.type }]);
-        } else if (f.type.startsWith("audio/")) {
-          if (f.size > 20 * 1024 * 1024) { toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" }); continue; }
-          const dataUrl = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "audio", dataUrl, mime: f.type }]);
-        } else if (isDoc) {
-          if (f.size > 15 * 1024 * 1024) { toast({ title: "Document too large", description: `${f.name} exceeds 15MB.`, variant: "destructive" }); continue; }
+          patch({ dataUrl, mime: f.type, status: "ready" });
+        } else if (kind === "file") {
+          patch({ status: "parsing" });
           const dataUrl = await readAsDataUrl(f);
           const base64 = dataUrl.split(",")[1] ?? "";
-          setAttachments((prev) => [...prev, { name: f.name, content: "", kind: "file", mime: f.type || "application/octet-stream", base64 }]);
-          toast({ title: "Document attached", description: `${f.name} will be read by SYDNEY.` });
+          patch({ mime: f.type || "application/octet-stream", base64, status: base64 ? "ready" : "error" });
+          if (base64) toast({ title: "Document attached", description: `${f.name} will be read by SYDNEY.` });
         } else {
-          if (f.size > 500 * 1024) { toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" }); continue; }
+          patch({ status: "parsing" });
           const text = await f.text();
-          setAttachments((prev) => [...prev, { name: f.name, content: text, kind: "text" }]);
+          patch({ content: text, status: "ready" });
         }
       } catch {
+        patch({ status: "error" });
         toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
       }
     }
   }, [toast]);
+
 
   if (!isFounder) return null;
 
