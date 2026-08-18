@@ -31,6 +31,7 @@ import BettingSystem from "@/components/dashboard/BettingSystem";
 import CeoDiary from "@/components/dashboard/CeoDiary";
 import CeoNotepad from "@/components/dashboard/ceo/CeoNotepad";
 import AICommandCentre from "@/components/dashboard/AICommandCentre";
+import FanZoneAdmin from "@/components/dashboard/FanZoneAdmin";
 import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
 import ReleaseCountdownAdmin from "@/components/dashboard/ReleaseCountdownAdmin";
@@ -161,7 +162,12 @@ const Dashboard = () => {
               </div>
             )}
             {tab === "briefing" && <DailyBriefing />}
-            {tab === "command" && <AICommandCentre />}
+            {tab === "command" && (
+              <div className="space-y-6">
+                <FanZoneAdmin />
+                <AICommandCentre />
+              </div>
+            )}
             {tab === "vault" && <KnowledgeVault />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}

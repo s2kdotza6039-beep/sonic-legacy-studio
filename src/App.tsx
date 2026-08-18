@@ -20,6 +20,7 @@ import Watch from "./pages/Watch";
 import Listen from "./pages/Listen";
 import UpcomingReleases from "./pages/UpcomingReleases";
 import Events from "./pages/Events";
+import FanZone from "./pages/FanZone";
 import Dashboard from "./pages/Dashboard";
 import Royalties from "./pages/Royalties";
 import Login from "./pages/Login";
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/listen" element={<Listen />} />
             <Route path="/upcoming" element={<UpcomingReleases />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/fan-zone" element={<FanZone />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={
