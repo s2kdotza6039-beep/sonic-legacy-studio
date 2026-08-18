@@ -489,9 +489,9 @@ const Assistant = () => {
             <div className="max-w-4xl mx-auto w-full flex flex-col gap-2">
               {attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {attachments.map((a, i) => (
-                    <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-1 text-[10px]">
-                      {a.kind === "image" ? (
+                  {attachments.map((a) => (
+                    <span key={a.id} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-1 text-[10px]">
+                      {a.kind === "image" && a.content ? (
                         <img src={a.content} alt={a.name} className="h-6 w-6 rounded object-cover" />
                       ) : a.kind === "audio" ? (
                         <AudioLines size={12} className="text-primary" />
@@ -499,13 +499,24 @@ const Assistant = () => {
                         <FileText size={12} className="text-primary" />
                       )}
                       <span className="max-w-[140px] truncate">{a.name}</span>
-                      <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
+                      <span
+                        className={`flex items-center gap-1 uppercase tracking-wider ${
+                          a.status === "error" ? "text-destructive" : a.status === "ready" ? "text-primary" : "text-muted-foreground"
+                        }`}
+                      >
+                        {a.status === "uploading" && <><Loader2 size={10} className="animate-spin" /> Uploading</>}
+                        {a.status === "parsing" && <><Loader2 size={10} className="animate-spin" /> Reading</>}
+                        {a.status === "ready" && <><Check size={10} /> Ready</>}
+                        {a.status === "error" && <><AlertTriangle size={10} /> Failed</>}
+                      </span>
+                      <button onClick={() => setAttachments(prev => prev.filter(p => p.id !== a.id))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
                         <X size={10} />
                       </button>
                     </span>
                   ))}
                 </div>
               )}
+
               {debugInfo && (
                 <div className="border border-border bg-secondary/30 text-[10px]">
                   <button
