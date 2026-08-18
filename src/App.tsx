@@ -31,6 +31,7 @@ import TermsConditions from "./pages/TermsConditions";
 import Popia from "./pages/Popia";
 import FloatingAssistant from "./components/FloatingAssistant";
 import PalesaAssistant from "./components/PalesaAssistant";
+import MpumiAssistant from "./components/MpumiAssistant";
 import Unsubscribe from "./pages/Unsubscribe";
 import SandboxPayments from "./pages/SandboxPayments";
 import SecurityRulesDoc from "./pages/SecurityRulesDoc";
@@ -105,6 +106,7 @@ const App = () => (
           </Routes>
           <FloatingAssistant />
           <PalesaAssistant />
+          <MpumiAssistant />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
