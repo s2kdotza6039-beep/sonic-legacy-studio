@@ -102,47 +102,49 @@ const Assistant = () => {
 
   const addFiles = async (files: FileList | File[]) => {
     for (const f of Array.from(files).slice(0, 5)) {
+      const id = `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const kind: Attachment["kind"] = f.type.startsWith("image/")
+        ? "image"
+        : f.type.startsWith("audio/")
+          ? "audio"
+          : isDocFile(f)
+            ? "file"
+            : "text";
+      const limit = kind === "image" ? 5 : kind === "audio" ? 20 : kind === "file" ? 15 : 0.5;
+      if (f.size > limit * 1024 * 1024) {
+        toast({ title: "File too large", description: `${f.name} exceeds ${limit}MB.`, variant: "destructive" });
+        continue;
+      }
+      // Show the chip immediately so the Founder sees upload → parse → ready.
+      setAttachments((prev) => [...prev, { id, name: f.name, kind, content: "", mime: f.type, status: "uploading" }]);
+      const patch = (u: Partial<Attachment>) =>
+        setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...u } : a)));
       try {
-        if (f.type.startsWith("image/")) {
-          if (f.size > 5 * 1024 * 1024) {
-            toast({ title: "Image too large", description: `${f.name} exceeds 5MB.`, variant: "destructive" });
-            continue;
-          }
+        if (kind === "image" || kind === "audio") {
           const content = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, kind: "image", content, mime: f.type }]);
-        } else if (f.type.startsWith("audio/")) {
-          if (f.size > 20 * 1024 * 1024) {
-            toast({ title: "Audio too large", description: `${f.name} exceeds 20MB.`, variant: "destructive" });
-            continue;
-          }
-          const content = await readAsDataUrl(f);
-          setAttachments((prev) => [...prev, { name: f.name, kind: "audio", content, mime: f.type }]);
-        } else if (isDocFile(f)) {
-          if (f.size > 15 * 1024 * 1024) {
-            toast({ title: "Document too large", description: `${f.name} exceeds 15MB.`, variant: "destructive" });
-            continue;
-          }
+          patch({ content, mime: f.type, status: "ready" });
+        } else if (kind === "file") {
+          patch({ status: "parsing" });
           const dataUrl = await readAsDataUrl(f);
           const base64 = dataUrl.split(",")[1] || "";
           if (!base64) {
+            patch({ status: "error" });
             toast({ title: "Unreadable document", description: `${f.name} could not be read.`, variant: "destructive" });
             continue;
           }
-          setAttachments((prev) => [...prev, { name: f.name, kind: "file", content: "", mime: f.type || "application/octet-stream", base64 }]);
+          patch({ mime: f.type || "application/octet-stream", base64, status: "ready" });
         } else {
-          if (f.size > 500 * 1024) {
-            toast({ title: "File too large", description: `${f.name} exceeds 500KB.`, variant: "destructive" });
-            continue;
-          }
+          patch({ status: "parsing" });
           const content = await f.text();
-          setAttachments((prev) => [...prev, { name: f.name, kind: "text", content }]);
+          patch({ content, status: "ready" });
         }
-
       } catch {
+        patch({ status: "error" });
         toast({ title: "Unreadable file", description: `${f.name} could not be read.`, variant: "destructive" });
       }
     }
   };
+
 
 
   useEffect(() => { fetchConversations(); }, []);
