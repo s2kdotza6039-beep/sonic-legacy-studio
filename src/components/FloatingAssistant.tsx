@@ -347,12 +347,13 @@ const FloatingAssistant = () => {
               ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" }
               : undefined
           }
-          className={`fixed z-50 border border-border bg-card shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${
+          className={`fixed z-50 border border-border bg-card shadow-2xl flex flex-col overflow-hidden relative transition-all duration-300 ${
             expanded
               ? "top-0 right-0 bottom-0 left-auto h-screen rounded-none"
               : `w-[380px] h-[500px] rounded-lg ${pos ? "" : "bottom-6 right-6"}`
           }`}
         >
+
           <div
             onPointerDown={expanded ? undefined : onPointerDown}
             onPointerMove={expanded ? undefined : onPointerMove}
