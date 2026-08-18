@@ -698,6 +698,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       }
     };
 
+    const tPrepareStart = Date.now();
     // Convert attachments ONCE — re-parsing documents on the follow-up call is
     // wasteful and would re-run PDF/Office extraction for every tool round-trip.
     const preparedMessages = await buildGeminiMsgs(messages, {
@@ -707,11 +708,14 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       parts: geminiParts,
     });
 
+    const prepareMs = Date.now() - tPrepareStart;
+    const timings: Record<string, number> = { prepare_ms: prepareMs };
     const debugPayload = {
       model: "google/gemini-2.5-flash",
       attachments: attachmentDebug,
       sent_to_gemini: geminiParts,
       warnings: attachmentErrors,
+      timings,
     };
     slog("attachments_prepared", debugPayload);
     if (attachmentErrors.length) {
@@ -721,11 +725,15 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
         content: `ATTACHMENT PROCESSING NOTES (tell the Founder plainly if relevant): ${attachmentErrors.join("; ")}`,
       });
     }
-    const debugHeader = { "x-attachment-debug": encodeURIComponent(JSON.stringify(debugPayload)).slice(0, 6000) };
+    // Rebuilt on each use so the latest timing numbers travel with the response.
+    const buildDebugHeader = () => ({
+      "x-attachment-debug": encodeURIComponent(JSON.stringify(debugPayload)).slice(0, 6000),
+    });
 
 
-    const callAI = async (msgs: any[], stream: boolean) =>
-      fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const callAI = async (msgs: any[], stream: boolean) => {
+      const startedAt = Date.now();
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -735,6 +743,11 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           stream,
         }),
       });
+      const ms = Date.now() - startedAt;
+      timings[stream ? "gemini_stream_ms" : "gemini_first_call_ms"] = ms;
+      slog("gemini_call", { stream, ms, status: r.status, messages: msgs.length });
+      return r;
+    };
 
     // First call: non-streaming so we can detect tool calls reliably.
     const first = await callAI(preparedMessages, false);
@@ -751,7 +764,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           : "AI service temporarily unavailable",
         attachment_warnings: attachmentErrors,
         attachment_debug: debugPayload,
-      }), { status: 500, headers: { ...corsHeaders, ...debugHeader, "Content-Type": "application/json" } });
+      }), { status: 500, headers: { ...corsHeaders, ...buildDebugHeader(), "Content-Type": "application/json" } });
     }
 
     const firstJson = await first.json();
@@ -894,7 +907,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     }
 
     return new Response(second.body, {
-      headers: { ...corsHeaders, ...debugHeader, "Content-Type": "text/event-stream" },
+      headers: { ...corsHeaders, ...buildDebugHeader(), "Content-Type": "text/event-stream" },
     });
   } catch (e) {
     console.error("front-desk-assistant error:", e);

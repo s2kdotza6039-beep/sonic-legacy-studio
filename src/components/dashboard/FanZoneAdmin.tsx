@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Send, Trash2, Plus, Heart, Eye, MessageCircle } from "lucide-react";
+import { Sparkles, Send, Trash2, Plus, Heart, Eye, MessageCircle, Upload, Loader2, X } from "lucide-react";
+
 
 type FanPost = {
   id: string;
@@ -34,6 +35,11 @@ const emptyPost = {
   status: "published",
 };
 
+const MEDIA_BUCKET = "fan-media";
+const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5; // 5 years — public feed links
+const MAX_IMAGE_MB = 10;
+const MAX_VIDEO_MB = 200;
+
 const FanZoneAdmin = () => {
   const { toast } = useToast();
   const [posts, setPosts] = useState<FanPost[]>([]);
@@ -41,6 +47,51 @@ const FanZoneAdmin = () => {
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [form, setForm] = useState(emptyPost);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadName, setUploadName] = useState<string | null>(null);
+  const [uploadMs, setUploadMs] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const uploadMedia = async (file: File) => {
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      toast({ title: "Unsupported file", description: "Upload an image or a video.", variant: "destructive" });
+      return;
+    }
+    const limit = isImage ? MAX_IMAGE_MB : MAX_VIDEO_MB;
+    if (file.size > limit * 1024 * 1024) {
+      toast({ title: "File too large", description: `${file.name} exceeds ${limit}MB.`, variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    setUploadName(file.name);
+    setUploadMs(null);
+    const started = performance.now();
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `posts/${Date.now()}-${safe}`;
+    const { error: upErr } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+    if (upErr) {
+      setUploading(false);
+      toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
+      return;
+    }
+    const { data: signed, error: signErr } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_TTL);
+    const ms = Math.round(performance.now() - started);
+    setUploading(false);
+    setUploadMs(ms);
+    if (signErr || !signed?.signedUrl) {
+      toast({ title: "Couldn't link media", description: signErr?.message ?? "No URL returned", variant: "destructive" });
+      return;
+    }
+    setForm((f) => ({ ...f, media_url: signed.signedUrl, media_type: isImage ? "image" : "video" }));
+    toast({ title: "Media uploaded", description: `${file.name} ready in ${(ms / 1000).toFixed(1)}s.` });
+  };
+
 
   const load = async () => {
     const [{ data: p }, { data: m }] = await Promise.all([
@@ -107,6 +158,8 @@ const FanZoneAdmin = () => {
       return;
     }
     setForm(emptyPost);
+    setUploadName(null);
+    setUploadMs(null);
     toast({ title: "Drop is live", description: "Post added to the Fan Zone feed." });
     load();
   };
@@ -216,12 +269,58 @@ const FanZoneAdmin = () => {
             onChange={(e) => setForm({ ...form, body: e.target.value })}
             className={`${inputCls} resize-y`}
           />
-          <input
-            placeholder="Media URL (image or video)"
-            value={form.media_url}
-            onChange={(e) => setForm({ ...form, media_url: e.target.value })}
-            className={inputCls}
-          />
+          <div className="space-y-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadMedia(f);
+                e.target.value = "";
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-2 text-[10px] uppercase tracking-widest border border-border px-3 py-2 hover:border-primary/50 transition-colors disabled:opacity-50"
+              >
+                {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                {uploading ? "Uploading..." : "Upload image / video"}
+              </button>
+              {uploadName && (
+                <span className="text-[10px] text-muted-foreground">
+                  {uploadName}
+                  {uploadMs !== null && ` · ${uploadMs}ms`}
+                </span>
+              )}
+              {form.media_url && (
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, media_url: "" })}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-destructive"
+                >
+                  <X size={11} /> Clear media
+                </button>
+              )}
+            </div>
+            {form.media_url && (
+              <div className="border border-border/70 p-2">
+                {form.media_type === "video" ? (
+                  <video src={form.media_url} controls className="max-h-48 w-full object-contain" />
+                ) : (
+                  <img src={form.media_url} alt="Fan post media preview" className="max-h-48 w-full object-contain" />
+                )}
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Images up to {MAX_IMAGE_MB}MB, video up to {MAX_VIDEO_MB}MB. Media is stored in the Fan Zone media library.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <select
               value={form.media_type}

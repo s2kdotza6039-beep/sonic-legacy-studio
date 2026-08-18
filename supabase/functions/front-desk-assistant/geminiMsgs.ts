@@ -18,6 +18,8 @@ export type AttachDebug = {
   detected: AttachDetected;
   bytes?: number;
   text_chars?: number;
+  /** Parse/extract time in ms (documents only). */
+  parse_ms?: number;
   status: "ok" | "skipped" | "error";
   error?: string;
 };
@@ -129,7 +131,9 @@ export const buildGeminiMsgs = async (msgs: any[], deps: BuildDeps) => {
 
     for (const f of (m.files || []).slice(0, MAX_DOCS)) {
       const before = errors.length;
+      const startedAt = Date.now();
       const text = (await extractDoc(f)).slice(0, MAX_DOC_CHARS);
+      const parseMs = Date.now() - startedAt;
       const failed = errors.length > before;
       debug.push({
         name: f?.name || "attachment",
@@ -137,6 +141,7 @@ export const buildGeminiMsgs = async (msgs: any[], deps: BuildDeps) => {
         detected: detectKind(f?.name || "", f?.mime || ""),
         bytes: f?.base64 ? Math.round(f.base64.length * 0.75) : 0,
         text_chars: text.length,
+        parse_ms: parseMs,
         status: failed ? "error" : "ok",
         error: failed ? errors[errors.length - 1] : undefined,
       });

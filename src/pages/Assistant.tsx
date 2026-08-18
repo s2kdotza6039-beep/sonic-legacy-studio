@@ -15,7 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 type DocFile = { name: string; mime: string; base64: string };
 type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[]; files?: DocFile[] };
 type AttachStatus = "uploading" | "parsing" | "ready" | "error";
-type Attachment = { id: string; name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string; status: AttachStatus };
+type Attachment = { id: string; name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string; status: AttachStatus; ms?: number; bytes?: number };
 type Convo = { id: string; title: string; created_at: string };
 
 const cleanForSpeech = (text: string) =>
@@ -74,6 +74,8 @@ const Assistant = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const attachInputRef = useRef<HTMLInputElement>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [clientTimings, setClientTimings] = useState<{ name: string; ms: number; bytes: number }[]>([]);
+  const [requestTiming, setRequestTiming] = useState<{ ttfb: number; total: number } | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try { return localStorage.getItem("assistant_sidebar_open") !== "false"; } catch { return true; }
@@ -121,13 +123,14 @@ const Assistant = () => {
         continue;
       }
       // Show the chip immediately so the Founder sees upload → parse → ready.
-      setAttachments((prev) => [...prev, { id, name: f.name, kind, content: "", mime: f.type, status: "uploading" }]);
+      setAttachments((prev) => [...prev, { id, name: f.name, kind, content: "", mime: f.type, status: "uploading", bytes: f.size }]);
+      const startedAt = performance.now();
       const patch = (u: Partial<Attachment>) =>
         setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, ...u } : a)));
       try {
         if (kind === "image" || kind === "audio") {
           const content = await readAsDataUrl(f);
-          patch({ content, mime: f.type, status: "ready" });
+          patch({ content, mime: f.type, status: "ready", ms: Math.round(performance.now() - startedAt) });
         } else if (kind === "file") {
           patch({ status: "parsing" });
           const dataUrl = await readAsDataUrl(f);
@@ -137,11 +140,11 @@ const Assistant = () => {
             toast({ title: "Unreadable document", description: `${f.name} could not be read.`, variant: "destructive" });
             continue;
           }
-          patch({ mime: f.type || "application/octet-stream", base64, status: "ready" });
+          patch({ mime: f.type || "application/octet-stream", base64, status: "ready", ms: Math.round(performance.now() - startedAt) });
         } else {
           patch({ status: "parsing" });
           const content = await f.text();
-          patch({ content, status: "ready" });
+          patch({ content, status: "ready", ms: Math.round(performance.now() - startedAt) });
         }
       } catch {
         patch({ status: "error" });
@@ -224,6 +227,8 @@ const Assistant = () => {
       audio: audioFiles.length ? audioFiles.map(a => a.content) : undefined,
       files: docFiles.length ? docFiles.map(a => ({ name: a.name, mime: a.mime || "application/octet-stream", base64: a.base64 || "" })) : undefined,
     };
+    setClientTimings(ready.map(a => ({ name: a.name, ms: a.ms ?? 0, bytes: a.bytes ?? 0 })));
+    setRequestTiming(null);
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
     setInput("");
@@ -254,6 +259,8 @@ const Assistant = () => {
       });
     };
 
+    const tRequestStart = performance.now();
+    let ttfbMs = 0;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
@@ -268,6 +275,7 @@ const Assistant = () => {
         body: JSON.stringify({ messages: allMessages, conversation_id: activeConvo }),
       });
 
+      ttfbMs = Math.round(performance.now() - tRequestStart);
       readDebugHeader(resp);
 
       if (!resp.ok) {
@@ -305,6 +313,10 @@ const Assistant = () => {
           } catch {}
         }
       }
+
+      const totalMs = Math.round(performance.now() - tRequestStart);
+      setRequestTiming({ ttfb: ttfbMs, total: totalMs });
+      console.info("[SYDNEY timing]", { ttfb_ms: ttfbMs, total_ms: totalMs, attachments: clientTimings });
 
       // Save assistant message
       if (activeConvo && assistantContent) {
@@ -525,7 +537,7 @@ const Assistant = () => {
                       >
                         {a.status === "uploading" && <><Loader2 size={10} className="animate-spin" /> Uploading</>}
                         {a.status === "parsing" && <><Loader2 size={10} className="animate-spin" /> Reading</>}
-                        {a.status === "ready" && <><Check size={10} /> Ready</>}
+                        {a.status === "ready" && <><Check size={10} /> Ready{typeof a.ms === "number" ? ` · ${a.ms}ms` : ""}</>}
                         {a.status === "error" && <><AlertTriangle size={10} /> Failed</>}
                       </span>
                       <button onClick={() => setAttachments(prev => prev.filter(p => p.id !== a.id))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
@@ -556,10 +568,23 @@ const Assistant = () => {
                           <span className="text-muted-foreground">{a.mime}</span>
                           {typeof a.bytes === "number" && <span className="text-muted-foreground">{(a.bytes / 1024).toFixed(0)}KB</span>}
                           {typeof a.text_chars === "number" && <span className="text-muted-foreground">{a.text_chars} chars</span>}
+                          {typeof a.parse_ms === "number" && <span className="text-primary">parse {a.parse_ms}ms</span>}
                           <span className={a.status === "ok" ? "text-primary" : "text-destructive"}>{a.status}</span>
                           {a.error && <span className="text-destructive">{a.error}</span>}
                         </div>
                       ))}
+                      <div className="flex flex-wrap gap-2 pt-1 border-t border-border/50">
+                        <span className="uppercase tracking-wider text-muted-foreground">Timing</span>
+                        {clientTimings.map((t, i) => (
+                          <span key={i} className="text-muted-foreground">
+                            {t.name}: read {t.ms}ms{t.bytes ? ` (${(t.bytes / 1024).toFixed(0)}KB)` : ""}
+                          </span>
+                        ))}
+                        {debugInfo.timings?.prepare_ms !== undefined && <span>server parse {debugInfo.timings.prepare_ms}ms</span>}
+                        {debugInfo.timings?.gemini_first_call_ms !== undefined && <span>gemini call {debugInfo.timings.gemini_first_call_ms}ms</span>}
+                        {debugInfo.timings?.gemini_stream_ms !== undefined && <span>gemini stream start {debugInfo.timings.gemini_stream_ms}ms</span>}
+                        {requestTiming && <span className="text-primary">round-trip {requestTiming.total}ms (first byte {requestTiming.ttfb}ms)</span>}
+                      </div>
                       <p className="text-muted-foreground">
                         Sent to {debugInfo.model}: {(debugInfo.sent_to_gemini || []).map((m: any) => m.parts.join("+")).join(" | ") || "text only"}
                       </p>
