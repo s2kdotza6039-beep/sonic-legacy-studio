@@ -158,6 +158,8 @@ const FanZoneAdmin = () => {
       return;
     }
     setForm(emptyPost);
+    setUploadName(null);
+    setUploadMs(null);
     toast({ title: "Drop is live", description: "Post added to the Fan Zone feed." });
     load();
   };
