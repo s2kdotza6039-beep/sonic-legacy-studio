@@ -1,13 +1,6 @@
 [
   {
     "table": "public.tracks",
-    "policy": "Public reads active tracks",
-    "operation": "SELECT",
-    "outcome": "allowed",
-    "test": "anon CAN read non-sensitive columns"
-  },
-  {
-    "table": "public.tracks",
     "policy": "Column REVOKE on r2_object_key",
     "operation": "SELECT(col)",
     "outcome": "blocked",
