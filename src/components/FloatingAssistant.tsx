@@ -11,7 +11,8 @@ import HtmlPreview from "./HtmlPreview";
 
 type DocFile = { name: string; mime: string; base64: string };
 type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[]; files?: DocFile[] };
-type Attachment = { name: string; content: string; kind?: "text" | "image" | "audio" | "file"; dataUrl?: string; mime?: string; base64?: string };
+type AttachStatus = "uploading" | "parsing" | "ready" | "error";
+type Attachment = { id: string; name: string; content: string; kind?: "text" | "image" | "audio" | "file"; dataUrl?: string; mime?: string; base64?: string; status: AttachStatus };
 
 type Pos = { x: number; y: number };
 
