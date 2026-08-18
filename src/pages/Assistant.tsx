@@ -334,22 +334,36 @@ const Assistant = () => {
 
   return (
     <Layout>
-      <div className="min-h-[calc(100vh-200px)] flex">
+      <div className="min-h-[calc(100vh-200px)] flex relative overflow-hidden">
+        {/* Mobile drawer backdrop */}
+        {isMobile && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden
+            className="absolute inset-0 z-30 bg-background/70 backdrop-blur-sm animate-fade-in"
+          />
+        )}
         {/* Sidebar */}
-        {sidebarOpen && (
-        <div className="w-64 shrink-0 border-r border-border bg-card p-3 flex flex-col">
-          <Button onClick={newConversation} size="sm" className="w-full mb-3 gap-1 text-xs">
+        <div
+          className={`bg-card flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+            isMobile
+              ? `absolute inset-y-0 left-0 z-40 w-64 border-r border-border shadow-2xl ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`
+              : `shrink-0 ${sidebarOpen ? "w-64 border-r border-border p-3" : "w-0 border-r-0 p-0"}`
+          } ${isMobile ? "p-3" : ""}`}
+          aria-hidden={!sidebarOpen}
+        >
+          <Button onClick={newConversation} size="sm" className="w-full mb-3 gap-1 text-xs shrink-0">
             <Plus size={12} /> New Chat
           </Button>
           <ScrollArea className="flex-1">
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-[13rem]">
               {conversations.map(c => (
                 <div
                   key={c.id}
                   className={`flex items-center gap-2 p-2 cursor-pointer text-xs group ${activeConvo === c.id ? "bg-primary/10 border border-primary/30" : "hover:bg-secondary/50 border border-transparent"}`}
                 >
                   <MessageSquare size={12} className="shrink-0 text-muted-foreground" />
-                  <span onClick={() => loadConversation(c.id)} className="flex-1 truncate">{c.title}</span>
+                  <span onClick={() => { loadConversation(c.id); if (isMobile) setSidebarOpen(false); }} className="flex-1 truncate">{c.title}</span>
                   <button onClick={() => deleteConversation(c.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
                     <Trash2 size={10} />
                   </button>
@@ -358,7 +372,7 @@ const Assistant = () => {
             </div>
           </ScrollArea>
         </div>
-        )}
+
 
         {/* Chat */}
         <div className="flex-1 flex flex-col min-w-0">
