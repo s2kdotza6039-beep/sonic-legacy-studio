@@ -267,12 +267,58 @@ const FanZoneAdmin = () => {
             onChange={(e) => setForm({ ...form, body: e.target.value })}
             className={`${inputCls} resize-y`}
           />
-          <input
-            placeholder="Media URL (image or video)"
-            value={form.media_url}
-            onChange={(e) => setForm({ ...form, media_url: e.target.value })}
-            className={inputCls}
-          />
+          <div className="space-y-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadMedia(f);
+                e.target.value = "";
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-2 text-[10px] uppercase tracking-widest border border-border px-3 py-2 hover:border-primary/50 transition-colors disabled:opacity-50"
+              >
+                {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                {uploading ? "Uploading..." : "Upload image / video"}
+              </button>
+              {uploadName && (
+                <span className="text-[10px] text-muted-foreground">
+                  {uploadName}
+                  {uploadMs !== null && ` · ${uploadMs}ms`}
+                </span>
+              )}
+              {form.media_url && (
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, media_url: "" })}
+                  className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-destructive"
+                >
+                  <X size={11} /> Clear media
+                </button>
+              )}
+            </div>
+            {form.media_url && (
+              <div className="border border-border/70 p-2">
+                {form.media_type === "video" ? (
+                  <video src={form.media_url} controls className="max-h-48 w-full object-contain" />
+                ) : (
+                  <img src={form.media_url} alt="Fan post media preview" className="max-h-48 w-full object-contain" />
+                )}
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Images up to {MAX_IMAGE_MB}MB, video up to {MAX_VIDEO_MB}MB. Media is stored in the Fan Zone media library.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <select
               value={form.media_type}
