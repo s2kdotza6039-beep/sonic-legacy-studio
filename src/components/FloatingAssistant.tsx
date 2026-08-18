@@ -408,6 +408,37 @@ const FloatingAssistant = () => {
             </div>
           </div>
 
+          {/* Quick actions drawer (expanded mode) */}
+          {expanded && (
+            <div
+              aria-hidden={!sidebarOpen}
+              className={`absolute left-0 top-[49px] bottom-0 z-40 w-52 border-r border-border bg-card p-3 space-y-2 shadow-2xl transition-transform duration-300 ease-in-out ${
+                sidebarOpen ? "translate-x-0" : "-translate-x-full"
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Quick actions</p>
+              {[
+                { icon: Sunrise, label: "Morning briefing", prompt: "RUN MORNING BRIEFING" },
+                { icon: ListChecks, label: "Today's recap", prompt: "What did you do today?" },
+              ].map(({ icon: Icon, label, prompt }) => (
+                <button
+                  key={label}
+                  onClick={() => { setInput(prompt); setSidebarOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded border border-border px-2 py-1.5 text-left text-xs hover:bg-secondary/60"
+                >
+                  <Icon size={12} className="text-primary" /> {label}
+                </button>
+              ))}
+              <button
+                onClick={() => { setMessages([]); setSidebarOpen(false); }}
+                className="flex w-full items-center gap-2 rounded border border-border px-2 py-1.5 text-left text-xs hover:bg-secondary/60"
+              >
+                <Eraser size={12} className="text-primary" /> Clear chat
+              </button>
+            </div>
+          )}
+
+
           {nudge && (
             <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2">
               <Sparkles size={12} className="text-primary shrink-0" />
