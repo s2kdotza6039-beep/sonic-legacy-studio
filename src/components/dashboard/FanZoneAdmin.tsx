@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Send, Trash2, Plus, Heart, Eye, MessageCircle, Upload, Loader2, X } from "lucide-react";
+import { Sparkles, Send, Trash2, Plus, Heart, Eye, MessageCircle, Upload, Loader2, X, ShieldCheck, ShieldX, Clock } from "lucide-react";
+import { makeThumbnail } from "@/lib/mediaThumbnail";
+import { resumableUpload } from "@/lib/resumableUpload";
 
 
 type FanPost = {
@@ -11,6 +13,11 @@ type FanPost = {
   views: number;
   status: string;
   created_at: string;
+  media_url: string | null;
+  media_type: string;
+  thumb_url: string | null;
+  moderation_status: string;
+  moderation_note: string | null;
 };
 
 type FanMessage = {
@@ -30,10 +37,14 @@ const emptyPost = {
   title: "",
   body: "",
   media_url: "",
+  thumb_url: "",
   media_type: "image",
   artist_tag: "",
   status: "published",
 };
+
+const ALLOWED_IMAGE = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+const ALLOWED_VIDEO = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"];
 
 const MEDIA_BUCKET = "fan-media";
 const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5; // 5 years — public feed links
@@ -50,54 +61,114 @@ const FanZoneAdmin = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadName, setUploadName] = useState<string | null>(null);
   const [uploadMs, setUploadMs] = useState<number | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const uploadMedia = async (file: File) => {
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
     if (!isImage && !isVideo) {
-      toast({ title: "Unsupported file", description: "Upload an image or a video.", variant: "destructive" });
+      toast({
+        title: "Unsupported file type",
+        description: `${file.type || "That file"} can't be posted. Use JPG, PNG, WEBP, GIF, MP4, WEBM or MOV.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const allowed = isImage ? ALLOWED_IMAGE : ALLOWED_VIDEO;
+    if (!allowed.includes(file.type)) {
+      toast({
+        title: "Unsupported media type",
+        description: `${file.type} isn't supported. Allowed: ${allowed.join(", ")}.`,
+        variant: "destructive",
+      });
       return;
     }
     const limit = isImage ? MAX_IMAGE_MB : MAX_VIDEO_MB;
     if (file.size > limit * 1024 * 1024) {
-      toast({ title: "File too large", description: `${file.name} exceeds ${limit}MB.`, variant: "destructive" });
+      toast({
+        title: "File too large",
+        description: `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)}MB — the limit for ${isImage ? "images" : "video"} is ${limit}MB.`,
+        variant: "destructive",
+      });
       return;
     }
+
     setUploading(true);
     setUploadName(file.name);
     setUploadMs(null);
+    setProgress(0);
+    setUploadNote(null);
     const started = performance.now();
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `posts/${Date.now()}-${safe}`;
-    const { error: upErr } = await supabase.storage
-      .from(MEDIA_BUCKET)
-      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
-    if (upErr) {
+    const stamp = Date.now();
+    const path = `posts/${stamp}-${safe}`;
+    const thumbPath = `posts/thumbs/${stamp}-${safe.replace(/\.[^.]+$/, "")}.jpg`;
+
+    try {
+      await resumableUpload({
+        bucket: MEDIA_BUCKET,
+        path,
+        file,
+        contentType: file.type,
+        onProgress: setProgress,
+        onRetry: (_a, message) => setUploadNote(message),
+      });
+    } catch (e) {
       setUploading(false);
-      toast({ title: "Upload failed", description: upErr.message, variant: "destructive" });
+      setProgress(0);
+      toast({ title: "Upload failed", description: (e as Error).message, variant: "destructive" });
       return;
     }
+
+    // Thumbnail: downscaled image, or the first readable video frame.
+    let thumbUrl = "";
+    try {
+      const thumb = await makeThumbnail(file);
+      await resumableUpload({
+        bucket: MEDIA_BUCKET,
+        path: thumbPath,
+        file: thumb,
+        contentType: "image/jpeg",
+      });
+      const { data: signedThumb } = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .createSignedUrl(thumbPath, SIGNED_URL_TTL);
+      thumbUrl = signedThumb?.signedUrl ?? "";
+    } catch {
+      setUploadNote("Thumbnail couldn't be generated — the full media will be used instead.");
+    }
+
     const { data: signed, error: signErr } = await supabase.storage
       .from(MEDIA_BUCKET)
       .createSignedUrl(path, SIGNED_URL_TTL);
     const ms = Math.round(performance.now() - started);
     setUploading(false);
     setUploadMs(ms);
+    setProgress(100);
     if (signErr || !signed?.signedUrl) {
-      toast({ title: "Couldn't link media", description: signErr?.message ?? "No URL returned", variant: "destructive" });
+      toast({
+        title: "Couldn't link media",
+        description: signErr?.message ?? "No URL returned",
+        variant: "destructive",
+      });
       return;
     }
-    setForm((f) => ({ ...f, media_url: signed.signedUrl, media_type: isImage ? "image" : "video" }));
+    setForm((f) => ({
+      ...f,
+      media_url: signed.signedUrl,
+      thumb_url: thumbUrl,
+      media_type: isImage ? "image" : "video",
+    }));
     toast({ title: "Media uploaded", description: `${file.name} ready in ${(ms / 1000).toFixed(1)}s.` });
   };
-
 
   const load = async () => {
     const [{ data: p }, { data: m }] = await Promise.all([
       supabase
         .from("fan_posts")
-        .select("id, title, likes, views, status, created_at")
+        .select("id, title, likes, views, status, created_at, media_url, media_type, thumb_url, moderation_status, moderation_note")
         .order("created_at", { ascending: false })
         .limit(50),
       supabase
@@ -147,6 +218,8 @@ const FanZoneAdmin = () => {
       title: form.title.trim(),
       body: form.body.trim() || null,
       media_url: form.media_url.trim() || null,
+      thumb_url: form.thumb_url.trim() || null,
+      moderation_status: "pending",
       media_type: form.media_type,
       artist_tag: form.artist_tag.trim() || null,
       status: form.status,
@@ -160,7 +233,38 @@ const FanZoneAdmin = () => {
     setForm(emptyPost);
     setUploadName(null);
     setUploadMs(null);
-    toast({ title: "Drop is live", description: "Post added to the Fan Zone feed." });
+    setProgress(0);
+    setUploadNote(null);
+    toast({
+      title: "Post queued for review",
+      description: "It appears in the Fan Zone once approved in the moderation queue.",
+    });
+    load();
+  };
+
+  const moderate = async (id: string, decision: "approved" | "rejected") => {
+    const note =
+      decision === "rejected"
+        ? window.prompt("Reason for rejecting this post (optional)") ?? null
+        : null;
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("fan_posts")
+      .update({
+        moderation_status: decision,
+        moderation_note: note,
+        moderated_at: new Date().toISOString(),
+        moderated_by: auth.user?.id ?? null,
+      })
+      .eq("id", id);
+    if (error) {
+      toast({ title: "Couldn't moderate", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: decision === "approved" ? "Approved — live in the Fan Zone" : "Rejected",
+      description: decision === "approved" ? "The majita can see it now." : "It stays hidden from fans.",
+    });
     load();
   };
 
@@ -307,6 +411,17 @@ const FanZoneAdmin = () => {
                 </button>
               )}
             </div>
+            {uploading && (
+              <div className="space-y-1">
+                <div className="h-1.5 w-full bg-secondary overflow-hidden">
+                  <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {progress.toFixed(0)}% uploaded · resumable, retries automatically
+                </p>
+              </div>
+            )}
+            {uploadNote && <p className="text-[10px] text-primary">{uploadNote}</p>}
             {form.media_url && (
               <div className="border border-border/70 p-2">
                 {form.media_type === "video" ? (
@@ -317,7 +432,8 @@ const FanZoneAdmin = () => {
               </div>
             )}
             <p className="text-[10px] text-muted-foreground">
-              Images up to {MAX_IMAGE_MB}MB, video up to {MAX_VIDEO_MB}MB. Media is stored in the Fan Zone media library.
+              Images up to {MAX_IMAGE_MB}MB (JPG, PNG, WEBP, GIF), video up to {MAX_VIDEO_MB}MB (MP4, WEBM, MOV).
+              Uploads are resumable and a thumbnail is generated automatically. New posts enter the moderation queue.
             </p>
           </div>
 
@@ -357,6 +473,53 @@ const FanZoneAdmin = () => {
         </form>
       </div>
 
+      {/* Moderation queue */}
+      <div className="border border-border bg-card p-6">
+        <h3 className="text-sm uppercase tracking-widest text-primary mb-4 flex items-center gap-2">
+          <Clock size={14} /> Moderation queue
+        </h3>
+        {posts.filter((p) => p.moderation_status === "pending").length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing waiting for review.</p>
+        ) : (
+          <div className="space-y-3">
+            {posts
+              .filter((p) => p.moderation_status === "pending")
+              .map((p) => (
+                <div key={p.id} className="flex flex-wrap items-center gap-4 border border-border/70 p-3">
+                  {p.thumb_url || p.media_url ? (
+                    <img
+                      src={p.thumb_url ?? p.media_url ?? ""}
+                      alt={`Preview of ${p.title}`}
+                      loading="lazy"
+                      className="w-20 h-20 object-cover border border-border"
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm truncate">{p.title}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
+                      {p.media_type} · {p.status} · awaiting review
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => moderate(p.id, "approved")}
+                      className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest bg-primary text-primary-foreground px-3 py-1.5 hover:opacity-90"
+                    >
+                      <ShieldCheck size={12} /> Approve
+                    </button>
+                    <button
+                      onClick={() => moderate(p.id, "rejected")}
+                      className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest border border-border px-3 py-1.5 hover:border-destructive hover:text-destructive"
+                    >
+                      <ShieldX size={12} /> Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
       {/* Posts list */}
       <div className="border border-border bg-card p-6">
         <h3 className="text-sm uppercase tracking-widest text-primary mb-4">Posts</h3>
@@ -379,6 +542,17 @@ const FanZoneAdmin = () => {
                       <Eye size={11} /> {p.views}
                     </span>
                     <span className="text-primary">{p.status}</span>
+                    <span
+                      className={
+                        p.moderation_status === "approved"
+                          ? "text-primary"
+                          : p.moderation_status === "rejected"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                      }
+                    >
+                      {p.moderation_status}
+                    </span>
                   </div>
                 </div>
                 <button

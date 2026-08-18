@@ -21,6 +21,7 @@ type FanPost = {
   body: string | null;
   media_url: string | null;
   media_type: string;
+  thumb_url: string | null;
   artist_tag: string | null;
   likes: number;
   views: number;
@@ -62,7 +63,7 @@ const FanZone = () => {
       const [{ data: p }, { data: m }] = await Promise.all([
         supabase
           .from("fan_posts")
-          .select("id, title, body, media_url, media_type, artist_tag, likes, views, created_at")
+          .select("id, title, body, media_url, media_type, thumb_url, artist_tag, likes, views, created_at")
           .eq("status", "published")
           .order("created_at", { ascending: false })
           .limit(50),
@@ -177,14 +178,20 @@ const FanZone = () => {
                   <article key={post.id} className="border border-border bg-card overflow-hidden">
                     {post.media_url && post.media_type === "image" && (
                       <img
-                        src={post.media_url}
+                        src={post.thumb_url ?? post.media_url}
                         alt={post.title}
                         loading="lazy"
                         className="w-full max-h-[460px] object-cover"
                       />
                     )}
                     {post.media_url && post.media_type === "video" && (
-                      <video src={post.media_url} controls className="w-full max-h-[460px] bg-black" />
+                      <video
+                        src={post.media_url}
+                        poster={post.thumb_url ?? undefined}
+                        preload="none"
+                        controls
+                        className="w-full max-h-[460px] bg-black"
+                      />
                     )}
                     <div className="p-6">
                       <div className="flex items-center gap-3 mb-2">

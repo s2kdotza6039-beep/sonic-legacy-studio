@@ -16,6 +16,8 @@ export default {
       fontFamily: {
         display: ['"Playfair Display"', 'Georgia', 'serif'],
         body: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        palesa: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        mpumi: ['"Archivo Black"', '"DM Sans"', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
