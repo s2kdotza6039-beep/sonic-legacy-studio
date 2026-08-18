@@ -210,10 +210,11 @@ const FloatingAssistant = () => {
 
   const send = async () => {
     if ((!input.trim() && attachments.length === 0) || isLoading) return;
-    const textAtts = attachments.filter((a) => (a.kind ?? "text") === "text");
-    const imageAtts = attachments.filter((a) => a.kind === "image");
-    const audioAtts = attachments.filter((a) => a.kind === "audio");
-    const fileAtts = attachments.filter((a) => a.kind === "file");
+    const ready = attachments.filter((a) => a.status === "ready");
+    const textAtts = ready.filter((a) => (a.kind ?? "text") === "text");
+    const imageAtts = ready.filter((a) => a.kind === "image");
+    const audioAtts = ready.filter((a) => a.kind === "audio");
+    const fileAtts = ready.filter((a) => a.kind === "file");
     const attachBlock = textAtts.length
       ? `[ATTACHED FILES — please read and discuss these]:\n` +
         textAtts.map((a) => `--- FILE: ${a.name} ---\n${a.content}`).join("\n\n") +
