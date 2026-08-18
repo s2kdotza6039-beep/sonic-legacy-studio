@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bot, Send, X, Maximize2, Minimize2, ExternalLink, Mail, GripVertical, Sparkles, Paperclip, FileText, Volume2, AudioLines } from "lucide-react";
+import { Bot, Send, X, Maximize2, Minimize2, ExternalLink, Mail, GripVertical, Sparkles, Paperclip, FileText, Volume2, AudioLines, Loader2, Check, AlertTriangle, PanelLeftClose, PanelLeftOpen, Sunrise, ListChecks, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
