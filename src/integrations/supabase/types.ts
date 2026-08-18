@@ -1148,8 +1148,13 @@ export type Database = {
           likes: number
           media_type: string
           media_url: string | null
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_note: string | null
+          moderation_status: string
           scheduled_at: string | null
           status: string
+          thumb_url: string | null
           title: string
           updated_at: string
           views: number
@@ -1163,8 +1168,13 @@ export type Database = {
           likes?: number
           media_type?: string
           media_url?: string | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_note?: string | null
+          moderation_status?: string
           scheduled_at?: string | null
           status?: string
+          thumb_url?: string | null
           title: string
           updated_at?: string
           views?: number
@@ -1178,8 +1188,13 @@ export type Database = {
           likes?: number
           media_type?: string
           media_url?: string | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_note?: string | null
+          moderation_status?: string
           scheduled_at?: string | null
           status?: string
+          thumb_url?: string | null
           title?: string
           updated_at?: string
           views?: number
