@@ -13,7 +13,8 @@ import HtmlPreview from "../components/HtmlPreview";
 
 type DocFile = { name: string; mime: string; base64: string };
 type Msg = { role: "user" | "assistant"; content: string; images?: string[]; audio?: string[]; files?: DocFile[] };
-type Attachment = { name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string };
+type AttachStatus = "uploading" | "parsing" | "ready" | "error";
+type Attachment = { id: string; name: string; kind: "text" | "image" | "audio" | "file"; content: string; mime?: string; base64?: string; status: AttachStatus };
 type Convo = { id: string; title: string; created_at: string };
 
 const cleanForSpeech = (text: string) =>
