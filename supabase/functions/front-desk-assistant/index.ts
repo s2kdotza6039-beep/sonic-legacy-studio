@@ -682,100 +682,15 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       }
     };
 
-    const audioFormat = (mime: string) => {
-      const m = mime.toLowerCase();
-      if (m.includes("wav")) return "wav";
-      if (m.includes("webm")) return "webm";
-      if (m.includes("ogg")) return "ogg";
-      if (m.includes("flac")) return "flac";
-      if (m.includes("aac")) return "aac";
-      if (m.includes("mp4") || m.includes("m4a") || m.includes("x-m4a")) return "m4a";
-      return "mp3";
-    };
-
-    const toGeminiMsgs = async (msgs: any[]) => {
-      const out: any[] = [];
-      for (const m of msgs) {
-        // Pass tool-protocol messages through untouched: flattening them would
-        // drop tool_calls / tool_call_id and the gateway rejects the request (400).
-        if (m?.role === "tool" || m?.tool_calls || m?.tool_call_id) {
-          out.push(m);
-          continue;
-        }
-        const hasMedia = m?.role === "user" && (m.images?.length || m.audio?.length || m.files?.length);
-        if (!hasMedia) {
-          out.push({
-            role: m.role,
-            content: Array.isArray(m.content)
-              ? m.content
-              : typeof m.content === "string"
-                ? m.content
-                : String(m.content ?? ""),
-          });
-          continue;
-        }
-
-        const parts: any[] = [];
-        if (m.content) parts.push({ type: "text", text: m.content });
-        for (const url of (m.images || []).slice(0, 4)) {
-          if (typeof url !== "string" || !/^(data:image\/|https?:\/\/)/.test(url)) {
-            attachmentErrors.push("image: unsupported source, skipped");
-            attachmentDebug.push({ name: "image", mime: "image/*", detected: "image", status: "skipped", error: "unsupported source" });
-            continue;
-          }
-          const mime = /^data:([^;]+);/.exec(url)?.[1] || "image/*";
-          attachmentDebug.push({
-            name: "image",
-            mime,
-            detected: "image",
-            bytes: url.startsWith("data:") ? Math.round((url.length - url.indexOf(",") - 1) * 0.75) : undefined,
-            status: "ok",
-          });
-          parts.push({ type: "image_url", image_url: { url } });
-        }
-        for (const a of (m.audio || []).slice(0, 1)) {
-          const mimeMatch = typeof a === "string" ? /^data:([^;]+);base64,(.*)$/.exec(a) : null;
-          if (!mimeMatch || !mimeMatch[2]) {
-            attachmentErrors.push("audio: could not read clip, skipped");
-            attachmentDebug.push({ name: "audio", mime: "audio/*", detected: "audio", status: "skipped", error: "could not read clip" });
-            continue;
-          }
-          attachmentDebug.push({
-            name: "audio",
-            mime: mimeMatch[1],
-            detected: "audio",
-            bytes: Math.round(mimeMatch[2].length * 0.75),
-            status: "ok",
-          });
-          parts.push({ type: "input_audio", input_audio: { data: mimeMatch[2], format: audioFormat(mimeMatch[1]) } });
-        }
-        for (const f of (m.files || []).slice(0, 3)) {
-          const before = attachmentErrors.length;
-          const text = (await extractDoc(f)).slice(0, 15000);
-          const failed = attachmentErrors.length > before;
-          attachmentDebug.push({
-            name: f?.name || "attachment",
-            mime: f?.mime || "application/octet-stream",
-            detected: detectKind(f?.name || "", f?.mime || ""),
-            bytes: f?.base64 ? Math.round(f.base64.length * 0.75) : 0,
-            text_chars: text.length,
-            status: failed ? "error" : "ok",
-            error: failed ? attachmentErrors[attachmentErrors.length - 1] : undefined,
-          });
-          parts.push({ type: "text", text: `\n--- DOCUMENT: ${f?.name || "attachment"} ---\n${text}\n--- END DOCUMENT ---` });
-        }
-        if ((m.files || []).length > 3) attachmentErrors.push("only the first 3 documents per message were read");
-        if ((m.images || []).length > 4) attachmentErrors.push("only the first 4 images per message were read");
-        if ((m.audio || []).length > 1) attachmentErrors.push("only the first audio clip per message was read");
-        geminiParts.push({ role: "user", parts: parts.map((p: any) => p.type) });
-        out.push({ role: "user", content: parts });
-      }
-      return out;
-    };
-
     // Convert attachments ONCE — re-parsing documents on the follow-up call is
     // wasteful and would re-run PDF/Office extraction for every tool round-trip.
-    const preparedMessages = await toGeminiMsgs(messages);
+    const preparedMessages = await buildGeminiMsgs(messages, {
+      extractDoc,
+      errors: attachmentErrors,
+      debug: attachmentDebug,
+      parts: geminiParts,
+    });
+
     const debugPayload = {
       model: "google/gemini-2.5-flash",
       attachments: attachmentDebug,
