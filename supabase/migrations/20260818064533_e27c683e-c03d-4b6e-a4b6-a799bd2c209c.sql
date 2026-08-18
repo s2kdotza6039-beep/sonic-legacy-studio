@@ -1,0 +1,1 @@
+CREATE POLICY "Founders manage fan media" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'fan-media' AND public.has_role(auth.uid(), 'founder')) WITH CHECK (bucket_id = 'fan-media' AND public.has_role(auth.uid(), 'founder'));
