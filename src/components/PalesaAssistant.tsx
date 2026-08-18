@@ -31,7 +31,8 @@ const readPos = (): Pos | null => {
 };
 
 const WELCOME =
-  "Hi, I'm **PALESA** 😊 — the front desk at s2kDOTza Entertainment.\n\nI can point you to our **/artists**, **/listen**, **/watch**, **/events**, **/news** or **/contact** pages. What are you looking for?";
+  "**Eita!** Welcome to **s2kDOTza Entertainment & SONIC-LEGACY-STUDIO**. I am the Front Desk Assistant AI, your guide through this cultural enterprise. This is where township stories meet global platforms — we turn noise into legacy.\n\nSo tell me: who am I talking to today, how can I help you, **Z'khipha Boma What?**\n\n**A)** I am an independent artist looking for development or studio time.\n**B)** I am a brand manager, film producer, or corporate representative seeking partnership.\n**C)** I am a fan, browsing the site.\n**D)** I am a journalist or media outlet looking for Pitch Black Afro or our roster.";
+
 
 const PalesaAssistant = () => {
   const { isFounder, loading } = useUserRole();
