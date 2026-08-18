@@ -365,6 +365,16 @@ const FloatingAssistant = () => {
           >
             <div className="flex items-center gap-2">
               {!expanded && <GripVertical size={14} className="text-muted-foreground" />}
+              {expanded && (
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={toggleSidebar}
+                  aria-label={sidebarOpen ? "Hide quick actions" : "Show quick actions"}
+                  className="p-1 hover:text-primary"
+                >
+                  {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+                </button>
+              )}
               <Bot size={16} className="text-primary" />
               <span className="text-sm font-bold">SYDNEY · Personal Assistant</span>
             </div>
@@ -377,6 +387,7 @@ const FloatingAssistant = () => {
               >
                 {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
+
               <button
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => closeWindow(true)}
