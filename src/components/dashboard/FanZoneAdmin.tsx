@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Send, Trash2, Plus, Heart, Eye, MessageCircle } from "lucide-react";
+import { Sparkles, Send, Trash2, Plus, Heart, Eye, MessageCircle, Upload, Loader2, X } from "lucide-react";
+
 
 type FanPost = {
   id: string;
