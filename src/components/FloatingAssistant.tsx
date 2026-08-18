@@ -461,8 +461,8 @@ const FloatingAssistant = () => {
           >
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-1 pb-2">
-                {attachments.map((a, i) => (
-                  <span key={`${a.name}-${i}`} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px]">
+                {attachments.map((a) => (
+                  <span key={a.id} className="flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px]">
                     {a.kind === "image" && a.dataUrl ? (
                       <img src={a.dataUrl} alt={`Attached ${a.name}`} className="h-4 w-4 rounded object-cover" />
                     ) : a.kind === "audio" ? (
@@ -471,11 +471,18 @@ const FloatingAssistant = () => {
                       <FileText size={10} className="text-primary" />
                     )}
                     <span className="max-w-[120px] truncate">{a.name}</span>
-                    <button onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
+                    <span className={`flex items-center gap-0.5 uppercase tracking-wider ${a.status === "error" ? "text-destructive" : a.status === "ready" ? "text-primary" : "text-muted-foreground"}`}>
+                      {a.status === "uploading" && <><Loader2 size={9} className="animate-spin" /> Uploading</>}
+                      {a.status === "parsing" && <><Loader2 size={9} className="animate-spin" /> Reading</>}
+                      {a.status === "ready" && <><Check size={9} /> Ready</>}
+                      {a.status === "error" && <><AlertTriangle size={9} /> Failed</>}
+                    </span>
+                    <button onClick={() => setAttachments((prev) => prev.filter((p) => p.id !== a.id))} aria-label={`Remove ${a.name}`} className="hover:text-primary">
                       <X size={10} />
                     </button>
                   </span>
                 ))}
+
               </div>
             )}
             {isDragOver && (
