@@ -83,6 +83,9 @@ const Assistant = () => {
     try { localStorage.setItem("assistant_sidebar_open", String(next)); } catch {}
     return next;
   });
+  const isMobile = useIsMobile();
+  // On small screens the drawer starts closed so the chat keeps full width.
+  useEffect(() => { if (isMobile) setSidebarOpen(false); }, [isMobile]);
 
   const readDebugHeader = (resp: Response) => {
     const raw = resp.headers.get("x-attachment-debug");
