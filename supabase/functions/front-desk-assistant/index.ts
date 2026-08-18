@@ -591,30 +591,10 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
     const MAX_DOC_BYTES = 15 * 1024 * 1024;
     const attachmentErrors: string[] = [];
 
-    type AttachDebug = {
-      name: string;
-      mime: string;
-      detected: "image" | "audio" | "pdf" | "xlsx" | "csv" | "doc" | "text" | "unknown";
-      bytes?: number;
-      text_chars?: number;
-      status: "ok" | "skipped" | "error";
-      error?: string;
-    };
     const attachmentDebug: AttachDebug[] = [];
     const geminiParts: { role: string; parts: string[] }[] = [];
 
-    const detectKind = (name: string, mime: string): AttachDebug["detected"] => {
-      const n = (name || "").toLowerCase();
-      const m = (mime || "").toLowerCase();
-      if (m.startsWith("image/")) return "image";
-      if (m.startsWith("audio/")) return "audio";
-      if (m.includes("pdf") || n.endsWith(".pdf")) return "pdf";
-      if (n.endsWith(".csv") || m.includes("csv")) return "csv";
-      if (m.includes("sheet") || m.includes("excel") || /\.(xlsx|xls)$/.test(n)) return "xlsx";
-      if (m.includes("word") || /\.(docx|doc)$/.test(n)) return "doc";
-      if (m.startsWith("text/") || /\.(txt|md|json|log|ya?ml|xml|tsx?|jsx?|html)$/.test(n)) return "text";
-      return "unknown";
-    };
+
 
 
     const extractDoc = async (f: { name: string; mime?: string; base64: string }) => {
