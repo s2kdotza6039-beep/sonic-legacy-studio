@@ -73,6 +73,14 @@ const FloatingAssistant = () => {
   const attachInputRef = useRef<HTMLInputElement>(null);
   const [nudge, setNudge] = useState<string | null>(null);
   const lastNudgeRef = useRef<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem("floating_assistant_sidebar_open") === "true"; } catch { return false; }
+  });
+  const toggleSidebar = () => setSidebarOpen((prev) => {
+    const next = !prev;
+    try { localStorage.setItem("floating_assistant_sidebar_open", String(next)); } catch {}
+    return next;
+  });
 
   useEffect(() => {
     let cancelled = false;
