@@ -95,6 +95,9 @@ const Dashboard = () => {
 
             </div>
             <div className="flex items-center gap-4">
+              <Link to="/dashboard/approvals" className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-2">
+                <ShieldCheck size={14} /> Approval Queue
+              </Link>
               <Link to="/royalties" className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-2">
                 <Music size={14} /> Royalty Audit
               </Link>
