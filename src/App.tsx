@@ -22,6 +22,7 @@ import UpcomingReleases from "./pages/UpcomingReleases";
 import Events from "./pages/Events";
 import FanZone from "./pages/FanZone";
 import Dashboard from "./pages/Dashboard";
+import CoordinatorWorkspace from "./pages/CoordinatorWorkspace";
 import Royalties from "./pages/Royalties";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
