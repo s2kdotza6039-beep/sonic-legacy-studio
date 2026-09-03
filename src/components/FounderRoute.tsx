@@ -2,7 +2,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { Navigate } from "react-router-dom";
 
 const FounderRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isFounder, loading } = useUserRole();
+  const { isFounder, isCoordinator, loading } = useUserRole();
 
   if (loading) {
     return (
@@ -12,6 +12,10 @@ const FounderRoute = ({ children }: { children: React.ReactNode }) => {
         </div>
       </div>
     );
+  }
+
+  if (isCoordinator && !isFounder) {
+    return <Navigate to="/coordinator-workspace" replace />;
   }
 
   if (!isFounder) {

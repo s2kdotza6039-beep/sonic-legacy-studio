@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-type AppRole = "founder" | "executive" | "artist";
+type AppRole = "founder" | "executive" | "artist" | "coordinator";
 
 export const useUserRole = () => {
   const { user, loading: authLoading } = useAuth();
@@ -37,6 +37,7 @@ export const useUserRole = () => {
     isFounder: roles.includes("founder"),
     isExecutive: roles.includes("executive"),
     isArtist: roles.includes("artist"),
+    isCoordinator: roles.includes("coordinator"),
     loading: authLoading || loading,
   };
 };
