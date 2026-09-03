@@ -59,14 +59,14 @@ const CoordinatorWorkspace = () => {
   const logAction = useCallback(
     async (action: string, entity_type: string, entity_id: string | null, summary: string, after?: unknown) => {
       await supabase.from("action_log").insert({
-        actor_id: user?.id ?? null,
+        actor_id: user?.id,
         actor_role: isFounder ? "founder" : "coordinator",
-        actor_email: user?.email ?? null,
+        actor_email: user?.email,
         action,
         entity_type,
         entity_id,
         summary,
-        after: after ?? {},
+        after: (after ?? {}) as never,
       });
     },
     [user, isFounder],
@@ -105,7 +105,7 @@ const CoordinatorWorkspace = () => {
       return;
     }
     setSaving(true);
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from("events")
       .insert({
         title: form.title.trim(),
@@ -150,7 +150,7 @@ const CoordinatorWorkspace = () => {
       title,
       status: "pending",
       source: "lerato",
-      created_by: user?.id ?? null,
+      created_by: user?.id,
       payload: {
         template_id: selectedTemplate.id,
         template_title: selectedTemplate.title,

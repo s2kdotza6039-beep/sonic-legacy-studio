@@ -37,10 +37,10 @@ export const trackAgentEvent = (
       .insert({
         agent,
         event_type: eventType,
-        label: label ?? null,
-        path: typeof window !== "undefined" ? window.location.pathname : null,
+        label,
+        path: typeof window !== "undefined" ? window.location.pathname : undefined,
         session_id: sessionId(),
-        meta: meta ?? {},
+        meta: (meta ?? {}) as never,
       })
       .then(undefined, () => {});
   } catch {
