@@ -37,6 +37,7 @@ export const useUserRole = () => {
     isFounder: roles.includes("founder"),
     isExecutive: roles.includes("executive"),
     isArtist: roles.includes("artist"),
+    isCoordinator: roles.includes("coordinator"),
     loading: authLoading || loading,
   };
 };
