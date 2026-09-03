@@ -14,6 +14,10 @@ const FounderRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
+  if (isCoordinator && !isFounder) {
+    return <Navigate to="/coordinator-workspace" replace />;
+  }
+
   if (!isFounder) {
     return <Navigate to="/login" replace />;
   }
