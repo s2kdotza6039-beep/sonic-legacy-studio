@@ -166,6 +166,8 @@ const Dashboard = () => {
             {tab === "briefing" && <DailyBriefing />}
             {tab === "command" && (
               <div className="space-y-6">
+                <PendingFanPostsAlert />
+                <CoordinatorAuditLog />
                 <FanZoneAdmin />
                 <AICommandCentre />
               </div>
