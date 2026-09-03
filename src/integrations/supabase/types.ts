@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          actor_role: string | null
+          after: Json
+          before: Json
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          summary: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_role?: string | null
+          after?: Json
+          before?: Json
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          summary?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_role?: string | null
+          after?: Json
+          before?: Json
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          summary?: string | null
+        }
+        Relationships: []
+      }
+      agent_events: {
+        Row: {
+          agent: string
+          created_at: string
+          event_type: string
+          id: string
+          label: string | null
+          meta: Json
+          path: string | null
+          session_id: string | null
+        }
+        Insert: {
+          agent: string
+          created_at?: string
+          event_type: string
+          id?: string
+          label?: string | null
+          meta?: Json
+          path?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          agent?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          label?: string | null
+          meta?: Json
+          path?: string | null
+          session_id?: string | null
+        }
+        Relationships: []
+      }
       ai_activity_log: {
         Row: {
           action: string
@@ -728,6 +803,7 @@ export type Database = {
         Row: {
           content: string | null
           contract_type: string
+          coordinator_visible: boolean
           created_at: string
           created_by: string | null
           description: string | null
@@ -740,6 +816,7 @@ export type Database = {
         Insert: {
           content?: string | null
           contract_type?: string
+          coordinator_visible?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -752,6 +829,7 @@ export type Database = {
         Update: {
           content?: string | null
           contract_type?: string
+          coordinator_visible?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -2738,6 +2816,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_role_coordinator: { Args: { _user_id: string }; Returns: boolean }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -2761,7 +2840,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "founder" | "executive" | "artist"
+      app_role: "founder" | "executive" | "artist" | "coordinator"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2777,12 +2856,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2806,11 +2885,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2831,11 +2910,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2856,11 +2935,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2873,11 +2952,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2889,7 +2968,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["founder", "executive", "artist"],
+      app_role: ["founder", "executive", "artist", "coordinator"],
     },
   },
 } as const
