@@ -20,7 +20,7 @@ const CoordinatorAuditLog = () => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await (supabase as unknown as { from: (t: string) => any })
+      const { data } = await supabase
         .from("action_log")
         .select("id, action, entity_type, summary, actor_email, actor_role, created_at")
         .order("created_at", { ascending: false })

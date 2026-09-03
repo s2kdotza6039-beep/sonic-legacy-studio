@@ -30,10 +30,6 @@ type LogRow = {
   created_at: string;
 };
 
-const db = supabase as unknown as {
-  from: (t: string) => any;
-};
-
 const TABS = [
   { key: "events", label: "Shows & Events", icon: Calendar },
   { key: "social", label: "Social & Fan Zone", icon: Megaphone },
@@ -62,7 +58,7 @@ const CoordinatorWorkspace = () => {
 
   const logAction = useCallback(
     async (action: string, entity_type: string, entity_id: string | null, summary: string, after?: unknown) => {
-      await db.from("action_log").insert({
+      await supabase.from("action_log").insert({
         actor_id: user?.id ?? null,
         actor_role: isFounder ? "founder" : "coordinator",
         actor_email: user?.email ?? null,
@@ -78,10 +74,10 @@ const CoordinatorWorkspace = () => {
 
   const loadAll = useCallback(async () => {
     const [ev, ar, tp, lg] = await Promise.all([
-      db.from("events").select("id, title, artist_name, venue, city, start_date, status").order("start_date", { ascending: true }).limit(100),
-      db.from("artists").select("id, name, genre, status").order("name").limit(100),
-      db.from("contract_templates").select("id, title, contract_type, content").eq("coordinator_visible", true).order("title"),
-      db.from("action_log").select("id, action, entity_type, summary, created_at").eq("actor_id", user?.id ?? "").order("created_at", { ascending: false }).limit(100),
+      supabase.from("events").select("id, title, artist_name, venue, city, start_date, status").order("start_date", { ascending: true }).limit(100),
+      supabase.from("artists").select("id, name, genre, status").order("name").limit(100),
+      supabase.from("contract_templates").select("id, title, contract_type, content").eq("coordinator_visible", true).order("title"),
+      supabase.from("action_log").select("id, action, entity_type, summary, created_at").eq("actor_id", user?.id ?? "").order("created_at", { ascending: false }).limit(100),
     ]);
     setEvents(ev.data ?? []);
     setRoster(ar.data ?? []);
@@ -133,7 +129,7 @@ const CoordinatorWorkspace = () => {
   };
 
   const setEventStatus = async (ev: EventRow, status: string) => {
-    const { error } = await db.from("events").update({ status }).eq("id", ev.id);
+    const { error } = await supabase.from("events").update({ status }).eq("id", ev.id);
     if (error) {
       toast({ title: "Could not update", description: error.message, variant: "destructive" });
       return;
@@ -149,7 +145,7 @@ const CoordinatorWorkspace = () => {
     }
     setSaving(true);
     const title = `${selectedTemplate.title} — ${draft.party}`;
-    const { error } = await db.from("ai_drafts").insert({
+    const { error } = await supabase.from("ai_drafts").insert({
       draft_type: "contract",
       title,
       status: "pending",

@@ -32,9 +32,7 @@ export const trackAgentEvent = (
   meta?: Record<string, unknown>,
 ) => {
   try {
-    void (supabase as unknown as {
-      from: (t: string) => { insert: (v: unknown) => Promise<unknown> };
-    })
+    void supabase
       .from("agent_events")
       .insert({
         agent,
