@@ -85,6 +85,7 @@ const App = () => (
                 <Assistant />
               </FounderRoute>
             } />
+            <Route path="/coordinator-workspace" element={<CoordinatorWorkspace />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/sandbox/payments" element={
               <FounderRoute>
