@@ -17,27 +17,40 @@ const CeoTodos = () => {
   const fetch = async () => {
     let q = supabase.from("ceo_todos").select("*").order("is_done").order("due_date", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false });
     if (!showDone) q = q.eq("is_done", false);
-    const { data } = await q;
-    if (data) setTodos(data);
+    const { data, error } = await q;
+    if (error) { toast({ title: "Could not load tasks", description: error.message, variant: "destructive" }); return; }
+    setTodos(data ?? []);
   };
 
   useEffect(() => { fetch(); }, [showDone]);
 
+  // Live updates so tasks created by Sydney appear without a reload.
+  useEffect(() => {
+    const ch = supabase
+      .channel("ceo_todos_live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ceo_todos" }, () => fetch())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [showDone]);
+
   const add = async () => {
     if (!title.trim()) return;
-    await supabase.from("ceo_todos").insert({ title, priority, due_date: dueDate || null });
+    const { error } = await supabase.from("ceo_todos").insert({ title, priority, due_date: dueDate || null });
+    if (error) { toast({ title: "Could not add task", description: error.message, variant: "destructive" }); return; }
     setTitle(""); setDueDate("");
     toast({ title: "Task added" });
     fetch();
   };
 
   const toggle = async (id: string, done: boolean) => {
-    await supabase.from("ceo_todos").update({ is_done: !done }).eq("id", id);
+    const { error } = await supabase.from("ceo_todos").update({ is_done: !done }).eq("id", id);
+    if (error) { toast({ title: "Could not update task", description: error.message, variant: "destructive" }); return; }
     fetch();
   };
 
   const remove = async (id: string) => {
-    await supabase.from("ceo_todos").delete().eq("id", id);
+    const { error } = await supabase.from("ceo_todos").delete().eq("id", id);
+    if (error) { toast({ title: "Could not delete task", description: error.message, variant: "destructive" }); return; }
     fetch();
   };
 

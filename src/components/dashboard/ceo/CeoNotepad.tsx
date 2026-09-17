@@ -14,21 +14,30 @@ const CeoNotepad = () => {
   const { toast } = useToast();
 
   const fetchNotes = async () => {
-    const { data } = await supabase.from("ceo_notes").select("*").order("is_pinned", { ascending: false }).order("updated_at", { ascending: false });
-    if (data) {
-      setNotes(data);
-      if (!activeNote && data.length > 0) {
-        setActiveNote(data[0]);
-        setEditTitle(data[0].title);
-        setEditContent(data[0].content || "");
-      }
+    const { data, error } = await supabase.from("ceo_notes").select("*").order("is_pinned", { ascending: false }).order("updated_at", { ascending: false });
+    if (error) { toast({ title: "Could not load notes", description: error.message, variant: "destructive" }); return; }
+    setNotes(data ?? []);
+    if (!activeNote && data && data.length > 0) {
+      setActiveNote(data[0]);
+      setEditTitle(data[0].title);
+      setEditContent(data[0].content || "");
     }
   };
 
   useEffect(() => { fetchNotes(); }, []);
 
+  // Live updates so notes saved by Sydney appear without a reload.
+  useEffect(() => {
+    const ch = supabase
+      .channel("ceo_notes_live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ceo_notes" }, () => fetchNotes())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
   const addNote = async () => {
-    const { data } = await supabase.from("ceo_notes").insert({ title: "Untitled Note", content: "" }).select().single();
+    const { data, error } = await supabase.from("ceo_notes").insert({ title: "Untitled Note", content: "" }).select().single();
+    if (error) { toast({ title: "Could not create note", description: error.message, variant: "destructive" }); return; }
     if (data) {
       setActiveNote(data);
       setEditTitle(data.title);
@@ -39,19 +48,22 @@ const CeoNotepad = () => {
 
   const saveNote = async () => {
     if (!activeNote) return;
-    await supabase.from("ceo_notes").update({ title: editTitle, content: editContent }).eq("id", activeNote.id);
+    const { error } = await supabase.from("ceo_notes").update({ title: editTitle, content: editContent }).eq("id", activeNote.id);
+    if (error) { toast({ title: "Could not save note", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Note saved" });
     fetchNotes();
   };
 
   const deleteNote = async (id: string) => {
-    await supabase.from("ceo_notes").delete().eq("id", id);
+    const { error } = await supabase.from("ceo_notes").delete().eq("id", id);
+    if (error) { toast({ title: "Could not delete note", description: error.message, variant: "destructive" }); return; }
     if (activeNote?.id === id) { setActiveNote(null); setEditTitle(""); setEditContent(""); }
     fetchNotes();
   };
 
   const togglePin = async (id: string, pinned: boolean) => {
-    await supabase.from("ceo_notes").update({ is_pinned: !pinned }).eq("id", id);
+    const { error } = await supabase.from("ceo_notes").update({ is_pinned: !pinned }).eq("id", id);
+    if (error) { toast({ title: "Could not pin note", description: error.message, variant: "destructive" }); return; }
     fetchNotes();
   };
 

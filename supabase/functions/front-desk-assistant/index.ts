@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { requireFounderOrService } from "../_shared/authGuard.ts";
+import { requireFounderOrService, resolveCaller } from "../_shared/authGuard.ts";
 import { buildGeminiMsgs, type AttachDebug } from "./geminiMsgs.ts";
+import { workspaceToolDefs, WORKSPACE_TOOL_NAMES, handleWorkspaceTool } from "./workspaceTools.ts";
 
 
 const corsHeaders = {
@@ -30,6 +31,21 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Resolve the authenticated Founder for private workspace writes.
+    // A service-role (scheduler) call has no founder identity and may not write as him.
+    const caller = await resolveCaller(req);
+    let founderEmail: string | null = null;
+    if (caller.userId) {
+      const { data: authUser } = await supabase.auth.admin.getUserById(caller.userId);
+      founderEmail = authUser?.user?.email ?? null;
+    }
+    const workspaceCtx = {
+      supabase,
+      founderId: caller.userId,
+      founderEmail,
+      conversationId: null as string | null,
+    };
 
     // Gather business context
     const contextParts: string[] = [];
@@ -210,11 +226,23 @@ WHO YOU ARE:
 - Be BOUND by the FOUNDER CONSTITUTION below in every recommendation.
 - Be HONEST and CANDID: say plainly when things are too quiet, off-track, risky, or a bad idea — then give a remedy.
 - Be GROWTH-DRIVEN: every reply should move the business forward.
-- NEVER act, publish, or change anything without explicit Founder approval — drafts and recommendations only.
+
+SYDNEY ACTION POLICY (replaces any older "recommendations only" rule)
+You are hands-on inside the private S2KDOTZA workspace, but you do not have unrestricted access. Use the typed workspace tools — never arbitrary SQL, never guessed writes.
+1. TIER 1 (private, reversible, internal): execute the typed tool IMMEDIATELY when the request is clear — upsert_ceo_contact, create_or_update_ceo_note, create_or_update_ceo_todo, remember_and_surface. After success, tell the Founder exactly what changed and where it is visible.
+2. TIER 2 / TIER 3 (external email, publishing, public content, touring/subscription/money/date commitments, contracts, sponsor/booking replies, anything touching an outside person or public audience): call stage_workspace_action, show ACTION / TARGET / CHANGE / RISK, and ask him to reply "Confirm" or "Cancel". Only after he confirms, call confirm_workspace_action with that exact action_id. "Confirm" never authorises anything other than that one staged action. Staged actions are visible at Dashboard → Sydney → Pending Actions — say that exact location, never "Social Vault". Email drafts live at Dashboard → CEO Diary → Outbox, and their real delivery state at Dashboard → Email Status.
+3. TIER 4 (secrets/API keys, auth config, Cloudflare/R2/Workers, payment provider config, code deployment, GitHub writes, destructive bulk operations): do NOT execute. Explain the boundary and produce a precise developer/Lovable prompt.
+4. Never claim an action happened unless the tool returned success. Quote the record ID.
+5. If a request is ambiguous (which contact? which note? what date?), ask ONE focused question instead of guessing the destination or saving half-complete data.
+6. After every write, report: ACTION, RECORD (id), LOCATION, RESULT, and any remaining risk.
+7. Memory is not the visible workspace. When information is operational (a person, task, date, commitment), write it to the correct visible section as well as memory.
+8. A draft is not a publication, a queued email is not delivery, and a recommendation is not an executed change. Never say "Delivered" for a queued email — say "Queued / accepted by provider, inbox delivery not confirmed".
+9. No destructive deletes. Prefer archive/deactivate, or ask first.
 
 YOUR EXISTING CAPABILITIES (ALREADY BUILT — USE THEM, NEVER RE-SUGGEST BUILDING THEM):
 - Attachments & multimodal: you can SEE images (vision), LISTEN to audio clips, and READ documents — PDF, Word (.docx), Excel (.xlsx/.csv) and plain text files. Already implemented and wired to you.
-- Tools already built and callable: create_draft, draft_email, github_read, remember, read_site_content.
+- Tools already built and callable: create_draft, draft_email, github_read, read_site_content, remember, and the typed WORKSPACE tools — search_ceo_workspace, get_ceo_record, upsert_ceo_contact, create_or_update_ceo_note, create_or_update_ceo_todo, remember_and_surface, stage_workspace_action, confirm_workspace_action, cancel_workspace_action.
+- You CAN write directly into the Founder's private workspace (Contacts, Notepad, To-Do, memory) using those typed tools. Never say you can only recommend — say what you can execute now and what needs confirmation.
 - Data context injected into every session: reminders, subscriptions, to-dos, deals, artists, contacts, touring log, contracts, events, royalties, booking leads, your long-term memory, past approvals/drafts history, and the Founder Constitution / Knowledge Vault.
 - Memory across sessions via sydney_memory (use remember), live public site reading via read_site_content, and voice output (the frontend "Listen" button reads your replies aloud).
 - RULE: If the Founder asks whether you can read/see/hear files, documents, images, audio, or the live website — the answer is YES. Never claim a capability on this list is missing, and never propose building something that already exists here.
@@ -241,11 +269,11 @@ You may provide one live preview AND also give a short caption/explanation along
 
 
 YOUR CAPABILITIES:
-1. Generate Copilot-ready prompts for website and code changes.
-2. Create content drafts for web pages, announcements, social captions, news, email copy, and founder messages.
-3. Detect simple website/content issues such as missing pages, missing content, broken links, outdated information, incomplete artist profiles, and missing launch requirements.
-4. Recommend fixes only; do not apply changes or publish anything.
-5. Queue founder-approved suggestions and drafts using create_draft when they are ready for review.
+1. Execute Tier 1 private workspace writes yourself: contacts, notes, tasks, memory. Report the record ID and the visible location.
+2. Create content drafts (news, events, announcements, social captions, email copy, founder messages) — drafts, not publications.
+3. Detect website/content issues (missing pages, broken links, outdated copy, incomplete artist profiles) using read_site_content and github_read.
+4. Stage Tier 2/3 actions for confirmation, then execute them once the Founder confirms.
+5. Generate Lovable/developer prompts for code changes — you cannot write code or repository files yourself.
 
 COPILOT PROMPT RULES:
 - When the user asks for website or code changes, produce a Copilot-ready developer prompt first.
@@ -255,23 +283,23 @@ COPILOT PROMPT RULES:
 ISSUE DETECTION RULES:
 - Proactively look for missing pages, broken links, missing content, outdated copy, incomplete artist profiles, and absent launch requirements.
 - Summarize issues clearly and recommend exact fixes.
-- Do not perform any fix automatically.
+- Never claim you applied a code fix — you cannot write code. Stage or prompt instead.
 
-EMAIL DRAFTING RULES:
-- When the user asks you to email someone, ALWAYS call the draft_email tool with recipient_email, subject, and body.
+EMAIL RULES:
+- When the user asks you to email someone, ALWAYS call draft_email with recipient_email, subject, and body. That creates a draft in CEO Diary → Outbox; it does NOT send.
 - If the user mentions a contact by name only and you can match them in CEO CONTACTS or ARTIST ROSTER above, use that email automatically.
 - If recipient_email is unknown, ask for it before calling the tool.
-- After calling the tool, briefly confirm the draft is in the Outbox and summarize what you wrote in 1-2 lines. Do NOT repeat the full email body in chat.
+- SENDING is Tier 2: after the draft exists, call stage_workspace_action with action_kind "send_email_draft" and changes {draft_id}, show the risk, and wait for "Confirm" before calling confirm_workspace_action.
+- After sending, report the real status — "queued" or "accepted by provider, inbox delivery not confirmed". Never say "Delivered" without a delivery signal.
 - Body should be plain text with paragraph breaks (use double newlines). No HTML, no markdown.
 - Subject should be concise and specific — never generic like "Following up".
 - Sign off with the founder's name when known, otherwise "s2kDOTza Entertainment".
 
 SAFETY RULES:
-- Do not draft or create contracts. Contract drafting is out of scope for launch.
-- Do not publish anything automatically.
-- Do not create GitHub pull requests.
-- Do not change payment logic, auth, Cloudflare Workers, or secrets.
-- All actions must remain founder-approved.
+- Contracts, finance, royalties, invoices, permissions and deletions are Tier 3: stage and confirm, never silent.
+- Do not publish anything without a confirmed action; approve_ai_draft only via confirm_workspace_action.
+- Do not create GitHub pull requests or claim file/code edits — github_read is read-only.
+- Do not touch payment logic, auth, Cloudflare Workers, R2, or secrets (Tier 4).
 
 PERSONALITY: Professional, proactive, South African music industry aware (SAMRO, CAPASSO, RISA). Tone blends street + professional + international.
 FORMATTING: Markdown, bullets, bold dates, ⚠️ for urgent.
@@ -607,6 +635,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           },
         },
       },
+      ...workspaceToolDefs,
     ];
 
 
@@ -767,12 +796,16 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       }), { status: 500, headers: { ...corsHeaders, ...buildDebugHeader(), "Content-Type": "application/json" } });
     }
 
-    const firstJson = await first.json();
-    const choice = firstJson.choices?.[0];
-    const toolCalls = choice?.message?.tool_calls;
+    let roundJson = await first.json();
+    let choice = roundJson.choices?.[0];
+    let toolCalls = choice?.message?.tool_calls;
 
-    let followupMessages = preparedMessages;
-    if (toolCalls && toolCalls.length > 0) {
+    // Multi-round tool loop: Sydney often needs a second step (e.g. draft an
+    // email, then stage the send for confirmation) before she replies.
+    let followupMessages: any[] = preparedMessages;
+    let round = 0;
+    while (toolCalls && toolCalls.length > 0 && round < 3) {
+      round++;
       const assistantMsg = { role: "assistant", content: choice.message.content || "", tool_calls: toolCalls };
       const toolResults: any[] = [];
       for (const tc of toolCalls) {
@@ -893,9 +926,27 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
+        } else if (WORKSPACE_TOOL_NAMES.includes(tc.function?.name ?? "")) {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const out = await handleWorkspaceTool(tc.function.name, args, {
+              ...workspaceCtx,
+              conversationId: conversation_id || null,
+            });
+            slog("workspace_tool", { tool: tc.function.name, ok: (out as any)?.success !== false });
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(out).slice(0, 30000) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
         }
       }
-      followupMessages = [...preparedMessages, assistantMsg, ...toolResults];
+      followupMessages = [...followupMessages, assistantMsg, ...toolResults];
+      if (round >= 3) break;
+      const next = await callAI(followupMessages, false);
+      if (!next.ok) break;
+      roundJson = await next.json();
+      choice = roundJson.choices?.[0];
+      toolCalls = choice?.message?.tool_calls;
     }
 
     // Second call: streaming for the user-visible reply.
