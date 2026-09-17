@@ -32,6 +32,21 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Resolve the authenticated Founder for private workspace writes.
+    // A service-role (scheduler) call has no founder identity and may not write as him.
+    const caller = await resolveCaller(req);
+    let founderEmail: string | null = null;
+    if (caller.userId) {
+      const { data: authUser } = await supabase.auth.admin.getUserById(caller.userId);
+      founderEmail = authUser?.user?.email ?? null;
+    }
+    const workspaceCtx = {
+      supabase,
+      founderId: caller.userId,
+      founderEmail,
+      conversationId: null as string | null,
+    };
+
     // Gather business context
     const contextParts: string[] = [];
 
@@ -620,6 +635,7 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           },
         },
       },
+      ...workspaceToolDefs,
     ];
 
 
