@@ -22,11 +22,21 @@ const CeoContacts = () => {
   const fetchContacts = async () => {
     let q = supabase.from("ceo_contacts").select("*").order("name");
     if (filterCat !== "all") q = q.eq("category", filterCat);
-    const { data } = await q;
-    if (data) setContacts(data);
+    const { data, error } = await q;
+    if (error) { toast({ title: "Could not load contacts", description: error.message, variant: "destructive" }); return; }
+    setContacts(data ?? []);
   };
 
   useEffect(() => { fetchContacts(); }, [filterCat]);
+
+  // Live updates so contacts saved by Sydney appear without a reload.
+  useEffect(() => {
+    const ch = supabase
+      .channel("ceo_contacts_live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ceo_contacts" }, () => fetchContacts())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [filterCat]);
 
   const handleAdd = async () => {
     if (!form.name.trim()) return;
@@ -39,7 +49,8 @@ const CeoContacts = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("ceo_contacts").delete().eq("id", id);
+    const { error } = await supabase.from("ceo_contacts").delete().eq("id", id);
+    if (error) { toast({ title: "Could not delete contact", description: error.message, variant: "destructive" }); return; }
     fetchContacts();
   };
 
