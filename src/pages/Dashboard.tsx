@@ -182,6 +182,8 @@ const Dashboard = () => {
             {tab === "vault" && <KnowledgeVault />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}
+            {tab === "sydney" && <SydneyWorkspace />}
+            {tab === "emailstatus" && <EmailStatus />}
             {tab === "artists" && <ArtistPipeline />}
             {tab === "scorecard" && <ArtistScorecard />}
             {tab === "ideas" && <IdeasBoard />}
