@@ -922,6 +922,18 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           } catch (e) {
             toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
           }
+        } else if (WORKSPACE_TOOL_NAMES.includes(tc.function?.name ?? "")) {
+          try {
+            const args = JSON.parse(tc.function.arguments || "{}");
+            const out = await handleWorkspaceTool(tc.function.name, args, {
+              ...workspaceCtx,
+              conversationId: conversation_id || null,
+            });
+            slog("workspace_tool", { tool: tc.function.name, ok: (out as any)?.success !== false });
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(out).slice(0, 30000) });
+          } catch (e) {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }) });
+          }
         }
       }
       followupMessages = [...preparedMessages, assistantMsg, ...toolResults];
