@@ -141,6 +141,32 @@ Deno.serve(async (req) => {
   // Create Supabase client with service role (bypasses RLS)
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+  // 1b. Idempotency guard: if this correlation ID is already in flight or has
+  // already been accepted by the provider, do not queue a second copy.
+  // A prior 'failed'/'dlq' outcome is still retryable.
+  const { data: priorRows } = await supabase
+    .from('email_send_log')
+    .select('status, error_message, created_at')
+    .eq('message_id', messageId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  const prior = priorRows?.[0]
+  if (prior && ['pending', 'queued', 'accepted', 'sent', 'delivered'].includes(prior.status)) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        status: prior.status === 'sent' ? 'accepted' : prior.status,
+        queued: true,
+        duplicate: true,
+        message_id: messageId,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+
+
   // 2. Check suppression list (fail-closed: if we can't verify, don't send)
   const { data: suppressed, error: suppressionError } = await supabase
     .from('suppressed_emails')
