@@ -73,7 +73,14 @@ Deno.serve(async (req) => {
     const body = await req.json()
     templateName = body.templateName || body.template_name
     recipientEmail = body.recipientEmail || body.recipient_email
-    messageId = crypto.randomUUID()
+    // Stable correlation ID: callers (e.g. the Outbox) pass an explicit
+    // messageId / idempotencyKey and use the SAME value to look up delivery
+    // state later. Never invent a separate server-side ID when one is given.
+    const provided =
+      body.messageId || body.message_id || body.idempotencyKey || body.idempotency_key
+    messageId = typeof provided === 'string' && provided.trim()
+      ? provided.trim().slice(0, 200)
+      : crypto.randomUUID()
     idempotencyKey = body.idempotencyKey || body.idempotency_key || messageId
     if (body.templateData && typeof body.templateData === 'object') {
       templateData = body.templateData
