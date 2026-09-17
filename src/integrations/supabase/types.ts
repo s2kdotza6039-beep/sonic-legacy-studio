@@ -408,6 +408,72 @@ export type Database = {
         }
         Relationships: []
       }
+      assistant_pending_actions: {
+        Row: {
+          action_kind: string
+          after_snapshot: Json | null
+          before_snapshot: Json | null
+          changes: Json
+          conversation_id: string | null
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          executed_at: string | null
+          expires_at: string
+          id: string
+          result: Json | null
+          risk: string | null
+          status: string
+          summary: string
+          target_entity: string | null
+          target_id: string | null
+          tier: number
+          updated_at: string
+        }
+        Insert: {
+          action_kind: string
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          changes?: Json
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          executed_at?: string | null
+          expires_at?: string
+          id?: string
+          result?: Json | null
+          risk?: string | null
+          status?: string
+          summary: string
+          target_entity?: string | null
+          target_id?: string | null
+          tier?: number
+          updated_at?: string
+        }
+        Update: {
+          action_kind?: string
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          changes?: Json
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          executed_at?: string | null
+          expires_at?: string
+          id?: string
+          result?: Json | null
+          risk?: string | null
+          status?: string
+          summary?: string
+          target_entity?: string | null
+          target_id?: string | null
+          tier?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       betting_selections: {
         Row: {
           away: string
@@ -2544,6 +2610,60 @@ export type Database = {
           id?: string
           metadata?: Json | null
           reason?: string
+        }
+        Relationships: []
+      }
+      sydney_action_log: {
+        Row: {
+          action: string
+          actor_role: string
+          after_snapshot: Json
+          before_snapshot: Json
+          conversation_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          founder_email: string | null
+          founder_user_id: string | null
+          id: string
+          location: string | null
+          result: string | null
+          summary: string | null
+          tier: number | null
+        }
+        Insert: {
+          action: string
+          actor_role?: string
+          after_snapshot?: Json
+          before_snapshot?: Json
+          conversation_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          founder_email?: string | null
+          founder_user_id?: string | null
+          id?: string
+          location?: string | null
+          result?: string | null
+          summary?: string | null
+          tier?: number | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string
+          after_snapshot?: Json
+          before_snapshot?: Json
+          conversation_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          founder_email?: string | null
+          founder_user_id?: string | null
+          id?: string
+          location?: string | null
+          result?: string | null
+          summary?: string | null
+          tier?: number | null
         }
         Relationships: []
       }
