@@ -38,7 +38,9 @@ import KnowledgeVault from "@/components/dashboard/KnowledgeVault";
 import ReleasesManager from "@/components/dashboard/ReleasesManager";
 import ReleaseCountdownAdmin from "@/components/dashboard/ReleaseCountdownAdmin";
 import DailyBriefing from "@/components/dashboard/DailyBriefing";
-import { Target } from "lucide-react";
+import EmailStatus from "@/components/dashboard/EmailStatus";
+import SydneyWorkspace from "@/components/dashboard/SydneyWorkspace";
+import { Target, Bot, MailCheck } from "lucide-react";
 
 const DESKS = ["Decide", "Foundation", "Grow", "Create", "Protect"] as const;
 
@@ -50,6 +52,8 @@ const TABS = [
   { key: "vault", label: "Knowledge Vault", icon: BookLock, desk: "Foundation" },
   { key: "ceo", label: "CEO Diary", icon: BookOpen, desk: "Foundation" },
   { key: "notepad", label: "Notepad", icon: NotebookPen, desk: "Foundation" },
+  { key: "sydney", label: "Sydney", icon: Bot, desk: "Foundation" },
+  { key: "emailstatus", label: "Email Status", icon: MailCheck, desk: "Foundation" },
   { key: "contracts", label: "Contracts", icon: FileText, desk: "Foundation" },
   { key: "artists", label: "Artists", icon: Users, desk: "Grow" },
   { key: "scorecard", label: "Scorecard", icon: Star, desk: "Grow" },
