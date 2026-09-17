@@ -796,12 +796,16 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
       }), { status: 500, headers: { ...corsHeaders, ...buildDebugHeader(), "Content-Type": "application/json" } });
     }
 
-    const firstJson = await first.json();
-    const choice = firstJson.choices?.[0];
-    const toolCalls = choice?.message?.tool_calls;
+    let roundJson = await first.json();
+    let choice = roundJson.choices?.[0];
+    let toolCalls = choice?.message?.tool_calls;
 
-    let followupMessages = preparedMessages;
-    if (toolCalls && toolCalls.length > 0) {
+    // Multi-round tool loop: Sydney often needs a second step (e.g. draft an
+    // email, then stage the send for confirmation) before she replies.
+    let followupMessages: any[] = preparedMessages;
+    let round = 0;
+    while (toolCalls && toolCalls.length > 0 && round < 3) {
+      round++;
       const assistantMsg = { role: "assistant", content: choice.message.content || "", tool_calls: toolCalls };
       const toolResults: any[] = [];
       for (const tc of toolCalls) {
