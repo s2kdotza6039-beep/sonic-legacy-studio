@@ -46,7 +46,10 @@ const emptyPost = {
 const ALLOWED_IMAGE = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
 const ALLOWED_VIDEO = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"];
 
-const MEDIA_BUCKET = "fan-media";
+// Coordinator-owned fan media area — kept separate from founder-only storage
+// (contract files, careers submissions) so LERATO's uploads never sit beside
+// private founder data.
+const MEDIA_BUCKET = "fan-media-coordinator";
 const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5; // 5 years — public feed links
 const MAX_IMAGE_MB = 10;
 const MAX_VIDEO_MB = 200;
