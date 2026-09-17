@@ -940,7 +940,13 @@ ${businessContext}${vaultContext}${memoryContext}${learningContext}`;
           }
         }
       }
-      followupMessages = [...preparedMessages, assistantMsg, ...toolResults];
+      followupMessages = [...followupMessages, assistantMsg, ...toolResults];
+      if (round >= 3) break;
+      const next = await callAI(followupMessages, false);
+      if (!next.ok) break;
+      roundJson = await next.json();
+      choice = roundJson.choices?.[0];
+      toolCalls = choice?.message?.tool_calls;
     }
 
     // Second call: streaming for the user-visible reply.
