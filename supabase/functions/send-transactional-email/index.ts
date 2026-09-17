@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
 
     console.log('Email suppressed', { effectiveRecipient, templateName })
     return new Response(
-      JSON.stringify({ success: false, reason: 'email_suppressed' }),
+      JSON.stringify({ success: false, status: 'suppressed', reason: 'email_suppressed', message_id: messageId }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -383,7 +383,7 @@ Deno.serve(async (req) => {
       error_message: 'Failed to enqueue email',
     })
 
-    return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
+    return new Response(JSON.stringify({ error: 'Failed to enqueue email', status: 'failed', message_id: messageId }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -391,8 +391,10 @@ Deno.serve(async (req) => {
 
   console.log('Transactional email enqueued', { templateName, effectiveRecipient })
 
+  // The email is only QUEUED at this point. Delivery is not known yet — the
+  // dispatcher (process-email-queue) hands it to the provider afterwards.
   return new Response(
-    JSON.stringify({ success: true, queued: true }),
+    JSON.stringify({ success: true, status: 'queued', queued: true, message_id: messageId }),
     {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
