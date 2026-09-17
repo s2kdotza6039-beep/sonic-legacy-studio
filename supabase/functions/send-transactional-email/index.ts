@@ -73,7 +73,14 @@ Deno.serve(async (req) => {
     const body = await req.json()
     templateName = body.templateName || body.template_name
     recipientEmail = body.recipientEmail || body.recipient_email
-    messageId = crypto.randomUUID()
+    // Stable correlation ID: callers (e.g. the Outbox) pass an explicit
+    // messageId / idempotencyKey and use the SAME value to look up delivery
+    // state later. Never invent a separate server-side ID when one is given.
+    const provided =
+      body.messageId || body.message_id || body.idempotencyKey || body.idempotency_key
+    messageId = typeof provided === 'string' && provided.trim()
+      ? provided.trim().slice(0, 200)
+      : crypto.randomUUID()
     idempotencyKey = body.idempotencyKey || body.idempotency_key || messageId
     if (body.templateData && typeof body.templateData === 'object') {
       templateData = body.templateData
@@ -134,6 +141,32 @@ Deno.serve(async (req) => {
   // Create Supabase client with service role (bypasses RLS)
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+  // 1b. Idempotency guard: if this correlation ID is already in flight or has
+  // already been accepted by the provider, do not queue a second copy.
+  // A prior 'failed'/'dlq' outcome is still retryable.
+  const { data: priorRows } = await supabase
+    .from('email_send_log')
+    .select('status, error_message, created_at')
+    .eq('message_id', messageId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  const prior = priorRows?.[0]
+  if (prior && ['pending', 'queued', 'accepted', 'sent', 'delivered'].includes(prior.status)) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        status: prior.status === 'sent' ? 'accepted' : prior.status,
+        queued: true,
+        duplicate: true,
+        message_id: messageId,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+
+
   // 2. Check suppression list (fail-closed: if we can't verify, don't send)
   const { data: suppressed, error: suppressionError } = await supabase
     .from('suppressed_emails')
@@ -166,7 +199,7 @@ Deno.serve(async (req) => {
 
     console.log('Email suppressed', { effectiveRecipient, templateName })
     return new Response(
-      JSON.stringify({ success: false, reason: 'email_suppressed' }),
+      JSON.stringify({ success: false, status: 'suppressed', reason: 'email_suppressed', message_id: messageId }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -350,7 +383,7 @@ Deno.serve(async (req) => {
       error_message: 'Failed to enqueue email',
     })
 
-    return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
+    return new Response(JSON.stringify({ error: 'Failed to enqueue email', status: 'failed', message_id: messageId }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -358,8 +391,10 @@ Deno.serve(async (req) => {
 
   console.log('Transactional email enqueued', { templateName, effectiveRecipient })
 
+  // The email is only QUEUED at this point. Delivery is not known yet — the
+  // dispatcher (process-email-queue) hands it to the provider afterwards.
   return new Response(
-    JSON.stringify({ success: true, queued: true }),
+    JSON.stringify({ success: true, status: 'queued', queued: true, message_id: messageId }),
     {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

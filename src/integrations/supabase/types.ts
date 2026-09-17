@@ -751,6 +751,45 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_enquiries: {
+        Row: {
+          created_at: string
+          department: string
+          email: string
+          full_name: string
+          id: string
+          message: string
+          notified_message_id: string | null
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department: string
+          email: string
+          full_name: string
+          id?: string
+          message: string
+          notified_message_id?: string | null
+          status?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          email?: string
+          full_name?: string
+          id?: string
+          message?: string
+          notified_message_id?: string | null
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_posts: {
         Row: {
           caption: string | null
@@ -988,6 +1027,10 @@ export type Database = {
           body: string
           conversation_id: string | null
           created_at: string
+          delivery_error: string | null
+          delivery_message_id: string | null
+          delivery_status: string | null
+          delivery_updated_at: string | null
           id: string
           recipient_email: string
           recipient_name: string | null
@@ -1002,6 +1045,10 @@ export type Database = {
           body: string
           conversation_id?: string | null
           created_at?: string
+          delivery_error?: string | null
+          delivery_message_id?: string | null
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           id?: string
           recipient_email: string
           recipient_name?: string | null
@@ -1016,6 +1063,10 @@ export type Database = {
           body?: string
           conversation_id?: string | null
           created_at?: string
+          delivery_error?: string | null
+          delivery_message_id?: string | null
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           id?: string
           recipient_email?: string
           recipient_name?: string | null
