@@ -14,7 +14,7 @@ type Enquiry = {
   created_at: string;
 };
 
-const STATUSES = ["all", "new", "handled", "archived"] as const;
+const STATUSES = ["all", "new", "reviewing", "answered", "archived"] as const;
 
 const EnquiryDesk = () => {
   const { toast } = useToast();
@@ -119,12 +119,12 @@ const EnquiryDesk = () => {
               </div>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{r.message}</p>
               <div className="flex gap-2 pt-1">
-                {r.status !== "handled" && (
+                {r.status !== "answered" && (
                   <button
-                    onClick={() => setStatus(r.id, "handled")}
+                    onClick={() => setStatus(r.id, "answered")}
                     className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-primary border border-border px-2 py-1"
                   >
-                    <Check size={11} /> Mark handled
+                    <Check size={11} /> Mark answered
                   </button>
                 )}
                 {r.status !== "archived" && (
