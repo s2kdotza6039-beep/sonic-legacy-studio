@@ -184,36 +184,19 @@ const CeoOutbox = () => {
 
   const sendViaSystem = async (d: Draft) => {
     setSending(d.id);
-    const messageId = `outbox-${d.id}`;
     try {
-      const { data, error } = await supabase.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: "adhoc-message",
-          recipientEmail: d.recipient_email,
-          messageId,
-          idempotencyKey: messageId,
-          templateData: {
-            subject: d.subject,
-            body: d.body,
-            recipientName: d.recipient_name || undefined,
-          },
-        },
+      // The server reads the stored draft, sends it, records the outcome and
+      // updates this draft's delivery fields.
+      const { data, error } = await supabase.functions.invoke("send-outbox-email", {
+        body: { draftId: d.id },
       });
       if (error) throw error;
       const result = (data as any) || {};
-      if (result.error) throw new Error(result.error);
+      if (result.error && result.status !== "suppressed") throw new Error(result.error);
 
-      const status: string = result.status || "queued";
+      const status: string = result.status || "failed";
 
       if (status === "suppressed") {
-        const { error: updErr } = await supabase.from("email_drafts").update({
-          status: "blocked",
-          delivery_message_id: result.message_id || messageId,
-          delivery_status: "suppressed",
-          delivery_error: "Recipient is on the do-not-send list",
-          delivery_updated_at: new Date().toISOString(),
-        }).eq("id", d.id);
-        if (updErr) throw updErr;
         toast({
           title: "Not sent — address blocked",
           description: `${d.recipient_email} is on the do-not-send list.`,
@@ -223,29 +206,16 @@ const CeoOutbox = () => {
         return;
       }
 
-      // Queued only. Delivery is unknown until the provider responds.
-      const { error: updErr } = await supabase.from("email_drafts").update({
-        status: "queued",
-        sent_via: "system",
-        sent_at: null,
-        delivery_message_id: result.message_id || messageId,
-        delivery_status: status,
-        delivery_error: null,
-        delivery_updated_at: new Date().toISOString(),
-      }).eq("id", d.id);
-      if (updErr) throw updErr;
+      if (status !== "accepted") {
+        throw new Error(result.error || "The mail service did not accept this message.");
+      }
 
       toast({
-        title: "Email queued",
-        description: "Delivery is being processed. Watch the delivery status on this message.",
+        title: "Accepted by the mail service",
+        description: "Inbox delivery is not confirmed yet — watch the delivery status on this message.",
       });
       fetchDrafts();
     } catch (e: any) {
-      await supabase.from("email_drafts").update({
-        delivery_status: "failed",
-        delivery_error: (e.message || "Unknown error").slice(0, 500),
-        delivery_updated_at: new Date().toISOString(),
-      }).eq("id", d.id);
       toast({ title: "Send failed — nothing was sent", description: e.message || "Unknown error", variant: "destructive" });
       fetchDrafts();
     } finally {

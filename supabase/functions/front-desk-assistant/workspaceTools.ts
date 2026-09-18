@@ -250,34 +250,22 @@ async function executeStaged(ctx: WorkspaceCtx, action: any) {
     const { data: draft } = await sb.from("email_drafts").select("*").eq("id", draftId).maybeSingle();
     if (!draft) return { success: false, error: "Email draft no longer exists." };
     const messageId = `outbox-${draft.id}`;
-    const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`, {
+    // send-outbox-email records the send outcome and updates the draft itself.
+    const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-outbox-email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
       },
-      body: JSON.stringify({
-        templateName: "adhoc-message",
-        recipientEmail: draft.recipient_email,
-        messageId,
-        idempotencyKey: messageId,
-        templateData: { subject: draft.subject, body: draft.body, name: draft.recipient_name || undefined },
-      }),
+      body: JSON.stringify({ draftId: draft.id }),
     });
     const json = await res.json().catch(() => ({}));
-    const status = json?.status || (res.ok ? "queued" : "failed");
-    await sb.from("email_drafts").update({
-      status: status === "suppressed" || status === "failed" ? "blocked" : "queued",
-      delivery_message_id: messageId,
-      delivery_status: status,
-      delivery_error: json?.error || null,
-      delivery_updated_at: new Date().toISOString(),
-    }).eq("id", draft.id);
+    const status = json?.status || (res.ok ? "accepted" : "failed");
     return {
-      success: res.ok && status !== "failed" && status !== "suppressed",
+      success: res.ok && status === "accepted",
       status,
-      message_id: messageId,
-      note: "Queued for sending — this is NOT confirmed inbox delivery. Check CEO Diary → Outbox / Email Status for the real provider outcome.",
+      message_id: json?.message_id || messageId,
+      note: "Accepted by the mail service — this is NOT confirmed inbox delivery. Check CEO Diary → Outbox / Email Status for the real outcome.",
       location: LOCATIONS.email_draft,
       entity_id: draft.id,
       entity_type: "email_draft",
