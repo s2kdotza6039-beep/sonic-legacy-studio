@@ -40,7 +40,8 @@ import ReleaseCountdownAdmin from "@/components/dashboard/ReleaseCountdownAdmin"
 import DailyBriefing from "@/components/dashboard/DailyBriefing";
 import EmailStatus from "@/components/dashboard/EmailStatus";
 import SydneyWorkspace from "@/components/dashboard/SydneyWorkspace";
-import { Target, Bot, MailCheck } from "lucide-react";
+import EnquiryDesk from "@/components/dashboard/EnquiryDesk";
+import { Target, Bot, MailCheck, Inbox } from "lucide-react";
 
 const DESKS = ["Decide", "Foundation", "Grow", "Create", "Protect"] as const;
 
@@ -49,6 +50,7 @@ const TABS = [
   { key: "briefing", label: "Daily Briefing", icon: Sparkles, desk: "Decide" },
   { key: "command", label: "Social Vault", icon: ShieldCheck, desk: "Decide" },
   { key: "content", label: "Content", icon: Film, desk: "Decide" },
+  { key: "enquiries", label: "Enquiry Desk", icon: Inbox, desk: "Decide" },
   { key: "vault", label: "Knowledge Vault", icon: BookLock, desk: "Foundation" },
   { key: "ceo", label: "CEO Diary", icon: BookOpen, desk: "Foundation" },
   { key: "notepad", label: "Notepad", icon: NotebookPen, desk: "Foundation" },
@@ -179,6 +181,7 @@ const Dashboard = () => {
                 <AICommandCentre />
               </div>
             )}
+            {tab === "enquiries" && <EnquiryDesk />}
             {tab === "vault" && <KnowledgeVault />}
             {tab === "ceo" && <CeoDiary />}
             {tab === "notepad" && <CeoNotepad />}
