@@ -34,7 +34,6 @@ import Popia from "./pages/Popia";
 import FloatingAssistant from "./components/FloatingAssistant";
 import PalesaAssistant from "./components/PalesaAssistant";
 import MpumiAssistant from "./components/MpumiAssistant";
-import Unsubscribe from "./pages/Unsubscribe";
 import SandboxPayments from "./pages/SandboxPayments";
 import SecurityRulesDoc from "./pages/SecurityRulesDoc";
 import SecurityHashDrilldown from "./pages/SecurityHashDrilldown";
@@ -92,7 +91,6 @@ const App = () => (
                 <ApprovalQueue />
               </FounderRoute>
             } />
-            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/sandbox/payments" element={
               <FounderRoute>
                 <SandboxPayments />
