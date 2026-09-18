@@ -13,6 +13,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { requireFounderOrService } from "../_shared/authGuard.ts";
+import { sendRawEmail } from "../_shared/send-raw-email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -137,19 +138,17 @@ async function runSchedule(sb: ReturnType<typeof createClient>, s: Schedule) {
         <p><strong>${all.length}</strong> rows over the last ${s.lookback_hours}h (cadence: ${s.cadence}).</p>
         <p>Generated at ${new Date().toISOString()}.</p>
         <pre style="font-size:11px;background:#f5f5f5;padding:8px;overflow:auto">${truncated.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</pre>`;
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/send-transactional-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-        body: JSON.stringify({
-          to: s.destination,
-          recipient_email: s.destination,
-          subject: `[Security] Scheduled audit export — ${s.name} (${all.length} rows)`,
-          html,
-          template_name: "security-alert",
-          idempotency_key: `sched-export-${s.id}-${Date.now()}`,
-        }),
+      const result = await sendRawEmail({
+        to: s.destination,
+        subject: `[Security] Scheduled audit export — ${s.name} (${all.length} rows)`,
+        html,
+        label: "security-scheduled-export",
+        idempotencyKey: `sched-export-${s.id}-${Date.now()}`,
       });
-      return { ok: r.ok, error: r.ok ? null : `${r.status} ${(await r.text()).slice(0, 200)}` };
+      return {
+        ok: result.sent,
+        error: result.sent ? null : "recipient is on the do-not-send list",
+      };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
