@@ -11,6 +11,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { requireFounder, resolveCaller } from "../_shared/authGuard.ts";
+import { sendRawEmail } from "../_shared/send-raw-email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -156,17 +157,13 @@ async function sendOnce(
     if (!r.ok) throw new Error(`webhook ${r.status} ${(await r.text()).slice(0, 200)}`);
     return;
   }
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/send-transactional-email`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-    body: JSON.stringify({
-      to: destination,
-      subject: `[Security] ${ruleName} — ${count} ${kind} events`,
-      html: `<h2>${ruleName}</h2><p><strong>${count}</strong> <code>${kind}</code> events on <code>${source}</code> in the last ${windowMin} minutes (threshold ${threshold}).</p><pre>${JSON.stringify(sample, null, 2).slice(0, 4000)}</pre>`,
-      template_name: "security-alert",
-    }),
+  const result = await sendRawEmail({
+    to: destination,
+    subject: `[Security] ${ruleName} — ${count} ${kind} events`,
+    html: `<h2>${ruleName}</h2><p><strong>${count}</strong> <code>${kind}</code> events on <code>${source}</code> in the last ${windowMin} minutes (threshold ${threshold}).</p><pre>${JSON.stringify(sample, null, 2).slice(0, 4000)}</pre>`,
+    label: "security-alert",
   });
-  if (!r.ok) throw new Error(`email ${r.status} ${(await r.text()).slice(0, 200)}`);
+  if (!result.sent) throw new Error("email not sent: recipient is on the do-not-send list");
 }
 
 const nextBackoff = (attempt: number) =>

@@ -16,6 +16,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { requireFounderOrService } from "../_shared/authGuard.ts";
 import { resolveCaller } from "../_shared/authGuard.ts";
 import { template as dailyReportTemplate } from "../_shared/transactional-email-templates/security-daily-report.tsx";
+import { sendTemplateEmail } from "../_shared/transactional-email-templates/send-email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -199,17 +200,15 @@ Deno.serve(async (req) => {
   const sent: Array<{ to: string; ok: boolean; error?: string }> = [];
   for (const to of recipients) {
     try {
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/send-transactional-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-        body: JSON.stringify({
-          template_name: "security-daily-report",
-          recipient_email: to,
-          templateData,
-          idempotency_key: `security-daily-report-${date}-${to}${idemSuffix}`,
-        }),
+      const result = await sendTemplateEmail("security-daily-report", to, {
+        templateData,
+        idempotencyKey: `security-daily-report-${date}-${to}${idemSuffix}`,
       });
-      sent.push({ to, ok: r.ok, error: r.ok ? undefined : `${r.status} ${(await r.text()).slice(0, 200)}` });
+      sent.push({
+        to,
+        ok: result.sent,
+        error: result.sent ? undefined : "recipient is on the do-not-send list",
+      });
     } catch (e) {
       sent.push({ to, ok: false, error: e instanceof Error ? e.message : String(e) });
     }
