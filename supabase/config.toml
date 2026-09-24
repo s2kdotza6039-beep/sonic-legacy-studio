@@ -23,3 +23,8 @@ verify_jwt = false
 
 [functions.send-outbox-email]
 verify_jwt = true
+
+# Receives signed mail-event webhooks (bounces, complaints, unsubscribes).
+# Deliveries carry a Lovable signature, not a user login, so JWT verification must stay off.
+[functions.handle-email-events]
+verify_jwt = false
