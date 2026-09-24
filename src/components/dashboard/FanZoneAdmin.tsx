@@ -37,6 +37,8 @@ const emptyPost = {
   title: "",
   body: "",
   media_url: "",
+  media_path: "",
+  thumb_path: "",
   thumb_url: "",
   media_type: "image",
   artist_tag: "",
@@ -224,8 +226,8 @@ const FanZoneAdmin = () => {
       body: form.body.trim() || null,
       media_url: form.media_url.trim() || null,
       thumb_url: form.thumb_url.trim() || null,
-      media_path: (form as any).media_path || null,
-      thumb_path: (form as any).thumb_path || null,
+      media_path: form.media_path || null,
+      thumb_path: form.thumb_path || null,
       moderation_status: "pending",
       media_type: form.media_type,
       artist_tag: form.artist_tag.trim() || null,
@@ -411,7 +413,7 @@ const FanZoneAdmin = () => {
               {form.media_url && (
                 <button
                   type="button"
-                  onClick={() => setForm({ ...form, media_url: "" })}
+                  onClick={() => setForm({ ...form, media_url: "", media_path: "", thumb_path: "" })}
                   className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-destructive"
                 >
                   <X size={11} /> Clear media
