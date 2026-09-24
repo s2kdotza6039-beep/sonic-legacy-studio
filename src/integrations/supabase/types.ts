@@ -1344,6 +1344,7 @@ export type Database = {
           created_by: string | null
           id: string
           likes: number
+          media_path: string | null
           media_type: string
           media_url: string | null
           moderated_at: string | null
@@ -1352,6 +1353,7 @@ export type Database = {
           moderation_status: string
           scheduled_at: string | null
           status: string
+          thumb_path: string | null
           thumb_url: string | null
           title: string
           updated_at: string
@@ -1364,6 +1366,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           likes?: number
+          media_path?: string | null
           media_type?: string
           media_url?: string | null
           moderated_at?: string | null
@@ -1372,6 +1375,7 @@ export type Database = {
           moderation_status?: string
           scheduled_at?: string | null
           status?: string
+          thumb_path?: string | null
           thumb_url?: string | null
           title: string
           updated_at?: string
@@ -1384,6 +1388,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           likes?: number
+          media_path?: string | null
           media_type?: string
           media_url?: string | null
           moderated_at?: string | null
@@ -1392,6 +1397,7 @@ export type Database = {
           moderation_status?: string
           scheduled_at?: string | null
           status?: string
+          thumb_path?: string | null
           thumb_url?: string | null
           title?: string
           updated_at?: string
@@ -2982,6 +2988,7 @@ export type Database = {
         Returns: boolean
       }
       has_role_coordinator: { Args: { _user_id: string }; Returns: boolean }
+      is_public_fan_media: { Args: { _name: string }; Returns: boolean }
       reject_ai_draft: {
         Args: { _draft_id: string; _reason?: string }
         Returns: undefined
