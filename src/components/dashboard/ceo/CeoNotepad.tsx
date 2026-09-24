@@ -79,7 +79,7 @@ const CeoNotepad = () => {
     setActiveNote(n);
     setEditTitle(n.title);
     setEditContent(n.content || "");
-    setEditAtt(Array.isArray(n.attachments) ? n.attachments : []);
+    setEditAtt(Array.isArray(n.attachments) ? (n.attachments as unknown as Att[]) : []);
   };
 
   const addImage = () => {
