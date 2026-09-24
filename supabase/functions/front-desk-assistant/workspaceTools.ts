@@ -147,8 +147,8 @@ export const workspaceToolDefs = [
           is_pinned: { type: "boolean" },
           attachments: {
             type: "array",
-            description: "Images to show in the note. Public https image URLs only. Appended to existing attachments when append=true, otherwise replaces them.",
-            items: { type: "object", properties: { url: { type: "string" }, alt: { type: "string" } }, required: ["url"] },
+            description: "Images to show in the note. Each item is EITHER {url: public https link} OR {storage_path: an existing Founder-owned path in private Notepad storage}. Omit to keep existing images. append=true adds; append=false replaces. You cannot upload files from chat.",
+            items: { type: "object", properties: { url: { type: "string" }, storage_path: { type: "string" }, alt: { type: "string" } } },
           },
         },
         required: ["content"],
@@ -431,13 +431,29 @@ export async function handleWorkspaceTool(
       }
       const title = str(args.title, 200) || existing?.title || content.split("\n")[0].slice(0, 60) || "Note from Sydney";
       const rawAtt = Array.isArray(args.attachments) ? args.attachments.slice(0, 20) : null;
-      const newAtt: { type: string; url: string; alt: string }[] = [];
+      const newAtt: Record<string, unknown>[] = [];
       if (rawAtt) {
         for (const a of rawAtt) {
+          const sp = str(a?.storage_path ?? a?.path, 500);
+          if (sp) {
+            if (!ctx.founderId) return { success: false, error: "Storage attachments need an authenticated Founder." };
+            if (!sp.startsWith(`${ctx.founderId}/`) || sp.includes("..") || !/^[\w\-./]+\.(jpe?g|png|webp|gif)$/i.test(sp))
+              return { success: false, error: `Storage path is not in your private Notepad image folder: ${sp}` };
+            const folder = sp.slice(0, sp.lastIndexOf("/"));
+            const fname = sp.slice(sp.lastIndexOf("/") + 1);
+            const { data: objs, error: le } = await sb.storage.from("ceo-note-media").list(folder, { search: fname });
+            if (le || !objs?.some((o: any) => o.name === fname)) return { success: false, error: `Image not found in private storage: ${sp}` };
+            newAtt.push({ type: "image", source: "storage", path: sp, alt: str(a?.alt, 200), name: fname });
+            continue;
+          }
           const url = str(a?.url, 2000);
           if (!/^https:\/\/[^\s]+$/i.test(url)) return { success: false, error: `Invalid image URL (must be public https): ${url || "(empty)"}` };
-          newAtt.push({ type: "image", url, alt: str(a?.alt, 200) });
+          newAtt.push({ type: "image", source: "url", url, alt: str(a?.alt, 200) });
         }
+      }
+      if (existing && rawAtt && args.append) {
+        const total = (Array.isArray(existing.attachments) ? existing.attachments.length : 0) + newAtt.length;
+        if (total > 20) return { success: false, error: "A note can hold at most 20 images." };
       }
       let row: any;
       if (existing) {
