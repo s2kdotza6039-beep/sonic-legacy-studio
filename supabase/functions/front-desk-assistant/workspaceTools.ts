@@ -145,6 +145,11 @@ export const workspaceToolDefs = [
           note_id: { type: "string" },
           append: { type: "boolean", description: "Append to existing note content instead of replacing." },
           is_pinned: { type: "boolean" },
+          attachments: {
+            type: "array",
+            description: "Images to show in the note. Public https image URLs only. Appended to existing attachments when append=true, otherwise replaces them.",
+            items: { type: "object", properties: { url: { type: "string" }, alt: { type: "string" } }, required: ["url"] },
+          },
         },
         required: ["content"],
       },
@@ -425,17 +430,28 @@ export async function handleWorkspaceTool(
         if (!existing) return { success: false, error: "note_id not found." };
       }
       const title = str(args.title, 200) || existing?.title || content.split("\n")[0].slice(0, 60) || "Note from Sydney";
+      const rawAtt = Array.isArray(args.attachments) ? args.attachments.slice(0, 20) : null;
+      const newAtt: { type: string; url: string; alt: string }[] = [];
+      if (rawAtt) {
+        for (const a of rawAtt) {
+          const url = str(a?.url, 2000);
+          if (!/^https:\/\/[^\s]+$/i.test(url)) return { success: false, error: `Invalid image URL (must be public https): ${url || "(empty)"}` };
+          newAtt.push({ type: "image", url, alt: str(a?.alt, 200) });
+        }
+      }
       let row: any;
       if (existing) {
         const nextContent = args.append ? `${existing.content || ""}\n\n${content}`.trim() : content;
         const { data, error } = await sb.from("ceo_notes")
-          .update({ title, content: nextContent, ...(args.is_pinned !== undefined ? { is_pinned: !!args.is_pinned } : {}) })
+          .update({ title, content: nextContent,
+            ...(rawAtt ? { attachments: args.append ? [...(Array.isArray(existing.attachments) ? existing.attachments : []), ...newAtt] : newAtt } : {}),
+            ...(args.is_pinned !== undefined ? { is_pinned: !!args.is_pinned } : {}) })
           .eq("id", existing.id).select().single();
         if (error) return { success: false, error: error.message };
         row = data;
       } else {
         const { data, error } = await sb.from("ceo_notes")
-          .insert({ title, content, is_pinned: !!args.is_pinned }).select().single();
+          .insert({ title, content, is_pinned: !!args.is_pinned, attachments: newAtt }).select().single();
         if (error) return { success: false, error: error.message };
         row = data;
       }
@@ -444,7 +460,7 @@ export async function handleWorkspaceTool(
         location: LOCATIONS.note, summary: `${existing ? "Updated" : "Saved"} note "${row.title}"`,
         before: existing ?? {}, after: row,
       });
-      return { success: true, updated: !!existing, record_id: row.id, title: row.title, location: LOCATIONS.note };
+      return { success: true, updated: !!existing, record_id: row.id, title: row.title, image_count: Array.isArray(row.attachments) ? row.attachments.length : 0, location: LOCATIONS.note };
     }
 
     case "create_or_update_ceo_todo": {

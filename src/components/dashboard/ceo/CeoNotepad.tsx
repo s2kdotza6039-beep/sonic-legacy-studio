@@ -4,13 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pin, Trash2, Save } from "lucide-react";
+import { Plus, Pin, Trash2, Save, ImagePlus, X } from "lucide-react";
+
+type Att = { type?: string; url: string; alt?: string };
+const MD_IMG = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
+const mdImages = (text: string): Att[] => Array.from(text.matchAll(MD_IMG)).map(m => ({ url: m[2], alt: m[1] }));
 
 const CeoNotepad = () => {
   const [notes, setNotes] = useState<any[]>([]);
   const [activeNote, setActiveNote] = useState<any>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [editAtt, setEditAtt] = useState<Att[]>([]);
+  const [newUrl, setNewUrl] = useState("");
   const { toast } = useToast();
 
   const fetchNotes = async () => {
@@ -21,6 +27,7 @@ const CeoNotepad = () => {
       setActiveNote(data[0]);
       setEditTitle(data[0].title);
       setEditContent(data[0].content || "");
+      setEditAtt(Array.isArray(data[0].attachments) ? data[0].attachments : []);
     }
   };
 
@@ -42,13 +49,14 @@ const CeoNotepad = () => {
       setActiveNote(data);
       setEditTitle(data.title);
       setEditContent("");
+      setEditAtt([]);
       fetchNotes();
     }
   };
 
   const saveNote = async () => {
     if (!activeNote) return;
-    const { error } = await supabase.from("ceo_notes").update({ title: editTitle, content: editContent }).eq("id", activeNote.id);
+    const { error } = await supabase.from("ceo_notes").update({ title: editTitle, content: editContent, attachments: editAtt as any }).eq("id", activeNote.id);
     if (error) { toast({ title: "Could not save note", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Note saved" });
     fetchNotes();
@@ -71,7 +79,17 @@ const CeoNotepad = () => {
     setActiveNote(n);
     setEditTitle(n.title);
     setEditContent(n.content || "");
+    setEditAtt(Array.isArray(n.attachments) ? n.attachments : []);
   };
+
+  const addImage = () => {
+    const url = newUrl.trim();
+    if (!/^https:\/\/\S+$/i.test(url)) { toast({ title: "Use a public https image link", variant: "destructive" }); return; }
+    setEditAtt(a => [...a, { type: "image", url, alt: "" }]);
+    setNewUrl("");
+  };
+
+  const shownImages = [...editAtt, ...mdImages(editContent)];
 
   return (
     <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[400px]">
@@ -113,8 +131,27 @@ const CeoNotepad = () => {
               value={editContent}
               onChange={e => setEditContent(e.target.value)}
               className="flex-1 min-h-[300px] resize-none text-sm"
-              placeholder="Start writing..."
+              placeholder="Start writing... (images: ![caption](https://link))"
             />
+            <div className="flex gap-2">
+              <Input value={newUrl} onChange={e => setNewUrl(e.target.value)} placeholder="Paste image link (https://...)" className="text-xs" />
+              <Button size="sm" variant="outline" onClick={addImage} className="gap-1 text-xs shrink-0"><ImagePlus size={12} /> Add image</Button>
+            </div>
+            {shownImages.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {shownImages.map((img, i) => (
+                  <figure key={`${img.url}-${i}`} className="relative border border-border bg-secondary/30">
+                    <a href={img.url} target="_blank" rel="noopener noreferrer">
+                      <img src={img.url} alt={img.alt || "Note image"} loading="lazy" className="w-full h-auto max-h-80 object-contain" />
+                    </a>
+                    {img.alt && <figcaption className="text-xs text-muted-foreground p-2">{img.alt}</figcaption>}
+                    {i < editAtt.length && (
+                      <button onClick={() => setEditAtt(a => a.filter((_, j) => j !== i))} aria-label="Remove image" className="absolute top-1 right-1 bg-background/80 p-1 text-muted-foreground hover:text-destructive"><X size={12} /></button>
+                    )}
+                  </figure>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
