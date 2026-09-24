@@ -27,7 +27,7 @@ const CeoNotepad = () => {
       setActiveNote(data[0]);
       setEditTitle(data[0].title);
       setEditContent(data[0].content || "");
-      setEditAtt(Array.isArray(data[0].attachments) ? data[0].attachments : []);
+      setEditAtt(Array.isArray(data[0].attachments) ? (data[0].attachments as unknown as Att[]) : []);
     }
   };
 
