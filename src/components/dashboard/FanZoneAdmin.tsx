@@ -37,6 +37,8 @@ const emptyPost = {
   title: "",
   body: "",
   media_url: "",
+  media_path: "",
+  thumb_path: "",
   thumb_url: "",
   media_type: "image",
   artist_tag: "",
@@ -50,7 +52,7 @@ const ALLOWED_VIDEO = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"
 // (contract files, careers submissions) so LERATO's uploads never sit beside
 // private founder data.
 const MEDIA_BUCKET = "fan-media-coordinator";
-const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 5; // 5 years — public feed links
+const SIGNED_URL_TTL = 60 * 60; // preview only; public feed signs fresh links from media_path
 const MAX_IMAGE_MB = 10;
 const MAX_VIDEO_MB = 200;
 
@@ -162,6 +164,8 @@ const FanZoneAdmin = () => {
       ...f,
       media_url: signed.signedUrl,
       thumb_url: thumbUrl,
+      media_path: path,
+      thumb_path: thumbUrl ? thumbPath : "",
       media_type: isImage ? "image" : "video",
     }));
     toast({ title: "Media uploaded", description: `${file.name} ready in ${(ms / 1000).toFixed(1)}s.` });
@@ -222,6 +226,8 @@ const FanZoneAdmin = () => {
       body: form.body.trim() || null,
       media_url: form.media_url.trim() || null,
       thumb_url: form.thumb_url.trim() || null,
+      media_path: form.media_path || null,
+      thumb_path: form.thumb_path || null,
       moderation_status: "pending",
       media_type: form.media_type,
       artist_tag: form.artist_tag.trim() || null,
@@ -407,7 +413,7 @@ const FanZoneAdmin = () => {
               {form.media_url && (
                 <button
                   type="button"
-                  onClick={() => setForm({ ...form, media_url: "" })}
+                  onClick={() => setForm({ ...form, media_url: "", media_path: "", thumb_path: "" })}
                   className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-destructive"
                 >
                   <X size={11} /> Clear media

@@ -220,9 +220,26 @@ const Assistant = () => {
       ? `[ATTACHED MEDIA]: ${[...imageFiles, ...audioFiles, ...docFiles].map(a => `${a.kind === "file" ? "document" : a.kind}: ${a.name}`).join(", ")}\n\n`
       : "";
 
+    // Save chat images to the Founder's private Notepad storage so Sydney can attach them to notes.
+    const stored: string[] = [];
+    const EXTS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+    for (const a of imageFiles) {
+      try {
+        const blob = await (await fetch(a.content)).blob();
+        const ext = EXTS[blob.type];
+        if (!ext || !user) continue;
+        if (blob.size > 10 * 1024 * 1024) { toast({ title: `${a.name} is over 10 MB`, description: "Sydney can see it, but it wasn't saved to Notepad storage.", variant: "destructive" }); continue; }
+        const path = `${user.id}/chat/${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage.from("ceo-note-media").upload(path, blob, { contentType: blob.type, upsert: false });
+        if (error) toast({ title: `Couldn't store ${a.name}`, description: error.message, variant: "destructive" });
+        else stored.push(`${a.name} → ${path}`);
+      } catch { /* non-image data */ }
+    }
+    const storedNote = stored.length ? `[STORED CHAT IMAGES — use storage_path to attach to a note]: ${stored.join(", ")}\n\n` : "";
+
     const userMsg: Msg = {
       role: "user",
-      content: `${attachBlock}${mediaNote}${input.trim()}`,
+      content: `${attachBlock}${mediaNote}${storedNote}${input.trim()}`,
       images: imageFiles.length ? imageFiles.map(a => a.content) : undefined,
       audio: audioFiles.length ? audioFiles.map(a => a.content) : undefined,
       files: docFiles.length ? docFiles.map(a => ({ name: a.name, mime: a.mime || "application/octet-stream", base64: a.base64 || "" })) : undefined,

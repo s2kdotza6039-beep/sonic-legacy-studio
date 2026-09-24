@@ -147,7 +147,7 @@ export const workspaceToolDefs = [
           is_pinned: { type: "boolean" },
           attachments: {
             type: "array",
-            description: "Images to show in the note. Each item is EITHER {url: public https link} OR {storage_path: an existing Founder-owned path in private Notepad storage}. Omit to keep existing images. append=true adds; append=false replaces. You cannot upload files from chat.",
+            description: "Images to show in the note. Each item is EITHER {url: public https link} OR {storage_path: an existing Founder-owned path in private Notepad storage}. Omit to keep existing images. append=true adds; append=false replaces. Images the Founder attaches in chat are auto-saved to private storage and listed in the message under [STORED CHAT IMAGES] — use those storage_path values.",
             items: { type: "object", properties: { url: { type: "string" }, storage_path: { type: "string" }, alt: { type: "string" } } },
           },
         },

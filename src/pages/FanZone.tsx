@@ -63,7 +63,7 @@ const FanZone = () => {
       const [{ data: p }, { data: m }] = await Promise.all([
         supabase
           .from("fan_posts")
-          .select("id, title, body, media_url, media_type, thumb_url, artist_tag, likes, views, created_at")
+          .select("id, title, body, media_url, media_type, thumb_url, media_path, thumb_path, artist_tag, likes, views, created_at")
           .eq("status", "published")
           .order("created_at", { ascending: false })
           .limit(50),
@@ -75,7 +75,18 @@ const FanZone = () => {
           .order("created_at", { ascending: false })
           .limit(30),
       ]);
-      setPosts((p as FanPost[]) ?? []);
+      const rows = ((p ?? []) as any[]);
+      const paths = rows.flatMap((r) => [r.media_path, r.thumb_path]).filter(Boolean) as string[];
+      if (paths.length) {
+        const { data: signed } = await supabase.storage.from("fan-media-coordinator").createSignedUrls(paths, 60 * 60 * 6);
+        const map: Record<string, string> = {};
+        signed?.forEach((d) => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl; });
+        rows.forEach((r) => {
+          if (r.media_path && map[r.media_path]) r.media_url = map[r.media_path];
+          if (r.thumb_path && map[r.thumb_path]) r.thumb_url = map[r.thumb_path];
+        });
+      }
+      setPosts(rows as FanPost[]);
       setMessages((m as FanMessage[]) ?? []);
       setLoading(false);
     })();
