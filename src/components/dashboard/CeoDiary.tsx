@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, CheckSquare, Plane, Bell, BookOpen, Mail } from "lucide-react";
+import { CalendarDays, Users, CheckSquare, Plane, Bell, BookOpen, Mail, Brain } from "lucide-react";
+import SydneyMemoryPanel from "./ceo/SydneyMemoryPanel";
 import CeoCalendar from "./ceo/CeoCalendar";
 import CeoContacts from "./ceo/CeoContacts";
 import CeoTodos from "./ceo/CeoTodos";
@@ -23,6 +24,7 @@ const CeoDiary = () => {
           <TabsTrigger value="outbox" className="text-xs gap-1"><Mail size={12} /> Outbox</TabsTrigger>
           <TabsTrigger value="touring" className="text-xs gap-1"><Plane size={12} /> Touring</TabsTrigger>
           <TabsTrigger value="subscriptions" className="text-xs gap-1"><Bell size={12} /> Subscriptions</TabsTrigger>
+          <TabsTrigger value="memory" className="text-xs gap-1"><Brain size={12} /> Sydney Memory</TabsTrigger>
         </TabsList>
 
         <TabsContent value="calendar"><CeoCalendar /></TabsContent>
@@ -31,6 +33,7 @@ const CeoDiary = () => {
         <TabsContent value="outbox"><CeoOutbox /></TabsContent>
         <TabsContent value="touring"><TouringLog /></TabsContent>
         <TabsContent value="subscriptions"><SubscriptionsTracker /></TabsContent>
+        <TabsContent value="memory"><SydneyMemoryPanel /></TabsContent>
       </Tabs>
     </div>
   );
