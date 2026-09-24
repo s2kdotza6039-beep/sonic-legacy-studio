@@ -664,6 +664,7 @@ export type Database = {
       }
       ceo_notes: {
         Row: {
+          attachments: Json
           content: string | null
           created_at: string
           id: string
@@ -672,6 +673,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attachments?: Json
           content?: string | null
           created_at?: string
           id?: string
@@ -680,6 +682,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachments?: Json
           content?: string | null
           created_at?: string
           id?: string
