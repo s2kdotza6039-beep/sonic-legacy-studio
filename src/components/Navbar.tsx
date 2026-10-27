@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import Logo from "./Logo";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const navLinks = [
   { label: "Home", path: "/" },
@@ -21,6 +23,18 @@ const navLinks = [
 const Navbar = () => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+  const { isFounder, isCoordinator, loading } = useUserRole();
+  const [rolesReady, setRolesReady] = useState(false);
+
+  // Only reveal the private link once the role lookup has settled,
+  // so it never flickers in for signed-out visitors.
+  useEffect(() => {
+    if (!loading) setRolesReady(true);
+  }, [loading]);
+
+  const showWorkspace = rolesReady && !!user && isFounder;
+  const showCoordinatorWorkspace = rolesReady && !!user && isCoordinator && !isFounder;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
@@ -40,6 +54,30 @@ const Navbar = () => {
               {link.label}
             </Link>
           ))}
+          {showWorkspace && (
+            <Link
+              to="/dashboard"
+              className={`text-sm uppercase tracking-widest text-primary hover:text-primary ${
+                location.pathname.startsWith("/dashboard")
+                  ? "underline underline-offset-4"
+                  : ""
+              }`}
+            >
+              Workspace
+            </Link>
+          )}
+          {showCoordinatorWorkspace && (
+            <Link
+              to="/coordinator-workspace"
+              className={`text-sm uppercase tracking-widest text-primary hover:text-primary ${
+                location.pathname.startsWith("/coordinator-workspace")
+                  ? "underline underline-offset-4"
+                  : ""
+              }`}
+            >
+              My Desk
+            </Link>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -68,6 +106,24 @@ const Navbar = () => {
                 {link.label}
               </Link>
             ))}
+            {showWorkspace && (
+              <Link
+                to="/dashboard"
+                onClick={() => setOpen(false)}
+                className="text-sm uppercase tracking-widest text-primary"
+              >
+                Workspace
+              </Link>
+            )}
+            {showCoordinatorWorkspace && (
+              <Link
+                to="/coordinator-workspace"
+                onClick={() => setOpen(false)}
+                className="text-sm uppercase tracking-widest text-primary"
+              >
+                My Desk
+              </Link>
+            )}
           </div>
         </div>
       )}
